@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞与私密报告
+    url: https://github.com/zbwork/zhiban-ai/security/policy
+    about: 请先阅读安全政策，不要在公开 Issue 中提交漏洞细节。

@@ -1,0 +1,93 @@
+# dsh-runtime 员工装配基座（P1 可干活版）。
+# assemble/cordis.ts 只覆盖三处：system-prompt.persona（员工人设）、
+# session-persistence-jsonl.root（会话落点）、skill-filesystem.customSkillDirs（P3）。
+# 纪律：不挂 stdout logger（stdout 只走协议帧）；jsonrpc 必须最后一行。
+#
+# 工具/沙箱说明：
+# - sandbox-policy mode=workspace-write：写操作由内核沙箱限制在会话工作区
+#   （每会话的 initialize.cwd = /data/tenants/<t>/<u>）内，kernel 强制。
+# - approval policy=never：P1 的 JSON-RPC wire 无 HITL 审批回传（P3 的已知开口），
+#   保留 'ask' 会让工具卡在等审批直到 turn 超时。因此 P1 用 never + 沙箱写边界兜底。
+- id: llm
+  name: '@deepseek-ai/dsh-llm'
+- id: session
+  name: '@deepseek-ai/dsh-session'
+- id: credentials
+  name: '@deepseek-ai/dsh-credentials-local'
+- id: agent
+  name: '@deepseek-ai/dsh-agent'
+- id: session-persistence-jsonl
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: ./sessions
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'
+- id: sandbox
+  name: '@deepseek-ai/dsh-sandbox-local'
+- id: sandbox-policy
+  name: '@deepseek-ai/dsh-sandbox-policy'
+  config:
+    mode: workspace-write
+- id: bash-sandbox
+  name: '@deepseek-ai/dsh-bash-sandbox'
+  config:
+    timeoutMs: 60000
+- id: approval
+  name: '@deepseek-ai/dsh-user-approval'
+  config:
+    policy: never
+- id: permission
+  name: '@deepseek-ai/dsh-permission-presets'
+  config:
+    presets:
+      read-only:
+        sandbox: read-only
+        approval: never
+      workspace-write:
+        sandbox: workspace-write
+        approval: never
+      danger-full-access:
+        sandbox: danger-full-access
+        approval: never
+- id: shell-env
+  name: '@deepseek-ai/dsh-shell-env'
+- id: fs-observation-policy
+  name: '@deepseek-ai/dsh-fs-observation-policy'
+- id: fs-sandbox
+  name: '@deepseek-ai/dsh-fs-sandbox'
+- id: tools
+  name: '@deepseek-ai/dsh-tools'
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+- id: tool-str-replace-editor
+  name: '@deepseek-ai/dsh-tool-str-replace-editor'
+  config:
+    maxOutputChars: 16000
+# 技能（ZAP-1.1 §11 / F03）：注册表 + 文件系统发现 + 模型侧目录/加载工具，与 dsh-base 同款三件。
+# customSkillDirs 由 assemble 填：[员工静态 skills 目录, 会话 skills 目录(Bus 下发的包落盘处)]。
+# includeDefaultRoots=false：不扫 cwd/.dsh/skills、$DSH_HOME/skills、~/.agents/skills——技能只来自平台。
+- id: skill
+  name: '@deepseek-ai/dsh-skill'
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    includeDefaultRoots: false
+    customSkillDirs: []
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+  config:
+    persona: ''
+- id: agent-loop
+  name: '@deepseek-ai/dsh-agent-loop'
+  config:
+    agents: []
+- id: jsonrpc
+  name: '@deepseek-ai/dsh-sdk-jsonrpc-server'

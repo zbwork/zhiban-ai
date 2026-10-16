@@ -1,0 +1,5 @@
+.dart_tool/
+.flutter-plugins-dependencies
+build/
+coverage/
+test/preview/failures/

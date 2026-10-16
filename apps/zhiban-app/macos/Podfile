@@ -1,0 +1,73 @@
+platform :osx, '12.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'ephemeral', 'Flutter-Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure \"flutter pub get\" is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Flutter-Generated.xcconfig, then run \"flutter pub get\""
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_macos_podfile_setup
+
+# Workaround for Flutter 3.35.x podhelper parsing bug:
+# DART_DEFINES contains base64 values ending with "=", which breaks split('=')
+# when parsing Flutter-Generated.xcconfig.
+def flutter_parse_xcconfig_file(file)
+  file_abs_path = File.expand_path(file)
+  return [] unless File.exist? file_abs_path
+
+  entries = {}
+  skip_line_start_symbols = ['#', '/']
+  File.foreach(file_abs_path) do |line|
+    next if skip_line_start_symbols.any? { |symbol| line =~ /^\s*#{symbol}/ }
+    next if line.strip.empty?
+
+    key_value_pair = line.split('=', 2)
+    if key_value_pair.length == 2
+      entries[key_value_pair[0].strip] = key_value_pair[1].strip
+    else
+      puts "Invalid key/value pair: #{line}"
+    end
+  end
+  entries
+end
+
+target 'Runner' do
+  use_frameworks!
+
+  pod 'Sparkle'
+
+  # F16 RTC: 本地 vendored DingRTC macOS SDK (二进制不入库, 见 Frameworks/DingRTC/README.md)。
+  pod 'DingRTC', :path => 'Frameworks/DingRTC'
+
+  flutter_install_all_macos_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_macos_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '12.0'
+    end
+  end
+end

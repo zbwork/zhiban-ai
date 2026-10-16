@@ -1,0 +1,12 @@
+**
+!apps/
+!apps/agent-bus-admin/
+!apps/agent-bus-admin/**
+!deploy/
+!deploy/community/
+!deploy/community/admin.nginx.conf
+apps/agent-bus-admin/node_modules/
+apps/agent-bus-admin/dist/
+apps/agent-bus-admin/dist-community/
+apps/agent-bus-admin/.env*
+apps/agent-bus-admin/output/

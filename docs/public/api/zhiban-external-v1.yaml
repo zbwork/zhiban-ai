@@ -1,0 +1,2024 @@
+openapi: 3.1.0
+info:
+  title: 知办AI External API
+  version: v1
+  description: |
+    外部系统通过 API Key (`ek_`)、接入方 Agent 服务通过 Session Token (`st_`)，或 H5 应用后端通过应用 OAuth JWT (`eyJ...`) 调用知办AI 的对外接口。
+
+    - 鉴权: `Authorization: Bearer <token>`
+    - 路径前缀: `/api/external/v1/*`
+    - 权限模型: API Key 使用 `tenant.*` scope；应用 OAuth JWT 只接受 `kb.read` / `contacts.read`，并仅映射到对应只读接口。
+    - 读取见 [开发者文档 / 鉴权与凭证](../openapi/authentication.md)。
+
+    当前已开放：**鉴权 + 用户登录 token introspection + 知识库（增 / 查 / 检索） + 组织架构同步（成员 / 部门 / 职位 CRUD + 增量查询）+ 系统通知 + 主动发送聊天消息**。
+
+servers:
+  - url: https://api.example.com
+    description: 生产 (待上线)
+  - url: https://test-api.example.com
+    description: 测试
+
+security:
+  - apiKey: []
+  - sessionToken: []
+
+tags:
+  - name: auth
+    description: Agent 凭证换 Session Token；H5 应用交换授权码或刷新令牌
+  - name: knowledge
+    description: 知识库 / 文档 / 检索
+  - name: memory
+    description: 记忆（召回 / 写入数字员工的长期与会话记忆）
+  - name: org
+    description: 组织架构同步（成员 / 部门 / 职位 CRUD + 增量查询 + webhook 通知）
+  - name: notification
+    description: 系统通知（触发目标知办用户与指定知办数字员工的对话通知）
+  - name: chat
+    description: 主动发送聊天消息（按 EMP 标准向目标数字员工直聊写入结构化消息）
+  - name: audit
+    description: 审计场景专用（跨用户读私有 KB）
+
+paths:
+  /.well-known/openid-configuration:
+    get:
+      summary: 获取单点登录发现配置
+      tags: [auth]
+      security: []
+      responses:
+        '200':
+          description: 环境级 issuer、token endpoint、JWKS 地址和已支持 scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenIDConfiguration'
+
+  /.well-known/jwks.json:
+    get:
+      summary: 获取应用令牌验签公钥
+      tags: [auth]
+      security: []
+      responses:
+        '200':
+          description: 当前 active 与 retiring RSA 公钥集合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWKS'
+        '503':
+          description: 验签公钥暂时不可用
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: '{"error":"keys_unavailable"}'
+
+  # ============================================================================
+  # 鉴权
+  # ============================================================================
+  /api/external/v1/oauth/token:
+    post:
+      summary: 换取或刷新 Agent / H5 应用令牌
+      description: |
+        同一 token endpoint 支持 Agent 服务和 H5 应用后端：
+
+        - `client_credentials`：Agent SDK 凭证换 Session Token (`st_...`)
+        - `runtime_access`：运行时凭证换绑定租户和 Runtime 的 Session Token；A2A 可选绑定数字员工
+        - `authorization_code`：H5 应用后端用一次性 code 换 Access / ID / Refresh Token
+        - `refresh_token`：H5 应用轮换 Refresh Token 并取得一组新令牌
+
+        - 本接口**不需要**额外鉴权头（凭证本身即鉴权）
+        - Agent Runtime 使用 `grant_type=runtime_access`，必须传 `tenant_id`；知识库的 `agent_id` 在检索业务请求中传，不属于换发参数
+        - 普通非 Agent 的租户机器集成可继续使用 `grant_type=client_credentials`
+        - H5 应用的 client_secret 只能由对方系统后端保管；授权码和 Refresh Token 均为一次性消费
+        - 标准请求格式为 `application/x-www-form-urlencoded`；当前继续兼容已有 JSON 调用
+        - 本接口是 OAuth2 token endpoint，成功响应不使用 `{success, code, message, data}` 业务信封；`access_token` 位于顶层
+        - 客户端认证失败统一返 401（不区分 client_id 不存在 / secret 错 / 已撤销，防爆破）；授权码或 Refresh Token 无效时错误消息包含 `invalid_grant`
+        - 当前错误响应沿用 Bus `{success, code, message}` 信封；成功响应才使用 OAuth2 顶层 token 字段
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OAuthTokenRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthTokenRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          description: 同一 client_id 请求过于频繁
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/external/v1/auth/introspect:
+    post:
+      summary: 解码并校验知办用户登录 token
+      description: |
+        业务方系统间调用时，被调用方系统后端用自己的租户 API Key 调本接口，校验调用方透传的知办用户登录 token。
+
+        - 需要 `tenant.auth.introspect` scope
+        - 只接受 `ek_` API Key，不接受 `st_`
+        - token 无效、过期、撤销或跨租户时统一返回 `active=false`
+      tags: [auth]
+      security:
+        - apiKey: [tenant.auth.introspect]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenIntrospectionRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenIntrospectionResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================================================
+  # 知识库 CRUD（当前外部 API：增 / 查 / 检索；改 / 删未开放）
+  # ============================================================================
+  /api/external/v1/knowledge-bases:
+    get:
+      summary: 列出本租户的知识库
+      description: |
+        返回本租户的**租户级**知识库列表（不含员工个人私有 KB）。
+        - API Key / Session Token 需要 `tenant.kb.read`；H5 应用 JWT 需要 `kb.read`。
+      tags: [knowledge]
+      security:
+        - apiKey: [tenant.kb.read]
+        - sessionToken: [tenant.kb.read]
+        - appOAuth: [kb.read]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KBListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: 创建知识库（租户级）
+      description: |
+        创建一个**租户级**知识库。外部 API 不允许创建员工个人 KB——`space_kind` 和 `visibility` 由系统强制设为 `tenant`，请求体里填了也被忽略。
+        - 需要 `tenant.kb.write` scope。
+      tags: [knowledge]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKBRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KBResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/external/v1/knowledge-bases/{knowledge_base_id}:
+    get:
+      summary: 查看知识库详情
+      description: |
+        返回单个知识库的元信息（名称、描述、文档数等）。
+        - 需要 `tenant.kb.read` scope。
+        - 跨租户或不可见统一返 404。
+      tags: [knowledge]
+      security:
+        - apiKey: [tenant.kb.read]
+        - sessionToken: [tenant.kb.read]
+        - appOAuth: [kb.read]
+      parameters:
+        - in: path
+          name: knowledge_base_id
+          required: true
+          schema: { type: string, format: uuid }
+          description: 知识库的对外 UUID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KBResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/external/v1/knowledge-bases/{knowledge_base_id}/documents:
+    get:
+      summary: 列出知识库文档
+      description: |
+        返回指定知识库的文档列表（最多 200 条）。
+        - 需要 `tenant.kb.read` scope。
+        - 仅能访问本租户内的 KB；跨租户访问统一返 `404 kb.not_found`（防探测）。
+        - KB visibility=private 时仅创建者可见。
+      tags: [knowledge]
+      security:
+        - apiKey: [tenant.kb.read]
+        - sessionToken: [tenant.kb.read]
+        - appOAuth: [kb.read]
+      parameters:
+        - in: path
+          name: knowledge_base_id
+          required: true
+          schema: { type: string, format: uuid }
+          description: KB 的对外 UUID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      summary: 上传文档到知识库
+      description: |
+        往指定知识库上传一份文档。支持两种请求格式：
+
+        **方式 A：multipart/form-data**（推荐，能传文件名）
+        - `file`：二进制文件（必填）
+        - `title`：文档标题（可选，留空用文件名）
+        - `mime_type`：MIME 类型（可选，留空用 file 的 Content-Type）
+
+        **方式 B：裸 body**
+        - body 是文件原始字节
+        - `?title=...`、`?mime_type=...` 通过 URL 参数提供
+
+        - 需要 `tenant.kb.write` scope
+        - 文档大小上限 **4 MiB**
+        - 上传后异步切片，初始 `status: ingesting`，完成后变 `ready`
+      tags: [knowledge]
+      parameters:
+        - in: path
+          name: knowledge_base_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: title
+          required: false
+          schema: { type: string }
+          description: 仅方式 B 用
+        - in: query
+          name: mime_type
+          required: false
+          schema: { type: string }
+          description: 仅方式 B 用
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                title: { type: string }
+                mime_type: { type: string }
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/external/v1/knowledge-bases/{knowledge_base_id}/documents/{document_id}:
+    get:
+      summary: 查看文档详情
+      description: |
+        返回单个文档的元信息（标题、大小、切片数、状态等）。
+        - 需要 `tenant.kb.read` scope。
+      tags: [knowledge]
+      security:
+        - apiKey: [tenant.kb.read]
+        - sessionToken: [tenant.kb.read]
+        - appOAuth: [kb.read]
+      parameters:
+        - in: path
+          name: knowledge_base_id
+          required: true
+          schema: { type: string, format: uuid }
+          description: KB 的对外 UUID
+        - in: path
+          name: document_id
+          required: true
+          schema: { type: string, format: uuid }
+          description: 文档 UUID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/external/v1/knowledge-bases/{knowledge_base_id}/retrieve:
+    post:
+      summary: 语义检索（RAG 核心接口）
+      description: |
+        对指定知识库做语义检索，返回最相关的若干 chunks。接入方 Agent 服务在对话时拉取上下文用。
+
+        - 需要 `tenant.kb.read` scope
+        - 默认 `top_k=5`、`threshold=0.2`
+      tags: [knowledge]
+      security:
+        - apiKey: [tenant.kb.read]
+        - sessionToken: [tenant.kb.read]
+        - appOAuth: [kb.read]
+      parameters:
+        - in: path
+          name: knowledge_base_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetrieveRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetrieveResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/external/v1/knowledge/retrieve:
+    post:
+      summary: 按当前数字员工检索已关联知识库
+      description: |
+        只接受 `runtime_access` 换出的 `st_`。请求体必须传 `agent_id + query`；服务端从 token 读取 tenant/runtime，逐次校验 Agent 后按 canonical `agent_kb_bindings` 聚合检索。若 token 已绑定 Agent，请求 Agent 必须一致。
+
+        - 需要 `tenant.kb.read`（兼容 `kb.read` / `zhiban.kb.search`）
+        - Agent 没有关联知识库或没有命中时返回 200 + `items=[]`
+        - `ek_` 或非 runtime_access 的 `st_` 均拒绝
+      tags: [knowledge]
+      security:
+        - sessionToken: [tenant.kb.read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentKnowledgeRetrieveRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentKnowledgeRetrieveResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================================================
+  # 记忆（召回 / 写入；forget / 列举 / 审计未开放，见路线图）
+  # ============================================================================
+  /api/external/v1/memories/recall:
+    post:
+      summary: 语义召回（RAG 核心接口）
+      description: |
+        按五维上下文召回最相关的记忆项，供 Agent 在对话中按需取用。
+
+        - 需要 `tenant.memory.read` scope
+        - `tenant_id` 从凭证解出，**调用方不要传**；`user_id / agent_id / session_id` 必填
+        - 底层引擎部分失败时降级返回（`data.degraded=true`），不报错，以免阻断对话
+      tags: [memory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryRecallRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryRecallResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/external/v1/memories/events:
+    post:
+      summary: 写入记忆事件
+      description: |
+        写一段自然语言，底层引擎自行抽取 / 沉淀为可召回的记忆。
+
+        - 需要 `tenant.memory.write` scope
+        - `tenant_id` 从凭证解出，**调用方不要传**；`user_id / agent_id / session_id` 必填
+        - 只写真正值得长期记住的事实 / 偏好 / 决定，避免污染后续召回
+      tags: [memory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryWriteRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryWriteResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/external/v1/memories:
+    get:
+      summary: 列举（检视）记忆
+      description: |
+        列出某 scope 下已存的记忆，用于自查「到底记了啥」。GET 无 body，
+        `tenant_id` 从凭证解出，`user_id / agent_id / session_id` 走 query 参数。
+
+        - 需要 `tenant.memory.read` scope
+        - `scope` 省略走 `user_long_term`
+        - 返回结构同召回（`data.items` + `data.degraded`），`id` 可用于 DELETE 遗忘
+      tags: [memory]
+      parameters:
+        - { name: user_id, in: query, required: true, schema: { type: string } }
+        - { name: agent_id, in: query, required: true, schema: { type: string } }
+        - { name: session_id, in: query, required: true, schema: { type: string } }
+        - { name: group_id, in: query, required: false, schema: { type: string } }
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [user_long_term, agent_private, session, group_shared]
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 10 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryRecallResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/external/v1/memories/{id}:
+    delete:
+      summary: 遗忘（删除）一条记忆
+      description: |
+        按 `id`（先前召回 / 列举拿到的）删除一条记忆。
+
+        - 需要 `tenant.memory.write` scope
+        - **归属校验**：服务端先确认该 `id` 属于本租户本用户才删除；
+          不属于的（别人的 / 不存在 / 跨 scope）计入 `rejected`，不会被删
+      tags: [memory]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: user_id, in: query, required: true, schema: { type: string } }
+        - { name: agent_id, in: query, required: true, schema: { type: string } }
+        - { name: session_id, in: query, required: true, schema: { type: string } }
+        - { name: group_id, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryForgetResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================================================
+  # 组织架构同步（成员 / 部门 / 职位 CRUD + 增量查询）
+  # ============================================================================
+
+  # --- Departments ---
+  /api/external/v1/org/departments:
+    get:
+      summary: 列出部门（支持增量查询）
+      description: |
+        游标分页列出本租户的部门树。支持 `updated_since` 增量查询（含已删除 tombstone）。
+        - API Key (`ek_`) 需要 `tenant.org.read` scope
+        - Session Token (`st_`) 需要 `org.read` capability
+        - H5 应用 JWT (`eyJ...`) 需要 `contacts.read`，且只能调用 GET 接口
+      security:
+        - apiKey: []
+        - sessionToken: []
+        - appOAuth: [contacts.read]
+      tags: [org]
+      parameters:
+        - in: query
+          name: cursor
+          schema: { type: string }
+          description: 上一页返回的 next_cursor
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: updated_since
+          schema: { type: string, format: date-time }
+          description: RFC3339 时间戳；传此参数时返回含已删除（status=deleted）的 tombstone
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: 创建部门
+      security:
+        - apiKey: []
+      tags: [org]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDepartmentRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '409':
+          description: third_department_id 冲突
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Response' }
+
+  /api/external/v1/org/departments/{department_id}:
+    get:
+      summary: 查看部门详情
+      security:
+        - apiKey: []
+        - sessionToken: []
+        - appOAuth: [contacts.read]
+      tags: [org]
+      parameters:
+        - in: path
+          name: department_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: 更新部门
+      security:
+        - apiKey: []
+      tags: [org]
+      parameters:
+        - in: path
+          name: department_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDepartmentRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: third_department_id 冲突或循环依赖
+    delete:
+      summary: 删除部门
+      description: |
+        软删除部门。硬约束：
+        - 根部门（depth=0）不可删除 → 409
+        - 有子部门的不可删除 → 409
+        - 有成员的不可删除 → 409
+      security:
+        - apiKey: []
+      tags: [org]
+      parameters:
+        - in: path
+          name: department_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: No Content
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 不可删除（根部门 / 有子部门 / 有成员）
+
+  # --- Members ---
+  /api/external/v1/org/members:
+    get:
+      summary: 列出成员（支持增量查询）
+      description: |
+        游标分页列出本租户的成员。`updated_since` 启用增量模式（含 status=left 的 tombstone）。
+        - 成员标识: `account_id`（当前值为 accounts 稳定 UUID，作为 opaque string 使用）
+        - API Key (`ek_`) 需要 `tenant.org.read` scope
+        - Session Token (`st_`) 需要 `org.read` capability
+        - H5 应用 JWT (`eyJ...`) 需要 `contacts.read`，且只能调用 GET 接口
+      security:
+        - apiKey: []
+        - sessionToken: []
+        - appOAuth: [contacts.read]
+      tags: [org]
+      parameters:
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: updated_since
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberListResponse'
+    post:
+      summary: 添加成员
+      description: |
+        通过 phone 或 email 查找已有账号或自动创建，并将其加入本租户。
+        - 需要 `tenant.org.write` scope
+      security:
+        - apiKey: []
+      tags: [org]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMemberRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '409':
+          description: 该账号已是租户成员
+
+  /api/external/v1/org/members/{account_id}:
+    get:
+      summary: 查看成员详情
+      security:
+        - apiKey: []
+        - sessionToken: []
+        - appOAuth: [contacts.read]
+      tags: [org]
+      parameters:
+        - in: path
+          name: account_id
+          required: true
+          schema: { type: string, format: uuid }
+          description: 成员的稳定 account ID（opaque string）
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: 更新成员信息
+      security:
+        - apiKey: []
+      tags: [org]
+      parameters:
+        - in: path
+          name: account_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: 移除成员
+      description: |
+        软删除成员（status → left）。不删除 accounts 行。
+        硬约束：持有 `tenant.admin` 角色的成员**不可**通过 External API 移除 → 403。
+      security:
+        - apiKey: []
+      tags: [org]
+      parameters:
+        - in: path
+          name: account_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: No Content
+        '403':
+          description: 不可移除租户管理员
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # --- Positions ---
+  /api/external/v1/org/positions:
+    get:
+      summary: 列出职位（支持增量查询）
+      security:
+        - apiKey: []
+        - sessionToken: []
+        - appOAuth: [contacts.read]
+      tags: [org]
+      parameters:
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: updated_since
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionListResponse'
+    post:
+      summary: 创建职位
+      security:
+        - apiKey: []
+      tags: [org]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePositionRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionResponse'
+        '409':
+          description: third_position_id 冲突
+
+  /api/external/v1/org/positions/{position_id}:
+    get:
+      summary: 查看职位详情
+      security:
+        - apiKey: []
+        - sessionToken: []
+        - appOAuth: [contacts.read]
+      tags: [org]
+      parameters:
+        - in: path
+          name: position_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      summary: 更新职位
+      security:
+        - apiKey: []
+      tags: [org]
+      parameters:
+        - in: path
+          name: position_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePositionRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: third_position_id 冲突
+    delete:
+      summary: 删除职位
+      security:
+        - apiKey: []
+      tags: [org]
+      parameters:
+        - in: path
+          name: position_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: No Content
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # 系统通知
+  # ============================================================================
+  /api/external/v1/notifications/agent-conversation:
+    post:
+      summary: 发送知办数字员工对话通知
+      description: |
+        外部系统向当前租户内的目标知办用户发送一条即时通知。通知不会写入聊天记录；桌面端弹出 `title` / `description`，点击进入对应会话。
+
+        - 使用 API Key (`ek_`) 调用；不接受管理员 JWT。
+        - 需要 `tenant.notification.write` scope。
+        - `user_id` 是目标知办用户账号 ID，值为知办平台稳定 UUID，必须是当前租户有效成员；已删除的 `account_uuid` / `user_uuid` 会返回 HTTP `400` 。
+        - `agent_id` 是知办数字员工 ID，值为知办平台稳定 UUID，必须对目标知办用户可见；已删除的 `agent_uuid` 会返回 HTTP `400` 。
+        - `user_id + agent_id` 对应目标知办用户与知办数字员工的一条直聊会话；服务端会准备或复用该 conversation，并在响应里返回 `conversation_id`。
+        - 不支持外部 URL 跳转；点击通知固定进入知办AI内的知办数字员工对话。
+      tags: [notification]
+      security:
+        - apiKey: [tenant.notification.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentConversationNotificationRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConversationNotificationResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # 主动发送聊天消息
+  # ============================================================================
+  /api/external/v1/chat/messages:
+    post:
+      summary: 主动发送数字员工聊天消息
+      description: |
+        外部系统或外部 Agent 服务按 EMP 标准向目标知办用户与指定数字员工的直聊会话写入一条结构化 Agent 消息。
+
+        - 使用 API Key (`ek_`) 调用；不接受管理员 JWT。
+        - 需要 `tenant.chat.message.write` scope。
+        - `target.type` v1 固定为 `agent_conversation`，即 `target.user_id + target.agent_id` 对应的一条数字员工直聊。
+        - `message.blocks` 是唯一消息正文，必须是 EMP registry 中状态为 `stable` 的标准 block；服务端不做 fallback、不压平文本。
+      tags: [chat]
+      security:
+        - apiKey: [tenant.chat.message.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentChatMessageRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentChatMessageResponse'
+        '400':
+          $ref: '#/components/responses/InvalidParams'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          description: WuKongIM 投递失败
+
+  # ============================================================================
+  # 跨用户审计场景（独立 scope, 自动写审计）
+  # ============================================================================
+  /api/external/v1/users/{user_id}/knowledge-bases:
+    get:
+      summary: 跨用户列出私有 KB（审计）
+      description: |
+        以租户管理员审计身份，列出**指定用户**的个人私有知识库**元信息**（不含文档内容）。
+        - 需要 `tenant.kb.list_user_private` scope（独立的更严范围）
+        - 调用会自动写入审计日志（事件类型 `tenant.admin.user_kb_inspect`）
+      tags: [knowledge, audit]
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema: { type: string, format: uuid }
+          description: 目标用户的 UUID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KBListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/external/v1/users/{user_id}/knowledge-bases/{knowledge_base_id}:
+    get:
+      summary: 跨用户查看私有 KB 详情（审计）
+      description: |
+        查看指定用户私有 KB 的元信息。
+        - 需要 `tenant.kb.list_user_private` scope
+        - 写审计日志
+      tags: [knowledge, audit]
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: knowledge_base_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KBResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/external/v1/users/{user_id}/knowledge-bases/{knowledge_base_id}/documents:
+    get:
+      summary: 跨用户读取私有 KB 文档列表（审计）
+      description: |
+        列出指定用户私有 KB 的文档列表。**比上面两个接口范围更严**——可以读到内容相关字段，所以独立 scope。
+        - 需要 `tenant.kb.read_user_private` scope（独立 scope，权限更高）
+        - 写审计日志
+      tags: [knowledge, audit]
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: knowledge_base_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ============================================================================
+# Schemas
+# ============================================================================
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: ek_<prefix>_<secret>
+      description: 外部系统的长期凭证（租户后台「API Key 管理」创建）
+    sessionToken:
+      type: http
+      scheme: bearer
+      bearerFormat: st_<prefix>_<secret>
+      description: Agent SDK 用 client_id + secret 换取的 60 分钟短期凭证
+    appOAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: H5 应用后端通过 authorization_code / refresh_token 获得；仅支持 kb.read 与 contacts.read 的只读接口
+
+  schemas:
+    # ---------- 通用响应包装 ----------
+    Response:
+      type: object
+      required: [success, code, message]
+      properties:
+        success: { type: boolean }
+        code:
+          type: integer
+          description: 业务错误码；200=OK，4010=Unauthorized，4030=Forbidden，4040=NotFound
+        message: { type: string }
+        traceId: { type: string }
+
+    # ---------- 鉴权 ----------
+    OAuthTokenRequest:
+      oneOf:
+        - $ref: '#/components/schemas/AgentClientCredentialsTokenRequest'
+        - $ref: '#/components/schemas/RuntimeAccessTokenRequest'
+        - $ref: '#/components/schemas/AppAuthorizationCodeTokenRequest'
+        - $ref: '#/components/schemas/AppRefreshTokenRequest'
+      discriminator:
+        propertyName: grant_type
+
+    AgentClientCredentialsTokenRequest:
+      type: object
+      required: [grant_type, client_id, client_secret]
+      additionalProperties: false
+      properties:
+        grant_type:
+          type: string
+          const: client_credentials
+        client_id:
+          type: string
+          example: "agentsdk_K3xJ7p2QvN8mR4tY6bL9wD5cF1aZ"
+        client_secret:
+          type: string
+        capability_bindings:
+          type: array
+          items: { type: string }
+          description: 可选；缩小 token 范围到父凭证的子集。不给则取父凭证全集。
+        ttl_seconds:
+          type: integer
+          description: 可选；自定义 TTL（秒）；不给走默认 3600。
+    RuntimeAccessTokenRequest:
+      type: object
+      required: [grant_type, client_id, client_secret, tenant_id]
+      additionalProperties: false
+      properties:
+        grant_type: { type: string, const: runtime_access }
+        client_id: { type: string }
+        client_secret: { type: string }
+        capability_bindings:
+          type: array
+          items: { type: string }
+        ttl_seconds: { type: integer }
+        tenant_id:
+          oneOf:
+            - { type: string }
+            - { type: integer }
+          description: runtime_access 必填；当前租户 ID 或 UUID。
+        agent_id:
+          type: string
+          description: 可选；绑定发起方数字员工。作为 opaque string 使用。
+        account_id:
+          type: string
+          description: 可选；需要访问个人私有数据时绑定当前账号。作为 opaque string 使用。
+    AppAuthorizationCodeTokenRequest:
+      type: object
+      required: [grant_type, code, client_id, client_secret, redirect_uri]
+      additionalProperties: false
+      properties:
+        grant_type: { type: string, const: authorization_code }
+        code: { type: string, example: ac_xxx }
+        client_id: { type: string, example: app_xxx }
+        client_secret: { type: string, example: sk_xxx }
+        redirect_uri:
+          type: string
+          format: uri
+          description: 必须与应用后台登记值完全一致
+
+    AppRefreshTokenRequest:
+      type: object
+      required: [grant_type, refresh_token, client_id, client_secret]
+      additionalProperties: false
+      properties:
+        grant_type: { type: string, const: refresh_token }
+        refresh_token: { type: string, example: rt_xxx }
+        client_id: { type: string, example: app_xxx }
+        client_secret: { type: string, example: sk_xxx }
+
+    OAuthTokenResponse:
+      oneOf:
+        - $ref: '#/components/schemas/SessionTokenResponse'
+        - $ref: '#/components/schemas/AppOAuthTokenResponse'
+
+    SessionTokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token:
+          type: string
+          example: "st_a1b2c3d4_..."
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          description: 秒
+        scope:
+          type: string
+          description: 空格分隔的 scope 列表
+        session_token_id:
+          type: string
+          description: 本次签发的 Session Token 稳定标识；作为 opaque string 使用。
+        bound_tenant_id: { type: integer, deprecated: true, description: 历史内部键；新接入方不要保存或依赖。 }
+        bound_runtime_environment_id: { type: integer, deprecated: true, description: 历史内部键；新接入方不要保存或依赖。 }
+        bound_agent_id:
+          type: string
+          description: 仅请求 agent_id 并成功绑定时返回。
+        bound_account_id:
+          type: string
+          description: 仅请求 account_id 并成功绑定时返回。
+    AppOAuthTokenResponse:
+      type: object
+      required: [access_token, id_token, refresh_token, token_type, expires_in, scope]
+      properties:
+        access_token: { type: string, description: RS256 应用 OAuth JWT }
+        id_token: { type: string, description: RS256 OIDC ID Token；必须校验 issuer、audience、exp 和 nonce }
+        refresh_token: { type: string, example: rt_xxx, description: 每次刷新都会轮换，旧值立即失效 }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, example: 7200 }
+        scope: { type: string, example: "kb.read contacts.read" }
+
+    OpenIDConfiguration:
+      type: object
+      required:
+        - issuer
+        - authorization_endpoint
+        - token_endpoint
+        - jwks_uri
+        - response_types_supported
+        - grant_types_supported
+        - subject_types_supported
+        - id_token_signing_alg_values_supported
+        - token_endpoint_auth_methods_supported
+        - scopes_supported
+        - claims_supported
+      properties:
+        issuer:
+          type: string
+          format: uri
+          description: ID Token 的预期签发方，必须与 iss 完全一致。
+        authorization_endpoint:
+          type: string
+          description: 知办AI 客户端内部使用的应用启动 URI 模板；对方应用后端不要直接调用。
+        token_endpoint:
+          type: string
+          format: uri
+          description: 应用后端交换或刷新令牌的接口。
+        jwks_uri:
+          type: string
+          format: uri
+          description: 获取 ID Token 验签公钥集合的接口。
+        response_types_supported:
+          type: array
+          items: { type: string, enum: [code] }
+        grant_types_supported:
+          type: array
+          items: { type: string }
+        subject_types_supported:
+          type: array
+          items: { type: string, enum: [public] }
+        id_token_signing_alg_values_supported:
+          type: array
+          items: { type: string, enum: [RS256] }
+        token_endpoint_auth_methods_supported:
+          type: array
+          items: { type: string, enum: [client_secret_post, client_secret_basic] }
+        scopes_supported:
+          type: array
+          items: { type: string, enum: [openid, email, profile, kb.read, contacts.read] }
+        claims_supported:
+          type: array
+          items:
+            type: string
+            enum: [sub, email, email_verified, name, phone_number, tenant, membership, zhiban_context, nonce]
+
+    JWKS:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/JSONWebKey'
+
+    JSONWebKey:
+      type: object
+      required: [kty, use, alg, kid, n, e]
+      additionalProperties: true
+      properties:
+        kty: { type: string, const: RSA, description: 密钥类型。 }
+        use: { type: string, const: sig, description: 公钥用途为签名验证。 }
+        alg: { type: string, const: RS256, description: 适用的签名算法。 }
+        kid: { type: string, description: 与 JWT Header 中 kid 匹配的密钥编号。 }
+        n: { type: string, description: Base64URL 编码的 RSA 模数。 }
+        e: { type: string, description: Base64URL 编码的 RSA 公钥指数，通常为 AQAB。 }
+
+    TokenIntrospectionRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: 知办用户登录 access token。
+
+    TokenIntrospectionResult:
+      type: object
+      required: [active]
+      properties:
+        active: { type: boolean }
+        account_id: { type: integer }
+        account_uuid: { type: string }
+        tenant_id: { type: integer }
+        workspace_id: { type: integer }
+        act_scope: { type: string }
+        session_uuid: { type: string }
+        perms:
+          type: array
+          items: { type: string }
+        perms_hash: { type: string }
+        must_change_password: { type: boolean }
+        admin: { type: boolean }
+        acting_as: { type: string }
+        kind: { type: string }
+        issuer: { type: string }
+        subject: { type: string }
+        issued_at: { type: integer }
+        expires_at: { type: integer }
+        cache_ttl_seconds:
+          type: integer
+          description: 调用方本地缓存本次 introspection 结果的建议上限秒数。
+
+    TokenIntrospectionResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/TokenIntrospectionResult'
+
+    # ---------- 知识库 ----------
+    KB:
+      type: object
+      properties:
+        id: { type: string, description: 知识库稳定 ID；作为 opaque string 使用。 }
+        name: { type: string }
+        description: { type: string }
+        space_kind:
+          type: string
+          enum: [tenant, personal]
+          description: 租户级 / 个人私有
+        owner_account_id:
+          type: integer
+          description: 个人 KB 的创建者；租户级 KB 此字段为 0
+        visibility:
+          type: string
+          enum: [tenant, private, workspace]
+        status:
+          type: string
+          enum: [active, pending, failed]
+        document_count: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    CreateKBRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: "产品资料库"
+        description:
+          type: string
+          example: "产品白皮书 / 数据手册 / 销售话术"
+
+    KBListResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/KB' }
+
+    KBResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/KB' }
+
+    # ---------- 文档 ----------
+    Document:
+      type: object
+      properties:
+        id: { type: string, description: 文档稳定 ID；作为 opaque string 使用。 }
+        knowledge_base_id: { type: string, description: 所属知识库稳定 ID。 }
+        title: { type: string }
+        mime_type:
+          type: string
+          description: "text/plain / text/markdown / application/pdf 等"
+        size_bytes: { type: integer, description: 文档字节数 }
+        chunk_count: { type: integer, description: 切片完成后的 chunk 数 }
+        status:
+          type: string
+          enum: [ingesting, ready, failed]
+        created_at: { type: string, format: date-time }
+
+    DocumentListResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/Document' }
+
+    DocumentResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/Document' }
+
+    # ---------- 检索 ----------
+    RetrieveRequest:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query:
+          type: string
+          example: "公司年假规定"
+        top_k:
+          type: integer
+          default: 5
+          description: 返回多少条 chunk，1-50
+        threshold:
+          type: number
+          format: float
+          default: 0.2
+          description: 相似度阈值；小于此值的 chunk 不返回
+        rerank:
+          type: boolean
+          default: false
+          description: 是否走二次重排（提升相关性，可选）
+
+    RetrieveChunk:
+      type: object
+      properties:
+        content: { type: string, description: chunk 文本内容 }
+        document_id: { type: string, description: 文档稳定 ID。 }
+        document_title: { type: string }
+        similarity: { type: number, format: float, description: 相似度 0-1 }
+
+    RetrieveResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                knowledge_base_id: { type: string, description: 知识库稳定 ID。 }
+                total: { type: integer, description: 返回的 chunks 数量 }
+                chunks:
+                  type: array
+                  items: { $ref: '#/components/schemas/RetrieveChunk' }
+
+    AgentKnowledgeRetrieveRequest:
+      type: object
+      required: [agent_id, query]
+      additionalProperties: false
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+          description: 当前数字员工 UUID；服务端按 token tenant/runtime 逐次校验。
+        query:
+          type: string
+          example: "年假如何折算？"
+
+    AgentKnowledgeRetrieveItem:
+      type: object
+      properties:
+        reference_id: { type: string }
+        knowledge_base_id: { type: string, description: 知识库稳定 ID。 }
+        kb_name: { type: string }
+        document_id: { type: string, description: 文档稳定 ID。 }
+        score: { type: number, format: float }
+        content: { type: string }
+
+    AgentKnowledgeRetrieveResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                tool_name: { type: string, example: zhiban.kb.search }
+                query: { type: string }
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/AgentKnowledgeRetrieveItem' }
+                sources:
+                  type: array
+                  items: { type: object, additionalProperties: true }
+                result_quality: { type: string, enum: [hit, empty] }
+
+    # ---------- 记忆 ----------
+    MemoryRecallRequest:
+      type: object
+      required: [user_id, agent_id, session_id, query]
+      properties:
+        user_id: { type: string, description: 目标用户标识（tenant 以下由调用方提供） }
+        agent_id: { type: string, description: 数字员工标识 }
+        session_id: { type: string, description: 会话标识 }
+        group_id: { type: string, description: 群聊场景传真实 group；缺省按 none 处理 }
+        query:
+          type: string
+          example: "用户的付款备注是什么"
+        scopes:
+          type: array
+          description: "收窄召回范围（只能收窄不能放大）；省略用平台默认集。可选值：user_long_term / agent_private / session / group_shared"
+          items: { type: string }
+        limit:
+          type: integer
+          default: 10
+          description: 单 scope 召回上限，1-50
+
+    MemoryItem:
+      type: object
+      properties:
+        id: { type: string, description: 记忆项 ID }
+        content: { type: string, description: 记忆内容 }
+        score: { type: number, format: float, description: 相关度 0-1 }
+
+    MemoryRecallResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/MemoryItem' }
+                degraded:
+                  type: boolean
+                  description: 底层引擎部分失败时为 true，items 是降级子集
+
+    MemoryWriteRequest:
+      type: object
+      required: [user_id, agent_id, session_id, content]
+      properties:
+        user_id: { type: string }
+        agent_id: { type: string }
+        session_id: { type: string }
+        group_id: { type: string, description: 群聊场景传真实 group }
+        content:
+          type: string
+          example: "请记住用户的付款备注是 codex-pay-0629"
+
+    MemoryWriteResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                ok: { type: boolean }
+
+    MemoryForgetResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                deleted: { type: integer, description: 实际删除条数 }
+                rejected: { type: integer, description: 因归属校验不通过被拒条数（不实删） }
+
+    # ---------- 组织架构 ----------
+    Department:
+      type: object
+      properties:
+        id: { type: string, description: 部门稳定 ID；作为 opaque string 使用。 }
+        parent_id: { type: string, description: 父部门稳定 ID。 }
+        name: { type: string }
+        path: { type: string }
+        depth: { type: integer }
+        sort_order: { type: integer }
+        third_department_id: { type: string, description: 对方系统的部门 ID；在当前租户和接入来源内唯一。 }
+        member_count: { type: integer }
+        metadata: { type: object }
+        status: { type: string, enum: [active, deleted], description: deleted 仅在增量模式 (updated_since) 中出现 }
+        updated_at: { type: string, format: date-time }
+
+    CreateDepartmentRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, example: "技术部" }
+        parent_id: { type: string, description: 不填则在根下创建 }
+        sort_order: { type: integer, default: 0 }
+        third_department_id: { type: string, description: 对方系统的部门 ID；在当前租户和接入来源内唯一。 }
+        metadata: { type: object }
+
+    UpdateDepartmentRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        parent_id: { type: string, description: 空串解除父级 }
+        sort_order: { type: integer }
+        third_department_id: { type: string }
+        metadata: { type: object }
+
+    DepartmentListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Department' }
+        next_cursor: { type: string }
+        has_more: { type: boolean }
+
+    DepartmentResponse:
+      type: object
+      properties:
+        id: { type: string }
+        parent_id: { type: string }
+        name: { type: string }
+        path: { type: string }
+        depth: { type: integer }
+        sort_order: { type: integer }
+        third_department_id: { type: string }
+        member_count: { type: integer }
+        metadata: { type: object }
+        status: { type: string }
+        updated_at: { type: string, format: date-time }
+
+    Member:
+      type: object
+      properties:
+        account_id: { type: string, description: 成员账号稳定 ID；作为 opaque string 使用。 }
+        display_name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        third_user_id: { type: string, description: 对方系统的用户 ID；在当前租户和接入来源内唯一。 }
+        title: { type: string }
+        department_id: { type: string, description: 所属部门稳定 ID。 }
+        status: { type: string, enum: [active, invited, suspended, left], description: left 即 tombstone }
+        roles: { type: array, items: { type: string } }
+        updated_at: { type: string, format: date-time }
+
+    CreateMemberRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        phone: { type: string }
+        email: { type: string }
+        display_name: { type: string }
+        title: { type: string }
+        third_user_id: { type: string }
+        department_id: { type: string }
+        role_code:
+          type: string
+          enum: [tenant.member]
+          description: 可选租户角色码。External API 仅允许显式授予 tenant.member；管理员/运营/构建等高权限角色必须走 Admin RBAC 流程。
+
+    UpdateMemberRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        display_name: { type: string }
+        title: { type: string }
+        third_user_id: { type: string }
+        department_id: { type: string, description: 空串清除部门 }
+        status: { type: string, enum: [active, suspended] }
+
+    MemberListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Member' }
+        next_cursor: { type: string }
+        has_more: { type: boolean }
+
+    MemberResponse:
+      type: object
+      properties:
+        account_id: { type: string }
+        display_name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        third_user_id: { type: string }
+        title: { type: string }
+        department_id: { type: string }
+        status: { type: string }
+        roles: { type: array, items: { type: string } }
+        updated_at: { type: string, format: date-time }
+
+    Position:
+      type: object
+      properties:
+        id: { type: string, description: 职位稳定 ID；作为 opaque string 使用。 }
+        name: { type: string }
+        description: { type: string }
+        sort_order: { type: integer }
+        third_position_id: { type: string, description: 对方系统的职位 ID；在当前租户和接入来源内唯一。 }
+        is_system: { type: boolean }
+        member_count: { type: integer }
+        agent_count: { type: integer }
+        metadata: { type: object }
+        status: { type: string, enum: [active, deleted] }
+        updated_at: { type: string, format: date-time }
+
+    CreatePositionRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, example: "高级工程师" }
+        description: { type: string }
+        sort_order: { type: integer, default: 0 }
+        third_position_id: { type: string }
+        metadata: { type: object }
+
+    UpdatePositionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        description: { type: string }
+        sort_order: { type: integer }
+        third_position_id: { type: string }
+        metadata: { type: object }
+
+    PositionListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Position' }
+        next_cursor: { type: string }
+        has_more: { type: boolean }
+
+    PositionResponse:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        sort_order: { type: integer }
+        third_position_id: { type: string }
+        is_system: { type: boolean }
+        member_count: { type: integer }
+        agent_count: { type: integer }
+        metadata: { type: object }
+        status: { type: string }
+        updated_at: { type: string, format: date-time }
+
+    # ---------- 通知 ----------
+    AgentConversationNotificationRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, agent_id, title, description]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: 目标知办用户账号 ID；来自 ZAP instances/sessions 用户上下文或组织与人员 API account_id，必须是当前租户有效成员。
+        agent_id:
+          type: string
+          format: uuid
+          description: 知办数字员工 ID，值为知办平台稳定 UUID；来自 ZAP agents 同步配置或 instances 的 digital_employee_uuid，必须对目标知办用户可见。
+        title:
+          type: string
+          minLength: 1
+          maxLength: 80
+          example: "审批待处理"
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          example: "客户工单 #INC-1024 等待你确认处理方案"
+        third_notification_id:
+          type: string
+          maxLength: 128
+          description: 对方系统的通知 ID，用于排查和审计关联；当前不做幂等覆盖。
+          example: "crm-ticket-INC-1024"
+    AgentConversationNotification:
+      type: object
+      properties:
+        notification_id:
+          type: string
+          description: 通知事件稳定 ID。
+        conversation_id:
+          type: string
+        room_id:
+          type: string
+    AgentConversationNotificationResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AgentConversationNotification'
+
+    # ---------- 主动发送聊天消息 ----------
+    EMPBlock:
+      type: object
+      required: [type]
+      additionalProperties: true
+      properties:
+        type:
+          type: string
+          description: EMP block 类型，必须已注册且状态为 stable。
+      description: 标准 EMP block。具体字段见 EMP 组件清单；服务端严格校验 type 与 schema，不做 fallback。
+
+    AgentChatMessageTarget:
+      type: object
+      additionalProperties: false
+      required: [type, user_id, agent_id]
+      properties:
+        type:
+          type: string
+          enum: [agent_conversation]
+          description: v1 固定为 agent_conversation。
+        user_id:
+          type: string
+          format: uuid
+          description: 目标知办用户账号 ID，必须是当前租户 active 成员。
+        agent_id:
+          type: string
+          format: uuid
+          description: 知办数字员工 ID，必须属于当前租户并对目标用户可见。
+    AgentChatMessageBody:
+      type: object
+      additionalProperties: false
+      required: [schema_version, blocks]
+      properties:
+        schema_version:
+          type: string
+          enum: [emp-1]
+        blocks:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/EMPBlock'
+
+    AgentChatMessageRequest:
+      type: object
+      additionalProperties: false
+      required: [target, message]
+      properties:
+        target:
+          $ref: '#/components/schemas/AgentChatMessageTarget'
+        message:
+          $ref: '#/components/schemas/AgentChatMessageBody'
+        third_message_id:
+          type: string
+          maxLength: 128
+          description: 对方系统的消息 ID，用于排查、审计和调用方侧去重记录；当前不做服务端幂等覆盖。
+    AgentChatMessage:
+      type: object
+      properties:
+        message_id:
+          type: string
+        conversation_id:
+          type: string
+        room_id:
+          type: string
+        wukong_message_id:
+          type: string
+          description: WuKongIM 消息 ID。
+
+    AgentChatMessageResponse:
+      allOf:
+        - $ref: '#/components/schemas/Response'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AgentChatMessage'
+
+    # ---------- Webhook 事件 ----------
+    WebhookEvent:
+      type: object
+      description: 组织架构变更通知 (thin event) — 仅通知“有变化”。生产同步建议接收方返回 2xx 后, 按本地 last_success_updated_at 调用 updated_since 增量查询; entity_id 仅用于排障、幂等记录或低频单实体回查。
+      properties:
+        schema_version: { type: integer, example: 1 }
+        event_type:
+          type: string
+          enum:
+            - org.department.created
+            - org.department.updated
+            - org.department.deleted
+            - org.member.created
+            - org.member.updated
+            - org.member.deleted
+            - org.position.created
+            - org.position.updated
+            - org.position.deleted
+        tenant_id: { type: string, description: 租户稳定 ID。 }
+        entity_kind: { type: string, enum: [department, member, position] }
+        entity_id: { type: string, description: 变更实体稳定 ID。 }
+        updated_at: { type: string, format: date-time }
+
+  responses:
+    InvalidParams:
+      description: 参数缺失或格式错
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Response' }
+          example:
+            success: false
+            code: 4000
+            message: "invalid params"
+    Unauthorized:
+      description: 凭证缺失 / 格式错 / 失效（撤销或过期）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Response' }
+          example:
+            success: false
+            code: 4010
+            message: "unauthorized: invalid api key"
+    Forbidden:
+      description: 凭证缺少所需 scope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Response' }
+          example:
+            success: false
+            code: 4030
+            message: 'forbidden: scope_denied: requires "tenant.kb.read"'
+    NotFound:
+      description: 资源不存在 / 跨租户 / private 不可见
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Response' }
+          example:
+            success: false
+            code: 4040
+            message: "not found: kb {uuid} not found"
+    InternalError:
+      description: 服务内部错误
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Response' }
+          example:
+            success: false
+            code: 5000
+            message: "internal error"

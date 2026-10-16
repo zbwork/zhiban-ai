@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F18 桌面更新 · Windows appcast 模板（WinSparkle feed）。
+  默认 feed：https://zb.qkfintech.cn/api/agent-bus/v1/app/appcast?platform=windows&amp;channel=stable
+  与原生 bridge 内 kDefaultAppcastUrl 一致。
+
+  每次发版替换占位：
+    {VERSION}      用户可读版本号，例如 1.0.1（与 pubspec version 的主体一致）
+    {BUILD_NUMBER} 整数构建号，例如 10100（与 pubspec version 的 + 后缀一致）
+    {PUBDATE}      RFC 822 时间，例如 Mon, 23 Jun 2026 10:00:00 +0800
+    {URL}          installer 下载直链，例如 https://ai-office.zhichengcredit.com/win/zhiban-setup-1.0.1.exe
+    {ED_SIGNATURE} Sparkle sign_update 对该 .exe 生成的 ed25519 签名（复用 macOS 同一私钥）
+    {LENGTH}       installer 文件字节数
+
+  sparkle:version 与 win_sparkle_set_app_build_version(FLUTTER_VERSION_BUILD) 比较。
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>知办AI Windows Updates</title>
+    <language>zh-CN</language>
+    <item>
+      <title>知办AI {VERSION}</title>
+      <pubDate>{PUBDATE}</pubDate>
+      <sparkle:version>{BUILD_NUMBER}</sparkle:version>
+      <sparkle:shortVersionString>{VERSION}</sparkle:shortVersionString>
+      <description><![CDATA[
+        <h3>本次更新</h3>
+        <ul>
+          <li>（填写发布说明）</li>
+        </ul>
+      ]]></description>
+      <enclosure
+        url="{URL}"
+        sparkle:version="{BUILD_NUMBER}"
+        sparkle:edSignature="{ED_SIGNATURE}"
+        length="{LENGTH}"
+        type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

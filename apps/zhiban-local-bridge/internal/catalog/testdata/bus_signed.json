@@ -1,0 +1,70 @@
+{
+  "canonical": "{\"allowed_hosts\":[\"aigc-chat-web.yixin.com\",\"zhiban-test.oss-cn-beijing.aliyuncs.com\"],\"arch\":\"arm64\",\"expires_at\":\"2036-09-17T12:00:00Z\",\"issued_at\":\"2026-09-10T12:00:00Z\",\"platform\":\"macos\",\"schema\":1,\"targets\":{\"claude_desktop\":{\"current\":{\"bundle_identifier\":\"com.anthropic.claudefordesktop\",\"layout\":\"app_bundle_dmg\",\"sources\":[{\"kind\":\"zhiban_package\",\"sha256\":\"c5451dba21b8bf4232f8feffbff946dc7be4d6a64ee22d3190954e16f62444c9\",\"size\":353897855,\"url\":\"https://dl.example.cn/local-coding/Claude-mac-universal.dmg\"}],\"team_identifier\":\"Q6L2SF6YDW\",\"version\":\"1.46388.4\"},\"previous\":null},\"codex_cli\":{\"current\":{\"binary_sha256\":\"b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3\",\"canary\":true,\"layout\":\"tarball_single\",\"profile_version\":\"2026.09.07.1\",\"release_notes\":\"修复 \u003chtml\u003e \u0026 中文 “引号” 转义用例\",\"sources\":[{\"kind\":\"zhiban_package\",\"sha256\":\"8cf911ea676523bfb2121ec561848d2aba564890ad536db4d8a3353f2b9850b1\",\"size\":87323149,\"url\":\"https://aigc-chat-web.yixin.com/api/agent-bus/v1/local-coding-tools/packages/0f2c1e2a-9a7c-4f5e-8f1b-1d2e3f4a5b6c/download\"}],\"version\":\"0.154.0\"},\"previous\":{\"binary_sha256\":\"b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3\",\"layout\":\"tarball_member\",\"member\":\"package/vendor/aarch64-apple-darwin/bin/codex\",\"sources\":[{\"kind\":\"zhiban_package\",\"sha256\":\"535d301b49131abfda3264f959fb0defa40bbc306976d98ddbc15c424636c55c\",\"size\":115672312,\"url\":\"https://dl.example.cn/local-coding/codex-0.153.4-darwin-arm64.tgz\"}],\"version\":\"0.153.4\"}}}}",
+  "public_key": "NptNmEQNo/ADI9Rnm5t66WE0l9MKiSz+Ouxd60dLHbw=",
+  "signed": {
+    "catalog": {
+      "schema": 1,
+      "issued_at": "2026-09-10T12:00:00Z",
+      "expires_at": "2036-09-17T12:00:00Z",
+      "platform": "macos",
+      "arch": "arm64",
+      "allowed_hosts": [
+        "aigc-chat-web.yixin.com",
+        "zhiban-test.oss-cn-beijing.aliyuncs.com"
+      ],
+      "targets": {
+        "claude_desktop": {
+          "current": {
+            "version": "1.46388.4",
+            "layout": "app_bundle_dmg",
+            "bundle_identifier": "com.anthropic.claudefordesktop",
+            "team_identifier": "Q6L2SF6YDW",
+            "sources": [
+              {
+                "kind": "zhiban_package",
+                "url": "https://dl.example.cn/local-coding/Claude-mac-universal.dmg",
+                "size": 353897855,
+                "sha256": "c5451dba21b8bf4232f8feffbff946dc7be4d6a64ee22d3190954e16f62444c9"
+              }
+            ]
+          },
+          "previous": null
+        },
+        "codex_cli": {
+          "current": {
+            "version": "0.154.0",
+            "layout": "tarball_single",
+            "binary_sha256": "b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3",
+            "profile_version": "2026.09.07.1",
+            "release_notes": "修复 \u003chtml\u003e \u0026 中文 “引号” 转义用例",
+            "canary": true,
+            "sources": [
+              {
+                "kind": "zhiban_package",
+                "url": "https://aigc-chat-web.yixin.com/api/agent-bus/v1/local-coding-tools/packages/0f2c1e2a-9a7c-4f5e-8f1b-1d2e3f4a5b6c/download",
+                "size": 87323149,
+                "sha256": "8cf911ea676523bfb2121ec561848d2aba564890ad536db4d8a3353f2b9850b1"
+              }
+            ]
+          },
+          "previous": {
+            "version": "0.153.4",
+            "layout": "tarball_member",
+            "member": "package/vendor/aarch64-apple-darwin/bin/codex",
+            "binary_sha256": "b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3",
+            "sources": [
+              {
+                "kind": "zhiban_package",
+                "url": "https://dl.example.cn/local-coding/codex-0.153.4-darwin-arm64.tgz",
+                "size": 115672312,
+                "sha256": "535d301b49131abfda3264f959fb0defa40bbc306976d98ddbc15c424636c55c"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "kid": "lc-catalog-fixture",
+    "signature": "UHamx7bEKY0D_ieQqBqTY0RfiLOzm-npJkFwQhW9FHbSqKVwqPVY09rsbchxaKADjYuN9X-i_cjLsn1wX2RgDg"
+  }
+}

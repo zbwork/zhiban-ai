@@ -1,0 +1,14 @@
+name: zhiban_core
+description: Shared Zhiban data models, IM contracts and EMP parsing.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.9.2 <4.0.0'
+
+dependencies:
+  dio: 5.9.0
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.26.3

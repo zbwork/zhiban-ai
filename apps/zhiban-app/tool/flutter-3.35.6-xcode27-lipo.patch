@@ -1,0 +1,32 @@
+--- a/packages/flutter_tools/lib/src/build_system/targets/darwin.dart
++++ b/packages/flutter_tools/lib/src/build_system/targets/darwin.dart
+@@ -72,6 +72,7 @@
+-    final ProcessResult verifyResult = await environment.processManager.run(<String>[
+-      'lipo',
+-      frameworkBinaryPath,
+-      '-verify_arch',
+-      ...archList,
+-    ]);
++    for (final String arch in archList) {
++      final ProcessResult verifyResult = await environment.processManager.run(<String>[
++        'lipo',
++        frameworkBinaryPath,
++        '-verify_arch',
++        arch,
++      ]);
+@@ -79,7 +80,8 @@
+-    if (verifyResult.exitCode != 0) {
+-      throw Exception(
+-        'Binary $frameworkBinaryPath does not contain architectures "$archs".\n'
+-        '\n'
+-        'lipo -info:\n'
+-        '$lipoInfo',
+-      );
++      if (verifyResult.exitCode != 0) {
++        throw Exception(
++          'Binary $frameworkBinaryPath does not contain architectures "$archs".\n'
++          '\n'
++          'lipo -info:\n'
++          '$lipoInfo',
++        );
++      }

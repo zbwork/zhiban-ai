@@ -1,0 +1,26 @@
+name: 功能建议
+description: 描述使用场景、问题与预期结果
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 用户场景与当前问题
+      description: 谁在什么场景遇到什么困难？请勿包含客户私密资料。
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 期望的结果
+      description: 描述用户希望完成的事情及可判断的成功条件。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 已尝试的替代方式
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: 兼容性与其他影响
+      description: 如已知，请说明对接口、配置、数据或现有使用方式的影响。

@@ -1,0 +1,56 @@
+{
+  "name": "@zhiban/dsh-runtime",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "desktop": "node dist/desktop/main.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:contract": "vitest run test/translate",
+    "check": "npm run typecheck && npm run lint && npm run build && npm run test"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-sdk-client": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-sdk-jsonrpc-demo": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-sdk-jsonrpc-server": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-sdk-protocol": "0.1.0-rc.8",
+    "@deepseek-ai/node-addon-landlock-run": "0.1.1",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@napi-rs/canvas": "1.0.9",
+    "@openai/codex": "0.132.0",
+    "@playwright/mcp": "0.0.80",
+    "docx": "9.7.1",
+    "exceljs": "4.4.0",
+    "fastify": "5.12.1",
+    "fflate": "0.8.3",
+    "image-size": "1.2.1",
+    "ipaddr.js": "2.5.0",
+    "officeparser": "7.8.0",
+    "pg": "8.23.0",
+    "playwright": "1.63.0-alpha-2026-08-31",
+    "pptxgenjs": "4.0.1",
+    "saxes": "5.0.1",
+    "ws": "8.21.3",
+    "yaml": "2.9.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "24.13.3",
+    "@types/pg": "8.23.1",
+    "@types/ws": "8.18.1",
+    "eslint": "9.39.5",
+    "tsx": "4.23.12",
+    "typescript": "~5.6.2",
+    "typescript-eslint": "8.67.0",
+    "vitest": "3.2.7"
+  }
+}

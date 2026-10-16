@@ -1,0 +1,14 @@
+SET LOCAL search_path=agent_bus,public;
+INSERT INTO roles(code,name,scope_kind,is_system) VALUES ('platform.admin','Platform administrator','platform',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('platform.tenant.create','platform.tenant.create','api','platform','tenant','create',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('platform.tenant.read','platform.tenant.read','api','platform','tenant','read',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('platform.tenant.suspend','platform.tenant.suspend','api','platform','tenant','suspend',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('platform.tenant.update','platform.tenant.update','api','platform','tenant','update',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('tenant.department.create','tenant.department.create','api','tenant','department','create',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('tenant.department.delete','tenant.department.delete','api','tenant','department','delete',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('tenant.department.read','tenant.department.read','api','tenant','department','read',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('tenant.department.update','tenant.department.update','api','tenant','department','update',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('tenant.member.read','tenant.member.read','api','tenant','member','read',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('tenant.member.remove','tenant.member.remove','api','tenant','member','remove',true);
+INSERT INTO permissions(code,name,kind,scope_kind,resource,action,is_system) VALUES ('tenant.member.update','tenant.member.update','api','tenant','member','update',true);
+INSERT INTO role_permissions(role_id,permission_id) SELECT r.id,p.id FROM roles r CROSS JOIN permissions p WHERE r.code='platform.admin' AND p.scope_kind='platform';

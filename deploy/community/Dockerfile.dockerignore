@@ -1,0 +1,18 @@
+# Only backend source is a community image build input.
+**
+!services/
+!services/agent-bus/
+!services/agent-bus/**/
+!services/agent-bus/**/*.go
+!services/agent-bus/go.mod
+!services/agent-bus/go.sum
+!services/agent-bus/sql/community/*.up.sql
+!services/agent-bus/internal/service/protocol/assets/*.md
+!services/agent-bus/internal/transport/http/bus/assets/**
+services/agent-bus/.env*
+services/agent-bus/configs/private/
+services/agent-bus/bin/
+services/agent-bus/logs/
+services/agent-bus/tmp/
+services/agent-bus/**/node_modules/
+services/agent-bus/**/build/

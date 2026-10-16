@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>知办AI External API · 在线调试</title>
+  <link rel="icon" href="data:," />
+  <style>
+    body { margin: 0; }
+    /* 顶栏与 Scalar 之间分隔 */
+    .zhiban-header {
+      padding: 12px 24px;
+      border-bottom: 1px solid #e5e7eb;
+      font-family: -apple-system, system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fff;
+    }
+    .zhiban-header h1 { margin: 0; font-size: 16px; }
+    .zhiban-header .meta { font-size: 12px; color: #6b7280; }
+    .zhiban-header a { color: #2563eb; text-decoration: none; margin-left: 12px; }
+  </style>
+</head>
+<body>
+  <div class="zhiban-header">
+    <h1>知办AI External API v1 — 在线调试 (Scalar)</h1>
+    <div class="meta">
+      右上角可切 Server → 选 dev/test/prod；
+      点任意端点的 "Try it out" 直接发请求；
+      <a href="/api/zhiban-external-v1.yaml" download>下载 yaml</a>
+      <a href="/handbook/tenant/api-key-management.html">先去拿 API Key →</a>
+    </div>
+  </div>
+
+  <!-- Scalar API Reference; standalone bundle 从 jsdelivr CDN 加载, 不需要 build。
+       要换成自托管 (避免外网依赖) 把 src 改成 docs-site/public/scalar.js 即可。 -->
+  <script
+    id="api-reference"
+    data-url="/api/zhiban-external-v1.yaml"
+    data-configuration='{
+      "theme": "default",
+      "layout": "modern",
+      "showSidebar": true,
+      "hideDownloadButton": false,
+      "defaultHttpClient": { "targetKey": "shell", "clientKey": "curl" },
+      "servers": [
+        { "url": "https://api.example.com", "description": "prod (需 VPN)" },
+        { "url": "https://test-api.example.com", "description": "test" },
+        { "url": "http://localhost:8080", "description": "local dev" }
+      ]
+    }'
+  ></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>

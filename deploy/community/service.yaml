@@ -1,0 +1,17 @@
+http: ${COMMUNITY_HTTP}
+postgresdsn: ${AGBUS_POSTGRES_DSN}
+redisaddr: redis:6379
+jwtprivatekeyfile: /run/community/jwt.pem
+jwtissuer: zhiban-community
+model:
+  provider: mock
+wukong:
+  url: http://wukong:5001
+  wsaddr: ws://127.0.0.1:18083
+  token: ${WUKONG_WEBHOOK_SECRET}
+object:
+  endpoint: http://host.docker.internal:19000
+  readendpoint: http://127.0.0.1:19000
+  bucket: community
+  accesskey: community
+  secretkey: ${OBJECT_PASSWORD}

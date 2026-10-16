@@ -1,0 +1,64 @@
+# Desktop worker: file/shell access is only through the authenticated host MCP broker.
+# Full mode is a host policy and never expands direct worker filesystem access.
+- id: llm
+  name: "@deepseek-ai/dsh-llm"
+- id: session
+  name: "@deepseek-ai/dsh-session"
+- id: credentials
+  name: "@deepseek-ai/dsh-credentials-local"
+- id: agent
+  name: "@deepseek-ai/dsh-agent"
+- id: session-persistence-jsonl
+  name: "@deepseek-ai/dsh-session-persistence-jsonl"
+  config:
+    root: ./sessions
+- id: subprocess
+  name: "@deepseek-ai/dsh-subprocess-local"
+- id: sandbox
+  name: "@deepseek-ai/dsh-sandbox-local"
+- id: sandbox-policy
+  name: "@deepseek-ai/dsh-sandbox-policy"
+  config:
+    mode: read-only
+- id: bash-sandbox
+  name: "@deepseek-ai/dsh-bash-sandbox"
+  config:
+    timeoutMs: 60000
+- id: approval
+  name: "@deepseek-ai/dsh-user-approval"
+  config:
+    policy: never
+- id: permission
+  name: "@deepseek-ai/dsh-permission-presets"
+  config:
+    presets:
+      read-only:
+        sandbox: read-only
+        approval: never
+- id: shell-env
+  name: "@deepseek-ai/dsh-shell-env"
+- id: fs-observation-policy
+  name: "@deepseek-ai/dsh-fs-observation-policy"
+- id: fs-sandbox
+  name: "@deepseek-ai/dsh-fs-sandbox"
+- id: tools
+  name: "@deepseek-ai/dsh-tools"
+- id: skill
+  name: "@deepseek-ai/dsh-skill"
+- id: skill-filesystem
+  name: "@deepseek-ai/dsh-skill-filesystem"
+  config:
+    includeDefaultRoots: false
+    customSkillDirs: []
+- id: tool-skill
+  name: "@deepseek-ai/dsh-tool-skill"
+- id: system-prompt
+  name: "@deepseek-ai/dsh-system-prompt"
+  config:
+    persona: ""
+- id: agent-loop
+  name: "@deepseek-ai/dsh-agent-loop"
+  config:
+    agents: []
+- id: jsonrpc
+  name: "@deepseek-ai/dsh-sdk-jsonrpc-server"

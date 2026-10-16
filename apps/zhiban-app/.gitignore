@@ -1,0 +1,67 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# F16 RTC: vendored DingRTC macOS SDK 二进制 (大文件, 本地下载, 不入库; podspec/README 仍跟踪)
+# 重建: 见 macos/Frameworks/DingRTC/README.md (从官方 URL 下载 SDK 解压到此)。
+macos/Frameworks/**/*.framework/
+macos/Frameworks/**/*.dylib
+macos/Frameworks/**/*.nn
+macos/Frameworks/DingRTC_macOS_SDK_*/
+macos/Frameworks/*.zip
+
+# F16 RTC: vendored DingRTC Windows SDK 二进制 (大文件, 本地下载, 不入库; CMakeLists 仍跟踪)
+# 放置: 解压官方 DingRTC_Windows_SDK_3_9_0.zip 到 windows/runner/third_party/ (CMake 自动探测, 见 windows/runner/CMakeLists.txt)。
+windows/runner/third_party/DingRTC_Windows_SDK_*/
+windows/runner/third_party/*.zip
+
+# F18 Update: vendored WinSparkle SDK 二进制 (本地下载, 不入库; CMakeLists/packaging 仍跟踪)
+# 放置: 解压官方 WinSparkle release 到 windows/runner/third_party/WinSparkle/ (CMake 自动探测)。
+windows/runner/third_party/WinSparkle/
+# Inno Setup 打包输出。
+windows/packaging/Output/
+
+# golden 测试失败时自动生成的对比图 (本地诊断用, 不入库)
+test/preview/failures/

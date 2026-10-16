@@ -1,0 +1,462 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+/*
+ * 知办AI Console design tokens.
+ * Vercel/Geist-inspired, but adapted for dense admin workflows and 知办AI blue.
+ *
+ * Existing CSS variable names (--color-parchment, --color-ink, --color-terracotta…)
+ * are preserved so existing components keep working — they just point to new values.
+ * New tokens (--color-link, --shadow-ring, …) layer on top.
+ */
+/* ANSI indices are resolved at runtime; keep all palette entries. */
+@theme static {
+  --color-ansi-0: #171717;
+  --color-ansi-1: #b91c1c;
+  --color-ansi-2: #0e7c39;
+  --color-ansi-3: #a16207;
+  --color-ansi-4: #0068d6;
+  --color-ansi-5: #9333b8;
+  --color-ansi-6: #087e8b;
+  --color-ansi-7: #d4d4d4;
+  --color-ansi-8: #737373;
+  --color-ansi-9: #ef4444;
+  --color-ansi-10: #22c55e;
+  --color-ansi-11: #eab308;
+  --color-ansi-12: #3b82f6;
+  --color-ansi-13: #c084fc;
+  --color-ansi-14: #06b6d4;
+  --color-ansi-15: #ffffff;
+}
+
+@theme {
+  /* —— Vercel tokens (canonical) —— */
+  --color-bg:        #ffffff;
+  --color-bg-sub:    #f8fbff;
+  --color-surface:   #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-text:      #171717;   /* Vercel black */
+  --color-text-sub:  #4d4d4d;
+  --color-text-mute: #808080;
+  --color-line:      #dbe6f5;
+  --color-line-soft: #eef5ff;
+  --color-brand:     #0f6bff;
+  --color-brand-hover:#0057e6;
+  --color-brand-soft:#eaf3ff;
+  --color-brand-line:#bed8ff;
+  --color-icon-blue: #0f6bff;
+  --color-icon-blue-bg: #dbeafe;
+  --color-icon-purple: #7c3aed;
+  --color-icon-purple-bg: #f2edff;
+  --color-icon-red: #dc2626;
+  --color-icon-red-bg: #fff1f2;
+  --color-icon-green: #0e7c39;
+  --color-icon-green-bg: #ecfdf5;
+  --color-icon-orange: #ea580c;
+  --color-icon-orange-bg: #fff7ed;
+  --color-accent:    #0f6bff;
+  --color-accent-fg: #ffffff;
+  --color-link:      #0f6bff;
+  --color-focus:     hsla(212, 100%, 48%, 1);
+
+  /* status hues (kept muted, ringy) */
+  --color-success:   #0e7c39;
+  --color-success-bg:#ecfdf5;
+  --color-warn:      #b45309;
+  --color-warn-bg:   #fffbeb;
+  --color-danger:    #b91c1c;
+  --color-danger-bg: #fef2f2;
+  --color-info:      #0068d6;
+  --color-info-bg:   #ebf5ff;
+  --color-control-bg:#ffffff;
+  --color-control-hover:#eef5ff;
+
+  /* —— legacy aliases (keep old class refs working) —— */
+  --color-parchment:        #ffffff;
+  --color-parchment-sub:    #f8fbff;
+  --color-paper:            #ffffff;
+  --color-ink:              #171717;
+  --color-ink-sub:          #4d4d4d;
+  --color-ink-mute:         #808080;
+  --color-terracotta:       #0f6bff;
+  --color-terracotta-soft:  #eaf3ff;
+  --color-terracotta-deep:  #0057e6;
+  --color-emerald-soft:     #0e7c39;
+  --color-amber-soft:       #b45309;
+
+  /* fonts: Geist Sans + Geist Mono */
+  --font-sans:  'Geist', 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  --font-mono:  'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-serif: 'Geist', system-ui, sans-serif;  /* serif aliased to sans — no serif in this skin */
+}
+
+/* Shadow-as-border + multi-layer card stack, exposed as utilities */
+@layer utilities {
+  .ring-border {
+    box-shadow: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px;
+  }
+  .ring-border-soft {
+    box-shadow: #ebebeb 0px 0px 0px 1px;
+  }
+  .card-shadow {
+    box-shadow:
+      rgba(15, 107, 255, 0.10) 0px 0px 0px 1px,
+      rgba(15, 23, 42, 0.05) 0px 2px 6px,
+      rgba(37, 99, 235, 0.06) 0px 14px 34px -18px,
+      rgba(255, 255, 255, 0.72) 0px 0px 0px 1px inset;
+  }
+  .card-shadow-hover:hover {
+    box-shadow:
+      rgba(15, 107, 255, 0.16) 0px 0px 0px 1px,
+      rgba(15, 23, 42, 0.07) 0px 6px 12px,
+      rgba(37, 99, 235, 0.10) 0px 18px 38px -18px,
+      rgba(255, 255, 255, 0.72) 0px 0px 0px 1px inset;
+  }
+  .console-panel {
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-line);
+    box-shadow:
+      rgba(0, 0, 0, 0.03) 0px 1px 2px,
+      rgba(0, 0, 0, 0.02) 0px 8px 24px -16px;
+  }
+  .dict-table-scroll > table {
+    min-width: max-content;
+  }
+  .dict-table-scroll > table th:first-child,
+  .dict-table-scroll > table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--color-surface);
+    box-shadow: 1px 0 0 var(--color-line-soft);
+  }
+  .dict-table-scroll > table th:first-child {
+    z-index: 2;
+    background: var(--color-bg-sub);
+  }
+  .table-sticky-first > table th:first-child,
+  .table-sticky-first > table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--color-surface);
+    box-shadow: 1px 0 0 var(--color-line-soft);
+  }
+  .table-sticky-first > table th:first-child {
+    z-index: 2;
+    background: var(--color-bg-sub);
+  }
+  .table-sticky-actions > table th:last-child,
+  .table-sticky-actions > table td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background: var(--color-surface);
+    box-shadow: -1px 0 0 var(--color-line-soft);
+  }
+  .table-sticky-actions > table th:last-child {
+    z-index: 2;
+    background: var(--color-bg-sub);
+  }
+  button[class*="bg-[var(--color-text)]"][class*="text-white"] {
+    background: var(--color-brand) !important;
+    color: #fff !important;
+    box-shadow: rgba(15, 107, 255, 0.24) 0 8px 18px;
+  }
+  button[class*="hover:bg-black"]:hover {
+    background: var(--color-brand-hover) !important;
+  }
+  :where(.card-shadow:has(> table)) {
+    border: 1px solid var(--color-line);
+    box-shadow: rgba(23, 23, 23, 0.02) 0 1px 0;
+  }
+  :where(.card-shadow:has(> table)) > table {
+    font-size: 13px;
+  }
+  :where(.card-shadow:has(> table)) > table thead {
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-bg-sub);
+    color: var(--color-text-mute);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  :where(.card-shadow:has(> table)) > table th {
+    padding: 12px 16px;
+    font-weight: 500;
+    text-align: left;
+  }
+  :where(.card-shadow:has(> table)) > table td {
+    padding: 14px 16px;
+  }
+  :where(.card-shadow:has(> table)) > table tbody tr {
+    border-top: 1px solid var(--color-line-soft);
+  }
+  :where(.card-shadow:has(> table)) > table tbody tr:first-child {
+    border-top: 0;
+  }
+  :where(.card-shadow:has(> table)) > table tbody tr:hover {
+    background: var(--color-bg-sub);
+  }
+  .console-grid {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(248,251,255,0.96) 58%, rgba(236,246,255,0.90) 100%),
+      var(--color-bg);
+  }
+  .admin-app-bg {
+    background:
+      linear-gradient(126deg, rgba(255,255,255,0.98) 0%, rgba(248,251,255,0.96) 50%, rgba(235,246,255,0.90) 100%),
+      var(--color-bg-sub);
+  }
+  .login-stage-bg {
+    background:
+      radial-gradient(circle at 50% 0%, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.70) 42%, transparent 70%),
+      linear-gradient(115deg, rgba(255,255,255,0.90) 0%, rgba(249,253,255,0.78) 46%, rgba(231,244,255,0.86) 100%),
+      var(--color-bg-sub);
+  }
+  .login-stage-shell {
+    background:
+      radial-gradient(circle at 39% 25%, rgba(112, 168, 255, 0.16) 0%, transparent 19%),
+      radial-gradient(circle at 0% 92%, rgba(78, 145, 255, 0.12) 0%, transparent 13%),
+      radial-gradient(circle at 100% 19%, rgba(211, 235, 255, 0.42) 0%, transparent 25%),
+      linear-gradient(115deg, rgba(255,255,255,0.98) 0%, rgba(251,253,255,0.94) 50%, rgba(236,247,255,0.82) 100%);
+    box-shadow:
+      rgba(15, 107, 255, 0.07) 0px 22px 80px,
+      rgba(255, 255, 255, 0.92) 0px 1px 0px inset;
+  }
+  .login-stage-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 210px;
+    height: 130px;
+    pointer-events: none;
+    background-image: radial-gradient(circle, rgba(15, 107, 255, 0.24) 1px, transparent 1.4px);
+    background-size: 16px 16px;
+    opacity: 0.42;
+    mask-image: linear-gradient(135deg, #000 0%, transparent 82%);
+  }
+  .login-primary-gradient {
+    background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-hover) 100%);
+  }
+  .brand-accent-line {
+    width: 44px;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--color-brand) 0%, #4f92ff 62%, rgba(79, 146, 255, 0.18) 100%);
+    box-shadow:
+      rgba(15, 107, 255, 0.24) 0 8px 18px,
+      rgba(255, 255, 255, 0.80) 0 1px 0 inset;
+  }
+  .login-auth-tabs {
+    height: 54px;
+  }
+  .login-auth-tab-button {
+    min-height: 40px;
+  }
+  .login-input:focus,
+  .login-input:focus-visible {
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: rgba(15, 107, 255, 0.22) 0 0 0 3px !important;
+  }
+  /*
+   * 全局 toast 浮层 · 真居中 + 顶部固定。
+   * 旧实现: 外层 740px 固定宽度盒子 + inline-flex 内层 pill → pill 被卡到容器左边, 看起来像"右对齐"。
+   * 新实现: 外层用 flex 居中, 让内层 pill 真正落在 viewport 水平中点。
+   * 入场: 从上方滑入 + 淡入, 比直接 popup 更柔和。
+   */
+  .global-api-toast {
+    position: fixed;
+    top: max(24px, env(safe-area-inset-top));
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    padding: 0 24px;
+    animation: gt-slide-in 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes gt-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .login-panel-card label.block > span:first-child {
+    color: #40516f;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .login-panel-card {
+    box-shadow:
+      rgba(15, 23, 42, 0.13) 0 32px 86px,
+      rgba(15, 107, 255, 0.16) 0 18px 46px,
+      rgba(15, 23, 42, 0.06) 0 2px 10px,
+      rgba(255, 255, 255, 0.82) 0 1px 0 inset;
+  }
+  .login-panel-card .login-panel-title {
+    color: #1f2d4f !important;
+    font-weight: 400 !important;
+  }
+  .login-feature-grid {
+    display: grid;
+    max-width: 760px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 32px;
+  }
+  .login-feature-card {
+    position: relative;
+    min-height: 220px;
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .login-feature-card:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 38px;
+    right: -16px;
+    width: 1px;
+    height: 152px;
+    background: linear-gradient(180deg, transparent 0%, rgba(190, 216, 255, 0.42) 18%, rgba(190, 216, 255, 0.32) 82%, transparent 100%);
+  }
+  .login-feature-icon {
+    width: 132px;
+    height: 100px;
+    margin: 0 auto 18px;
+  }
+  .login-feature-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .login-feature-title {
+    color: #07122f;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+  .login-feature-desc {
+    max-width: 180px;
+    margin: 12px auto 0;
+    color: #536783;
+    font-size: 13px;
+    line-height: 1.7;
+    letter-spacing: 0.005em;
+  }
+  @media (min-width: 1536px) {
+    .login-panel-card {
+      min-height: min(548px, calc(100vh - 116px));
+    }
+    .login-auth-tabs {
+      height: 58px;
+    }
+    .login-auth-tab-button {
+      min-height: 44px;
+    }
+    .login-feature-icon {
+      width: 146px;
+      height: 112px;
+      margin: 0 auto 22px;
+    }
+    .login-feature-title {
+      font-size: 17px;
+    }
+    .login-feature-desc {
+      max-width: 196px;
+      margin-top: 14px;
+      font-size: 14px;
+      line-height: 1.75;
+    }
+  }
+  .brand-mark-blue {
+    background: linear-gradient(135deg, #1f7aff 0%, #075df0 100%);
+    box-shadow:
+      rgba(15, 107, 255, 0.30) 0px 18px 40px,
+      rgba(255, 255, 255, 0.35) 0px 1px 0px inset;
+  }
+  .text-balance { text-wrap: balance; }
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-feature-settings: 'liga' 1, 'calt' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-text);
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+h1, h2, h3, h4, button {
+  letter-spacing: 0;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+button {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+/* Anchors inherit text color by default. Use .link-blue only for "content" links. */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+a.link-blue, .prose a {
+  color: var(--color-link);
+}
+a.link-blue:hover, .prose a:hover { text-decoration: underline; }
+
+/* focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a3a3a3; }
+
+/* native form controls — neutralize default styles toward Vercel feel */
+input, textarea, select {
+  font-family: inherit;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+/* kill the italic subtitle look (Claude theme) — Vercel doesn't italicize */
+.font-serif.italic { font-style: normal; color: var(--color-text-sub); }
+
+/* M3 — shared input style for form modals */
+.input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: white;
+  font-size: 13px;
+  color: var(--color-text);
+}
+.input:focus { border-color: var(--color-brand); outline: none; box-shadow: rgba(15, 107, 255, 0.16) 0 0 0 3px; }
+textarea.input { resize: vertical; }
+.input:disabled { background: var(--color-bg-sub); color: var(--color-text-mute); }
+.ring-border { box-shadow: inset 0 0 0 1px var(--color-line); }

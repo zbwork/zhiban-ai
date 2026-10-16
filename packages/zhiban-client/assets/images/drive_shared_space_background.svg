@@ -1,0 +1,5 @@
+<svg width="176" height="130" viewBox="8 4 176 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Original artwork: 192x146 with shadow padding. Matching native shadow is painted by the card. -->
+  <path d="M8 24C8 12.9543 16.9543 4 28 4H99.86C105.079 4 110.091 6.03993 113.826 9.68436L122.674 18.3156C126.409 21.9601 131.421 24 136.64 24H164C175.046 24 184 32.9543 184 44V114C184 125.046 175.046 134 164 134H28C16.9543 134 8 125.046 8 114V24Z" fill="url(#background)"/>
+  <defs><linearGradient id="background" x1="98" y1="4" x2="98" y2="134" gradientUnits="userSpaceOnUse"><stop stop-color="#00A8F0"/><stop offset="1" stop-color="#A2ECFF"/></linearGradient></defs>
+</svg>
