@@ -25,3 +25,53 @@ jobs:
           persist-credentials: false
       - name: Check community materials
         run: python3 .github/scripts/check-community.py .
+
+  community-backend-build:
+    name: community-backend-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: services/agent-bus
+    env:
+      GOWORK: 'off'
+    steps:
+      - name: Checkout public source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: services/agent-bus/go.mod
+          cache-dependency-path: services/agent-bus/go.sum
+      - name: Build community entry points
+        run: >-
+          go build -mod=readonly
+          ./cmd/community-bus ./cmd/community-admin ./cmd/community-worker
+          ./cmd/community-bootstrap ./cmd/community-migrate ./cmd/community-audit-writer
+
+  community-admin-build:
+    name: community-admin-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/agent-bus-admin
+    steps:
+      - name: Checkout public source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@10.32.1
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build community admin
+        run: pnpm build
+      - name: Lint community admin
+        run: pnpm lint

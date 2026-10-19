@@ -54,3 +54,8 @@ func (f frameworkLookup) GetFrameworkByID(ctx context.Context, id int64) (string
 	}
 	return env.Framework, nil
 }
+
+// NewFrameworkLookup enforces the same embedded runtime boundary for chat and cron.
+func NewFrameworkLookup(pool *pgxpool.Pool) frameworkLookup {
+	return frameworkLookup{runtimeenv.New(pool)}
+}

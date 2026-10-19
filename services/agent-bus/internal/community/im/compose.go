@@ -219,3 +219,20 @@ func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc c
 	})))
 	mux.Handle("POST "+wukongwh.WebhookPath, &wukongwh.Handler{Secret: c.WuKong.Token, Idem: persistentGate{}, Sink: trigger, PropagateSinkErrors: true})
 }
+
+// DirectConversations reuses canonical room provisioning for scheduled delivery.
+func DirectConversations(pool *pgxpool.Pool, c config.Config, visibility contacts.Service) *cronDirect {
+	adapter := wukong.NewAdapter(c.WuKong.URL, c.WuKong.TCPAddr, c.WuKong.WSAddr, nil)
+	mapper := wukong.NewDirectRoomMapper(adapter, accountLookup{account.New(pool)})
+	return &cronDirect{agentdirect.NewPrepareService(c.WuKong.URL != "", agentLookup{agent.New(pool)}, visibility, agentdirect.New(mapper, roomEnsurer{room.New(pool)}))}
+}
+
+type cronDirect struct{ prepare *agentdirect.PrepareService }
+
+func (d *cronDirect) EnsureDirectConversation(ctx context.Context, tenantID, accountID, agentID int64, agentUUID string) (string, error) {
+	result, err := d.prepare.Prepare(ctx, tenantID, accountID, agentUUID)
+	if err != nil {
+		return "", err
+	}
+	return result.ConversationUUID, nil
+}

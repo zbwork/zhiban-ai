@@ -6,6 +6,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/encode"
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
+	svc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/communityagent"
 	"net/http"
 	"strconv"
 )
@@ -14,10 +15,19 @@ type AgentReader interface {
 	List(context.Context, domagent.Filter) ([]domagent.DigitalEmployee, int64, error)
 	GetByUUID(context.Context, string) (*domagent.DigitalEmployee, error)
 }
-type AgentHandlers struct{ Agents AgentReader }
+type AgentHandlers struct {
+	Agents   AgentReader
+	Personal *svc.Personal
+}
 
 func agentView(e domagent.DigitalEmployee) map[string]any {
-	return map[string]any{"UUID": e.UUID, "Name": e.Name, "Intro": e.Intro, "Description": e.Description, "AvatarURL": e.AvatarURL, "Status": e.Status, "Source": e.Source, "Visibility": e.Visibility, "CreatorID": e.CreatorID, "CreatorName": e.CreatorName, "IsDefaultForCreator": e.IsDefaultForCreator, "PositionLabel": e.PositionLabel, "DepartmentName": e.DepartmentName, "execution_locus": e.ExecutionLocus, "supports_model_selection": false, "supports_skill_bindings": false, "can_manage_skills": false}
+	metadata := map[string]any{}
+	for _, key := range []string{"system_prompt", "agent_key", "allow_internet_access", "selected_app_uuids", "selected_app_labels", "selected_knowledge_base_uuids", "selected_knowledge_base_labels"} {
+		if value, ok := e.Metadata[key]; ok {
+			metadata[key] = value
+		}
+	}
+	return map[string]any{"Description": e.Description, "WelcomeMsg": e.WelcomeMsg, "metadata": metadata, "Tags": e.Tags, "UUID": e.UUID, "Name": e.Name, "Intro": e.Intro, "AvatarURL": e.AvatarURL, "Status": e.Status, "Source": e.Source, "Visibility": e.Visibility, "CreatorID": e.CreatorID, "CreatorName": e.CreatorName, "IsDefaultForCreator": e.IsDefaultForCreator, "PositionLabel": e.PositionLabel, "DepartmentName": e.DepartmentName, "execution_locus": e.ExecutionLocus, "supports_model_selection": false, "supports_skill_bindings": false, "can_manage_skills": false}
 }
 func (h *AgentHandlers) List(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()

@@ -2203,7 +2203,7 @@ func (s *impl) assertCronCapability(ctx context.Context, ag *domagent.DigitalEmp
 			Withf("cron runtime lookup failed for agent %s: %v", ag.UUID, err)
 	}
 	framework = strings.ToLower(strings.TrimSpace(framework))
-	if framework != "openclaw" && framework != "hermes" && framework != "zap" && framework != "dsh" {
+	if framework != "openclaw" && framework != "hermes" && framework != "zap" && framework != "dsh" && framework != "generic" {
 		return apperr.New(apperr.Forbidden, ErrCodeCronAgentNotSupported).
 			Withf("cron requires a chat-capable runtime; agent %s runtime framework=%q",
 				ag.UUID, framework)

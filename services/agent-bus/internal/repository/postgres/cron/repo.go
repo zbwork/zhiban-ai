@@ -20,7 +20,8 @@ import (
 
 // Repo cron 仓储.
 type Repo struct {
-	pool *pgxpool.Pool
+	pool      *pgxpool.Pool
+	community bool
 }
 
 func New(pool *pgxpool.Pool) *Repo {
@@ -631,7 +632,7 @@ func (r *Repo) DueJobs(ctx context.Context, horizon time.Time, limit int) ([]dom
 		  WHERE deleted_at IS NULL AND enabled=true AND status='active'
 		    AND scheduler_kind='bus'
 		    AND next_run_at IS NOT NULL AND next_run_at <= $1
-            AND `+localDesktopReadySQL("agent_cron_jobs")+`
+            AND `+r.desktopReadySQL("agent_cron_jobs")+`
 		  ORDER BY next_run_at ASC LIMIT $2`, horizon, limit)
 	if err != nil {
 		return nil, err
@@ -911,7 +912,7 @@ func (r *Repo) PickQueuedRunForUpdate(ctx context.Context, tx pgx.Tx, limit int)
 		`SELECT `+runCols+` FROM agent_cron_runs
 		  WHERE status='queued' AND (
             EXISTS (SELECT 1 FROM agent_cron_jobs j WHERE j.id=agent_cron_runs.job_id AND (j.deleted_at IS NOT NULL OR j.status<>'active'))
-            OR `+localDesktopReadySQL("agent_cron_runs")+`)
+            OR `+r.desktopReadySQL("agent_cron_runs")+`)
 		  ORDER BY id ASC
 		  FOR UPDATE SKIP LOCKED
 		  LIMIT $1`, limit)
@@ -1349,4 +1350,13 @@ func localDesktopReadySQL(owner string) string {
 func (r *Repo) RequeueUnstartedRun(ctx context.Context, id int64) error {
 	_, err := r.pool.Exec(ctx, `UPDATE agent_cron_runs SET status='queued' WHERE id=$1 AND status='running' AND message_uuid IS NULL`, id)
 	return err
+}
+
+// NewCommunity excludes local desktop work without referencing private device tables.
+func NewCommunity(pool *pgxpool.Pool) *Repo { r := New(pool); r.community = true; return r }
+func (r *Repo) desktopReadySQL(owner string) string {
+	if r.community {
+		return "EXISTS (SELECT 1 FROM digital_employees de WHERE de.id=" + owner + ".agent_id AND de.execution_locus <> 'local')"
+	}
+	return localDesktopReadySQL(owner)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/busrouter"
 	communitychat "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/chat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/config"
+	communitycron "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/cron"
 	communitydrive "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/drive"
 	communityim "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/im"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
@@ -20,14 +21,17 @@ import (
 	audit "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/authaudit"
 	convrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/conversation"
 	staterepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/convstate"
-	cronrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/cron"
+	eventrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/event"
 	kbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/knowledge"
 	msgrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/message"
 	rbac "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/rbac"
+	envrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/runtimeenv"
 	session "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/session"
 	skillrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/skill"
 	tenant "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/tenant"
+	agentsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/agent"
 	authsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/auth"
+	personal "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/communityagent"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/communitycatalog"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/contacts"
 	cronsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/cron"
@@ -84,9 +88,14 @@ func run(ctx context.Context, path string) error {
 	}
 	defer chatSvc.StopCancelListener()
 	handlers := busrouter.Handlers{Session: &httpsession.Handlers{Auth: auth}, Chat: &clientchat.Handlers{Chat: chatSvc}, Contacts: &clientcontacts.Handlers{Contacts: contactsSvc}}
-	handlers.Agents = &clientcatalog.AgentHandlers{Agents: agentrepo.New(pool)}
+	handlers.Agents = &clientcatalog.AgentHandlers{Agents: agentrepo.New(pool), Personal: &personal.Personal{Agents: agentsvc.New(agentrepo.New(pool), nil, nil, pool, eventrepo.New(pool)), Environments: envrepo.New(pool)}}
 	handlers.Catalog = &clientcatalog.Handlers{Skill: skillsvc.New(skillrepo.NewCommunity(pool))}
-	handlers.Cron = &clientcron.Handlers{Cron: cronsvc.New(cronsvc.Deps{Repo: cronrepo.New(pool), Agents: agentrepo.New(pool), Visibility: contactsSvc})}
+	cronService := communitycron.Compose(ctx, pool, chatSvc, contactsSvc, communityim.DirectConversations(pool, cfg, contactsSvc))
+	handlers.Cron = &clientcron.Handlers{Cron: cronService}
+	cronCtx, stopCron := context.WithCancel(ctx)
+	cronDone := make(chan struct{})
+	go func() { defer close(cronDone); cronsvc.NewLoop(cronService, 5*time.Second).Run(cronCtx) }()
+	defer func() { stopCron(); <-cronDone }()
 	handlers.Knowledge = &clientcatalog.KnowledgeHandler{Service: &communitycatalog.Knowledge{Repo: kbrepo.New(pool)}}
 	if storage != nil {
 		handlers.Drive = communitydrive.Compose(pool, storage)

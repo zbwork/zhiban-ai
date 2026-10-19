@@ -30,6 +30,12 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 		return auth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(membership)(handler)))
 	}
 	if h.Agents != nil {
+		if h.Agents.Personal != nil {
+			mux.Handle("POST /api/agent-bus/v1/agents", authT(http.HandlerFunc(h.Agents.Create)))
+			mux.Handle("PUT /api/agent-bus/v1/agents/{uuid}", authT(http.HandlerFunc(h.Agents.Update)))
+			mux.Handle("DELETE /api/agent-bus/v1/agents/{uuid}", authT(http.HandlerFunc(h.Agents.Delete)))
+		}
+
 		mux.Handle("GET /api/agent-bus/v1/agents", authT(http.HandlerFunc(h.Agents.List)))
 		mux.Handle("GET /api/agent-bus/v1/agents/{uuid}", authT(http.HandlerFunc(h.Agents.Get)))
 	}
@@ -39,6 +45,16 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	}
 	if h.Cron != nil {
 		mux.Handle("GET /api/agent-bus/v1/cron/jobs", authT(http.HandlerFunc(h.Cron.ListJobs)))
+		mux.Handle("POST /api/agent-bus/v1/cron/jobs", authT(http.HandlerFunc(h.Cron.CreateJob)))
+		mux.Handle("GET /api/agent-bus/v1/cron/jobs/{uuid}", authT(http.HandlerFunc(h.Cron.GetJob)))
+		mux.Handle("PATCH /api/agent-bus/v1/cron/jobs/{uuid}", authT(http.HandlerFunc(h.Cron.PatchJob)))
+		mux.Handle("DELETE /api/agent-bus/v1/cron/jobs/{uuid}", authT(http.HandlerFunc(h.Cron.DeleteJob)))
+		mux.Handle("POST /api/agent-bus/v1/cron/jobs/{uuid}/run", authT(http.HandlerFunc(h.Cron.RunNow)))
+		mux.Handle("POST /api/agent-bus/v1/cron/jobs/{uuid}/pause", authT(http.HandlerFunc(h.Cron.Pause)))
+		mux.Handle("POST /api/agent-bus/v1/cron/jobs/{uuid}/resume", authT(http.HandlerFunc(h.Cron.Resume)))
+		mux.Handle("GET /api/agent-bus/v1/cron/jobs/{uuid}/runs", authT(http.HandlerFunc(h.Cron.ListJobRuns)))
+		mux.Handle("GET /api/agent-bus/v1/cron/runs/{uuid}", authT(http.HandlerFunc(h.Cron.GetRun)))
+		mux.Handle("POST /api/agent-bus/v1/cron/runs/{uuid}/open-chat", authT(http.HandlerFunc(h.Cron.OpenChat)))
 		mux.Handle("GET /api/agent-bus/v1/cron/runs", authT(http.HandlerFunc(h.Cron.ListRuns)))
 	}
 	if h.Knowledge != nil {
