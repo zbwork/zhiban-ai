@@ -40,7 +40,7 @@ final sessionRealtimeBootstrapProvider = Provider<void>((ref) {
 /// 每个会话 scope 一次;切换企业重建 ProviderScope 后会再跑一次。
 final localCodingMaintenanceBootstrapProvider = Provider<void>((ref) {
   if (!(PlatformUtils.isMacOS || PlatformUtils.isWindows) ||
-      !AppConfig.localCodingToolsEnabled) {
+      !AppConfig.localCodingToolsEnabled || AppConfig.communityEdition) {
     return;
   }
   // 重新登录后自动重新接入(2026-09-18):同一个人回来时不必进页面点「修复并重试」。

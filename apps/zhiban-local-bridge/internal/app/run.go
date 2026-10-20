@@ -63,6 +63,7 @@ type VerifyManager interface {
 }
 
 type Config struct {
+	Community      *credential.CommunityManager
 	BridgeVersion  string
 	Platform       string
 	Arch           string
@@ -140,6 +141,11 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 			}
 			return state, nil
 		},
+	}
+	if config.Community != nil {
+		rpcConfig.BYOKSettings = func(ctx context.Context, params credential.BYOKSettings) (any, error) {
+			return config.Community.Settings(ctx, params)
+		}
 	}
 	if config.Credentials != nil {
 		rpcConfig.CredentialPrepare = func(ctx context.Context, params rpc.CredentialPrepareParams) (any, error) {

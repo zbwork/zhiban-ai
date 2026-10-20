@@ -856,7 +856,7 @@ func (m *Manager) planGlobalLocked(ctx context.Context, targetID, installationID
 			extra = &extraFile{Path: m.claudeDesktopMetaPath(), Before: metaBefore, Desired: metaDesired}
 		}
 		action := ActionSwitchGlobal
-		if switched && configBefore.Exists && sameManagedRegion(targetID, configBefore.Bytes, desired) &&
+		if switched && recorded.ProfileVersion == authorization.ProfileVersion && configBefore.Exists && sameManagedRegion(targetID, configBefore.Bytes, desired) &&
 			claudeDesktopDisplayCurrent(targetID, configBefore.Bytes, desired) &&
 			claudeExtraCACurrent(targetID, configBefore.Bytes, desired) &&
 			(extra == nil || bytes.Equal(extra.Before.Bytes, extra.Desired)) &&

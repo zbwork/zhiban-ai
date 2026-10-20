@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:zhiban_ui/utils/platform_utils.dart';
 import 'app_update_service.dart';
+import 'package:zhiban_client/config/app_config.dart';
 import 'desktop_update_cache.dart';
 
 enum DesktopUpdateCheckResult {
+  unavailable,
   upToDate,
   downloaded,
   readyToRestart,
@@ -104,6 +106,7 @@ class DesktopUpdateCoordinator {
 
   /// 桌面侧栏挂载时调用一次，注册 Swift→Dart 事件接收。
   void registerUpdateEventHandler() {
+    if (AppConfig.communityEdition) return;
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'updateEvent') {
         final args = Map<String, dynamic>.from(call.arguments as Map);
@@ -240,7 +243,10 @@ class DesktopUpdateCoordinator {
   /// The profile menu, settings page, and sidebar all share this background
   /// check. It never opens Sparkle's own check window.
   Future<bool> checkAndDownloadUpdate({String? feedUrl}) async =>
-      await checkForUpdates(feedUrl: feedUrl) != DesktopUpdateCheckResult.failed;
+      switch (await checkForUpdates(feedUrl: feedUrl)) {
+        DesktopUpdateCheckResult.failed || DesktopUpdateCheckResult.unavailable => false,
+        _ => true,
+      };
 
   /// Returns the completed outcome, not merely whether a check was accepted.
   Future<DesktopUpdateCheckResult> checkForUpdates({String? feedUrl}) =>
@@ -248,6 +254,7 @@ class DesktopUpdateCoordinator {
           .whenComplete(() => _checkOperation = null);
 
   Future<DesktopUpdateCheckResult> _checkAndDownload({String? feedUrl}) async {
+    if (AppConfig.communityEdition) return DesktopUpdateCheckResult.unavailable;
     if (!PlatformUtils.isDesktop) return DesktopUpdateCheckResult.failed;
     _log('manual check requested');
     try {
@@ -286,7 +293,7 @@ class DesktopUpdateCoordinator {
           .whenComplete(() => _installOperation = null);
 
   Future<bool> _install({required bool prepare, String? feedUrl}) async {
-    if (!PlatformUtils.isDesktop) return false;
+    if (AppConfig.communityEdition || !PlatformUtils.isDesktop) return false;
     try {
       final native = await _nativeState();
       if (native.pendingInstall) {
@@ -335,7 +342,9 @@ class DesktopUpdateCoordinator {
   }
 
   Future<DesktopUpdateState> getUpdateState() async {
-    if (!PlatformUtils.isDesktop) return const DesktopUpdateState.unavailable();
+    if (AppConfig.communityEdition || !PlatformUtils.isDesktop) {
+      return const DesktopUpdateState.unavailable();
+    }
     final native = await _nativeState();
     if (native.pendingInstall || native.nativeSessionActive) {
       _logUpdateState(native, native, cacheState: 'not_checked');
@@ -384,7 +393,7 @@ class DesktopUpdateCoordinator {
   }
 
   Future<String?> updateFeedUrl() async {
-    if (!PlatformUtils.isDesktop) {
+    if (AppConfig.communityEdition || !PlatformUtils.isDesktop) {
       return null;
     }
 

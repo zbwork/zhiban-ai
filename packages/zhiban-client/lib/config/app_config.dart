@@ -131,8 +131,7 @@ class AppConfig {
   // LOCAL_CODING_TOOLS_ENABLED=false。入口显示不代表 Bridge 已打进包：macOS Release
   // 仍需 LOCAL_CODING_BRIDGE_EMBED=YES 一组签名参数（README「本地编程工具 Bridge」），
   // 缺 helper 时页面提示"本地连接组件不可用"。
-  static const localCodingToolsEnabled = !communityEdition &&
-      bool.fromEnvironment(
+  static const localCodingToolsEnabled = bool.fromEnvironment(
         'LOCAL_CODING_TOOLS_ENABLED',
         defaultValue: true,
       );

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/zbwork/zhiban-ai/apps/zhiban-local-bridge/internal/credential"
 	"io"
 	"math/big"
 	"regexp"
@@ -113,6 +114,22 @@ func (s *Server) handleFrame(ctx context.Context, frame []byte) (Response, bool)
 	switch request.Method {
 	case "initialize":
 		return s.initialize(request)
+	case "byok.settings":
+		if !s.initialized {
+			return errorResponse(request.ID, CodeNotInitialized, "Bridge not initialized"), true
+		}
+		if s.config.BYOKSettings == nil {
+			return errorResponse(request.ID, CodeMethodNotFound, "Method not found"), true
+		}
+		var params credential.BYOKSettings
+		if decodeStrict(request.Params, &params) != nil {
+			return errorResponse(request.ID, CodeInvalidParams, "Invalid params"), true
+		}
+		result, err := s.config.BYOKSettings(ctx, params)
+		if err != nil {
+			return errorResponse(request.ID, CodeDomainError, "LCT-BYOK-SETTINGS_FAILED"), true
+		}
+		return resultResponse(request.ID, result), true
 	case "tool.detect":
 		if !s.initialized {
 			return errorResponse(request.ID, CodeNotInitialized, "Bridge not initialized"), true
@@ -202,6 +219,9 @@ func (s *Server) initialize(request Request) (Response, bool) {
 
 func (s *Server) supportedMethods() []string {
 	methods := make([]string, 0, 12)
+	if s.config.BYOKSettings != nil {
+		methods = append(methods, "byok.settings")
+	}
 	if s.config.Detect != nil {
 		methods = append(methods, "tool.detect")
 	}

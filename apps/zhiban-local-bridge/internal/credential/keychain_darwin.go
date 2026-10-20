@@ -26,6 +26,15 @@ static CFStringRef zb_account_string(const uint8_t *bytes, size_t length) {
 	);
 }
 
+// Community BYOK deliberately uses the login Keychain. Platform device
+// credentials keep Data Protection Keychain; failures never switch stores.
+static int zb_community_byok(const uint8_t *bytes, size_t length) {
+ const char *codex="community-byok-codex_cli-v1";
+ const char *claude="community-byok-claude_cli-v1";
+ return (length==strlen(codex) && memcmp(bytes,codex,length)==0) ||
+        (length==strlen(claude) && memcmp(bytes,claude,length)==0);
+}
+
 static CFMutableDictionaryRef zb_base_query(const uint8_t *account_bytes, size_t account_length) {
 	CFStringRef account = zb_account_string(account_bytes, account_length);
 	if (account == NULL) {
@@ -42,9 +51,11 @@ static CFMutableDictionaryRef zb_base_query(const uint8_t *account_bytes, size_t
 		return NULL;
 	}
 	CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword);
-	CFDictionarySetValue(query, kSecAttrService, CFSTR("cn.zhiban.local-coding"));
+	CFDictionarySetValue(query, kSecAttrService, zb_community_byok(account_bytes,account_length) ? CFSTR("cn.zhiban.community.local-coding") : CFSTR("cn.zhiban.local-coding"));
 	CFDictionarySetValue(query, kSecAttrAccount, account);
-	CFDictionarySetValue(query, kSecUseDataProtectionKeychain, kCFBooleanTrue);
+	if (!zb_community_byok(account_bytes,account_length)) {
+ CFDictionarySetValue(query, kSecUseDataProtectionKeychain, kCFBooleanTrue);
+ }
 	CFDictionarySetValue(query, kSecAttrSynchronizable, kCFBooleanFalse);
 	CFRelease(account);
 	return query;
@@ -64,7 +75,9 @@ static OSStatus zb_keychain_save(
 		return errSecAllocate;
 	}
 	CFDictionarySetValue(add_query, kSecValueData, data);
-	CFDictionarySetValue(add_query, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly);
+	if (!zb_community_byok(account_bytes,account_length)) {
+ CFDictionarySetValue(add_query, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly);
+ }
 	OSStatus status = SecItemAdd(add_query, NULL);
 	CFRelease(add_query);
 	if (status == errSecDuplicateItem) {
@@ -82,7 +95,9 @@ static OSStatus zb_keychain_save(
 			return errSecAllocate;
 		}
 		CFDictionarySetValue(updates, kSecValueData, data);
-		CFDictionarySetValue(updates, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly);
+		if (!zb_community_byok(account_bytes,account_length)) {
+ CFDictionarySetValue(updates, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly);
+ }
 		status = SecItemUpdate(match_query, updates);
 		CFRelease(match_query);
 		CFRelease(updates);

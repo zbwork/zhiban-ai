@@ -2,6 +2,7 @@ import 'package:zhiban_client/services/desktop_update_service.dart';
 
 extension DesktopUpdateCheckMessage on DesktopUpdateCheckResult {
   String get message => switch (this) {
+        DesktopUpdateCheckResult.unavailable => '社区版暂未启用应用内更新',
         DesktopUpdateCheckResult.upToDate => '已是最新版本',
         DesktopUpdateCheckResult.downloaded => '更新已下载，请在左下角点击安装',
         DesktopUpdateCheckResult.readyToRestart => '安装已就绪，请在左下角点击重启应用',
@@ -44,6 +45,7 @@ class DesktopUpdateCheckFeedback {
     if (revision != ifUnchanged) return;
     _set(
       switch (result) {
+        DesktopUpdateCheckResult.unavailable => '社区版暂未启用应用内更新',
         DesktopUpdateCheckResult.upToDate => '已是最新版本',
         DesktopUpdateCheckResult.downloaded => '已下载',
         DesktopUpdateCheckResult.readyToRestart => '安装已就绪',

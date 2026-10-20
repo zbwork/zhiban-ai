@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/zbwork/zhiban-ai/apps/zhiban-local-bridge/internal/credential"
 )
 
 const (
@@ -42,6 +43,7 @@ type DiagnosticsLatestFunc func(context.Context, string) (any, error)
 type CatalogApplyFunc func(context.Context, CatalogApplyParams) (any, error)
 
 type Config struct {
+	BYOKSettings       func(context.Context, credential.BYOKSettings) (any, error)
 	BridgeVersion      string
 	Platform           string
 	Arch               string

@@ -152,6 +152,46 @@ abstract interface class LocalCodingBridgeSession {
   Future<void> close();
 }
 
+/// Community settings travel only over the bundled helper's stdio.
+abstract interface class LocalCodingBYOKSession {
+  Future<Map<String, dynamic>> byokSettings({
+    required LocalCodingTarget target,
+    String? baseUrl,
+    String? model,
+    String? apiKey,
+    bool save = false,
+    bool delete = false,
+  });
+}
+
+extension LocalCodingBYOKAccess on LocalCodingBridgeSession {
+  Future<Map<String, dynamic>> byokSettings({
+    required LocalCodingTarget target,
+    String? baseUrl,
+    String? model,
+    String? apiKey,
+    bool save = false,
+    bool delete = false,
+  }) {
+    final session = this;
+    if (session is! LocalCodingBYOKSession ||
+        !supportedMethods.contains('byok.settings')) {
+      throw const LocalCodingBridgeException(
+        'byok_unavailable',
+        '请更新本地连接组件后设置 API',
+      );
+    }
+    return (session as LocalCodingBYOKSession).byokSettings(
+      target: target,
+      baseUrl: baseUrl,
+      model: model,
+      apiKey: apiKey,
+      save: save,
+      delete: delete,
+    );
+  }
+}
+
 abstract interface class LocalCodingBridgeSessionFactory {
   Future<LocalCodingBridgeSession> open();
 }
@@ -616,7 +656,7 @@ class ProcessLocalCodingBridgeSessionFactory
   }
 }
 
-class _ProcessLocalCodingBridgeSession implements LocalCodingBridgeSession {
+class _ProcessLocalCodingBridgeSession implements LocalCodingBridgeSession, LocalCodingBYOKSession {
   _ProcessLocalCodingBridgeSession(
     this._process, {
     required this.requestTimeout,
@@ -1005,6 +1045,26 @@ class _ProcessLocalCodingBridgeSession implements LocalCodingBridgeSession {
     }
   }
 
+  @override
+  Future<Map<String, dynamic>> byokSettings({
+    required LocalCodingTarget target,
+    String? baseUrl,
+    String? model,
+    String? apiKey,
+    bool save = false,
+    bool delete = false,
+  }) async {
+    _requireInitialized();
+    return _call('byok.settings', {
+      'target_id': target.id,
+      if (baseUrl != null) 'base_url': baseUrl,
+      if (model != null) 'model': model,
+      if (apiKey != null) 'api_key': apiKey,
+      'save': save,
+      'delete': delete,
+    });
+  }
+
   Future<Map<String, dynamic>> _call(
     String method,
     Map<String, dynamic> params, {
@@ -1234,7 +1294,7 @@ String _friendlyDomainMessage(String code) {
     case 'PROCESS_FAILED':
       return '工具进程启动失败，请查看诊断详情';
     case 'NOT_SWITCHED':
-      return '当前未切换到知办模型 API，无需恢复';
+      return '当前未切换到自定义模型 API，无需恢复';
     default:
       return '本地连接组件未能完成操作，请重试';
   }

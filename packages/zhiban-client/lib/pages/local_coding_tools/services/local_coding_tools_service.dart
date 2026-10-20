@@ -399,12 +399,12 @@ abstract interface class LocalCodingToolsOperations {
     required Map<String, dynamic> clientInfo,
   });
 
-  // CC Switch 式全局切换(切换为知办模型 API / 恢复官方配置)与「打开应用」。
+  // CC Switch 式全局切换(切换为自定义模型 API / 恢复官方配置)与「打开应用」。
   Future<LocalCodingToolsSnapshot> switchToZhiban(LocalCodingTarget target);
   Future<LocalCodingToolsSnapshot> restoreOfficial(LocalCodingTarget target);
   Future<LocalCodingLaunchResult> openApp(LocalCodingTarget target);
 
-  // 契约 §2.7 network.* · 一键为知办中转站设置代理例外。
+  // 契约 §2.7 network.* · 一键为你配置的模型服务设置代理例外。
   Future<LocalCodingToolsSnapshot> applyProxyFix();
 }
 
@@ -532,6 +532,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
   /// 暂时取不到 → Bridge 沿用自己落盘的目录;Bus 明确没有目录 → 让 Bridge 清除;
   /// Bridge 验签拒绝 → 忽略,detect 里就没有升级项。
   Future<void> _applyCatalog(LocalCodingBridgeSession session) async {
+    if (AppConfig.communityEdition) return;
     if (!session.supportedMethods.contains('catalog.apply')) return;
     final runtime = _catalogRuntime;
     if (runtime == null) return;
@@ -703,7 +704,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
       // 桌面端没有知办隔离 overlay(契约 §2.7.3),只有全局切换。
       throw const LocalCodingToolsException(
         'desktop_overlay_unsupported',
-        '桌面端不支持隔离配置，请使用「切换为知办模型 API」',
+        '桌面端不支持隔离配置，请使用「切换为自定义模型 API」',
       );
     }
     if (!_profilesReady) {
@@ -719,6 +720,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     );
     final session = await _bridgeFactory.open();
     try {
+      await _requireCommunitySettings(session, target);
       final credential = await session.credentialStatus();
       final current = await session.configurationStatus(target);
       if (current.state == LocalCodingConfigurationState.conflict) {
@@ -727,8 +729,9 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
           '检测到已有配置。为避免覆盖你的设置，知办已停止操作。',
         );
       }
+      final expectedProfile = await _expectedProfile(session, target);
       final needsConfiguration = !current.configured ||
-          current.profileVersion != _profileVersions[target.id];
+          current.profileVersion != expectedProfile;
       LocalCodingToolState? installation;
       String? effectiveInstallationId;
       if (needsConfiguration) {
@@ -830,6 +833,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
       try {
         final credential = await session.credentialStatus();
         if (mode == LocalCodingLaunchMode.managed &&
+            !AppConfig.communityEdition &&
             !_authorizationConnected(credential, deviceId)) {
           throw const LocalCodingToolsException(
             'authorization_not_current',
@@ -838,7 +842,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
         }
 
         final configuration = await session.configurationStatus(target);
-        final expectedProfile = _profileVersions[target.id] ?? '';
+        final expectedProfile = await _expectedProfile(session, target);
         if (mode == LocalCodingLaunchMode.managed) {
           if (configuration.state == LocalCodingConfigurationState.conflict) {
             throw const LocalCodingToolsException(
@@ -915,6 +919,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
   Future<void> removeAuthorizationOnLogout() => _removeAuthorization(logout: true);
 
   Future<void> _removeAuthorization({required bool logout}) async {
+    if (AppConfig.communityEdition) return;
     final deviceId = await _requireDeviceId();
     final identity = await _identityLoader();
     // 主动移除(含恢复官方配置后顺带撤销):先清记录,后面哪一步失败都不会被自动接回。
@@ -970,7 +975,12 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     _InspectTracker? tracker,
   }) async {
     final status = await session.credentialStatus();
-    final revocationPending = await _hasMatchingPendingRevocation(deviceId);
+    final revocationPending = !AppConfig.communityEdition && await _hasMatchingPendingRevocation(deviceId);
+    final expectedProfiles = <LocalCodingTarget, String>{};
+    for (final vendor in LocalCodingVendor.values) {
+      final version = await _expectedProfile(session, vendor.cliTarget);
+      for (final target in vendor.targets) { expectedProfiles[target] = version; }
+    }
     // M3 · 四个 target(两厂商 × CLI / 桌面端)各自检测;桌面端的配置视图由
     // Bridge 负责映射(Codex 共用 CLI 配置,Claude 走 3P 配置库)。
     final tools = <LocalCodingTarget, LocalCodingToolState>{};
@@ -988,7 +998,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
           // 桌面端沿用同厂商 CLI 的 Profile 版本(Bridge ScopeTarget)。
           expectedProfileVersions: Map<LocalCodingTarget, String>.unmodifiable({
             for (final target in LocalCodingTarget.values)
-              target: _profileVersions[target.scopeTarget.id] ?? '',
+              target: expectedProfiles[target] ?? '',
           }),
           registrationAvailable: _profilesReady,
           remoteRevocationPending: revocationPending,
@@ -1040,7 +1050,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
         throw LocalCodingToolsException(
           error.code,
           error.code.endsWith('-NETWORK-DIRECT_UNREACHABLE')
-              ? '当前网络不开代理就连不上知办中转站，没法自动修复，请检查网络后重试'
+              ? '当前网络不开代理就连不上你配置的模型服务，没法自动修复，请检查网络后重试'
               : '代理例外设置失败，请重试',
         );
       }
@@ -1054,10 +1064,31 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     }
   }
 
+  Future<String> _expectedProfile(LocalCodingBridgeSession session, LocalCodingTarget target) async {
+    if (!AppConfig.communityEdition) return _profileVersions[target.scopeTarget.id] ?? '';
+    final settings = await session.byokSettings(target: target);
+    return settings['profile_version'] as String? ?? '';
+  }
+
+  Future<void> _requireCommunitySettings(
+    LocalCodingBridgeSession session,
+    LocalCodingTarget target,
+  ) async {
+    if (!AppConfig.communityEdition) return;
+    final settings = await session.byokSettings(target: target);
+    if (settings['key_configured'] != true) {
+      throw const LocalCodingToolsException(
+        'byok_required',
+        '请先点击「API 设置」，填写自己的 API 地址、模型和 API Key',
+      );
+    }
+  }
+
   Future<void> _registerInSession(
     LocalCodingBridgeSession session,
     String deviceId,
   ) async {
+    if (AppConfig.communityEdition) return;
     var serverRotated = false;
     try {
       final prepared = await session.prepareRegistration(
@@ -1143,6 +1174,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     String deviceId, {
     bool requireRemoteCompletion = false,
   }) async {
+    if (AppConfig.communityEdition) return;
     final matching = await _matchingPendingRevocation(deviceId);
     if (matching == null) return;
     var pending = matching;
@@ -1327,7 +1359,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
   }) async {
     // 全局切换的配置文件不随退出登录 / 切环境 / 重装而消失,设备授权却会:
     // 先把授权补上再换票,否则「重新检测」必然 AUTH-DEVICE_MISSING
-    // (2026-09-14 开发机实测)。与「切换为知办模型 API」同一套接入逻辑。
+    // (2026-09-14 开发机实测)。与「切换为自定义模型 API」同一套接入逻辑。
     final ensureAuthorization =
         scope == LocalCodingVerifyScope.global && _profilesReady;
     String? deviceId;
@@ -1340,6 +1372,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     }
     final session = await _bridgeFactory.open();
     try {
+      await _requireCommunitySettings(session, target);
       if (!session.supportedMethods.contains('verify.execute')) {
         throw const LocalCodingToolsException(
           'verify_unsupported',
@@ -1562,6 +1595,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
   ) async {
     final session = await _bridgeFactory.open();
     try {
+      await _requireCommunitySettings(session, target);
       final credential = await session.credentialStatus();
       final installation = await session.detect(target);
       if (installation.uiState == LocalCodingToolUiState.notInstalled) {
@@ -1594,7 +1628,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
         // 契约 §2.7.3 supports_enable=false:该桌面端没有可写的第三方推理配置。
         throw const LocalCodingToolsException(
           'desktop_enable_unsupported',
-          '该桌面端暂不支持知办模型 API，仍可使用官方服务',
+          '该桌面端暂不支持自定义模型 API，仍可使用官方服务',
         );
       }
       if (!_authorizationConnected(credential, deviceId)) {
@@ -1631,7 +1665,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     } catch (_) {
       throw const LocalCodingToolsException(
         'switch_failed',
-        '切换为知办模型 API 失败，请重新检测后重试',
+        '切换为自定义模型 API 失败，请重新检测后重试',
       );
     } finally {
       await session.close();
@@ -1771,6 +1805,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     required Map<String, dynamic> clientInfo,
   }) async {
     final info = await PackageInfo.fromPlatform();
+    if (AppConfig.communityEdition) return null;
     final payload = <String, dynamic>{
       ...clientInfo,
       'app_version': '${info.version}+${info.buildNumber}',

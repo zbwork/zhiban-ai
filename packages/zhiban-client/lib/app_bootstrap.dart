@@ -64,7 +64,7 @@ Future<void> startApp({
   debugPrint('[BOOT] env=${AppConfig.env.name} api=${AppConfig.apiUrl()}');
   if (!kIsWeb &&
       (Platform.isMacOS || Platform.isWindows) &&
-      AppConfig.localCodingToolsEnabled) {
+      AppConfig.localCodingToolsEnabled && !AppConfig.communityEdition) {
     configureSessionLogoutCleanup(
       LocalCodingToolsService().removeAuthorizationOnLogout,
     );

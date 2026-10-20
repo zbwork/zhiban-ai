@@ -121,6 +121,7 @@ type ResolveAuthorizationFunc func(context.Context, string) (AuthorizationProfil
 type ProbeFunc func(context.Context, Installation, string) error
 
 type ManagerConfig struct {
+	AllowEmptyProfiles   bool
 	HomeDir              string
 	CodexHome            string
 	HelperExecutable     string
@@ -316,13 +317,13 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		}
 		for target, profile := range byTarget {
 			if !validTarget(target) || !validSafeValue(profile.Version) || validateGatewayURL(environment, profile.BaseURL) != nil ||
-				(profile.Model != "" && !validSafeValue(profile.Model)) {
+				(profile.Model != "" && !validModelValue(profile.Model)) {
 				return nil, ErrInvalidInput
 			}
 			profileCount++
 		}
 	}
-	if profileCount == 0 {
+	if profileCount == 0 && !config.AllowEmptyProfiles {
 		return nil, ErrInvalidInput
 	}
 	versions := make(map[string]string, len(config.SupportedVersions))
@@ -410,6 +411,11 @@ func (m *Manager) fullStatusLocked(targetID string) (Status, error) {
 	status.GlobalSwitched = global.SwitchedByZhiban
 	status.GlobalBackupAvailable = global.BackupAvailable
 	status.GlobalDrifted = global.Drifted
+	if byTarget, ok := m.profiles[EnvironmentDev]; ok {
+		if profile, ok := byTarget[profileTarget(targetID)]; ok && strings.HasPrefix(profile.Version, "byok-") && global.SwitchedByZhiban && global.ProfileVersion != profile.Version {
+			status.GlobalDrifted = true
+		}
+	}
 	status.GlobalUpgradeAvailable = global.UpgradeAvailable
 	if global.SwitchedByZhiban {
 		status.GlobalVerificationLevel = global.VerificationLevel
@@ -922,7 +928,7 @@ func validateManagedContent(targetID string, content []byte) error {
 		decoder.DisallowUnknownFields()
 		if decoder.Decode(&settings) != nil || decoder.Decode(&struct{}{}) != io.EOF ||
 			settings.Schema != "https://json.schemastore.org/claude-code-settings.json" ||
-			(settings.Model != "" && !validSafeValue(settings.Model)) ||
+			(settings.Model != "" && !validModelValue(settings.Model)) ||
 			(settings.Env.DisableAutoupdater != "" && settings.Env.DisableAutoupdater != "1") ||
 			settings.APIKeyHelper == "" || len(settings.APIKeyHelper) > 4096 ||
 			strings.ContainsAny(settings.APIKeyHelper, "\r\n\x00") ||
@@ -1175,6 +1181,18 @@ func desktopProbeInstallation(installation Installation) (Installation, error) {
 
 func validEnvironment(value Environment) bool {
 	return value == EnvironmentDev || value == EnvironmentTest || value == EnvironmentProd
+}
+
+func validModelValue(value string) bool {
+	if len(value) == 0 || len(value) > 256 {
+		return false
+	}
+	for _, r := range value {
+		if r <= 32 || r == 127 {
+			return false
+		}
+	}
+	return true
 }
 
 func validSafeValue(value string) bool {

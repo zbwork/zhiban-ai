@@ -89,7 +89,8 @@ func credentialPath(account string) (string, error) {
 	}
 	// Account names are fixed internal constants (device-identity-v1 /
 	// device-authorization-v1); reject anything that could escape the dir.
-	if account != keychainIdentityAccount && account != keychainAuthorizationAccount {
+	if account != keychainIdentityAccount && account != keychainAuthorizationAccount &&
+		account != "community-byok-codex_cli-v1" && account != "community-byok-claude_cli-v1" {
 		return "", ErrInvalidData
 	}
 	dir, err := credentialDir()

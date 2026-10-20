@@ -28,6 +28,7 @@ import (
 
 var (
 	bridgeVersion        = "0.3.0-dev"
+	communityEdition     = "true"
 	devClientAPIBaseURL  = "http://localhost:8080/api/agent-bus/v1"
 	testClientAPIBaseURL = "https://aigc-chat-web.yixin.com/api/agent-bus/v1"
 	prodClientAPIBaseURL = "https://zb.qkfintech.cn/api/agent-bus/v1"
@@ -66,6 +67,11 @@ var verifyFallbackModels = map[string][]string{
 	verify.TargetClaudeCLI: {"claude-sonnet-5", "claude-haiku-4-5-20251001"},
 }
 
+type toolCredentials interface {
+	app.CredentialManager
+	ConfigurationProfile(context.Context, string) (credential.ConfigurationProfile, error)
+}
+
 func main() {
 	platform, arch, ok := runtimeNames(runtime.GOOS, runtime.GOARCH)
 	if !ok {
@@ -92,13 +98,36 @@ func main() {
 		_, _ = fmt.Fprintln(os.Stderr, "bridge initialization failed")
 		os.Exit(1)
 	}
-	credentials, err := credential.NewManager(credential.ManagerConfig{
+	platformCredentials, err := credential.NewManager(credential.ManagerConfig{
 		Store:     credential.NewSystemCredentialStore(),
 		Endpoints: credentialEndpoints(),
 	})
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "bridge initialization failed")
 		os.Exit(1)
+	}
+	var credentials toolCredentials = platformCredentials
+	var community *credential.CommunityManager
+	profiles := configurationProfiles()
+	if communityEdition == "true" {
+		community, err = credential.NewCommunityManager()
+		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, "community credential store unavailable")
+			os.Exit(1)
+		}
+		credentials = community
+		localProfiles := map[string]configuration.GatewayProfile{}
+		for _, target := range []string{credential.TargetCodexCLI, credential.TargetClaudeCLI, credential.TargetClaudeDesktop} {
+			info, e := community.Settings(context.Background(), credential.BYOKSettings{TargetID: target})
+			if e != nil {
+				_, _ = fmt.Fprintln(os.Stderr, "community credential store unavailable")
+				os.Exit(1)
+			}
+			if info.KeyConfigured {
+				localProfiles[target] = configuration.GatewayProfile{Version: info.ProfileVersion, BaseURL: info.BaseURL, Model: info.Model}
+			}
+		}
+		profiles = map[configuration.Environment]map[string]configuration.GatewayProfile{configuration.EnvironmentDev: localProfiles}
 	}
 	helperExecutable, err := os.Executable()
 	if err != nil {
@@ -114,7 +143,7 @@ func main() {
 	// The system proxy intercepting the gateway (contract §2.7 network.*): the
 	// exemption only ever names the compiled gateway hosts.
 	var gatewayURLs []string
-	for _, byTarget := range configurationProfiles() {
+	for _, byTarget := range profiles {
 		for _, profile := range byTarget {
 			gatewayURLs = append(gatewayURLs, profile.BaseURL)
 		}
@@ -124,9 +153,10 @@ func main() {
 	})
 	modelListClient := credential.NewSecureHTTPClient()
 	configurations, err := configuration.NewManager(configuration.ManagerConfig{
-		HomeDir:          homeDir,
-		HelperExecutable: helperExecutable,
-		NodeLookup:       nodeLookup,
+		HomeDir:            homeDir,
+		AllowEmptyProfiles: community != nil,
+		HelperExecutable:   helperExecutable,
+		NodeLookup:         nodeLookup,
 		// The Codex model catalog (contract §2.7.2 "模型选择"): every trusted
 		// Codex sharing ~/.codex/config.toml, and the relay group's model ids.
 		CodexExecutables: func(ctx context.Context) ([]string, error) {
@@ -147,7 +177,7 @@ func main() {
 			}
 			return gatewaymodels.List(ctx, modelListClient, baseURL, token)
 		},
-		Profiles: configurationProfiles(),
+		Profiles: profiles,
 		// The desktop applications are different releases per platform
 		// (install.LockedVersions); the CLIs are the same everywhere.
 		SupportedVersions: install.LockedVersions(platform),
@@ -249,13 +279,22 @@ func main() {
 		_, _ = fmt.Fprintln(os.Stderr, "bridge initialization failed")
 		os.Exit(1)
 	}
+	fallbackModels := verifyFallbackModels
+	defaultModels := map[string]string{verify.TargetCodexCLI: prodGatewayModelAlias, verify.TargetClaudeCLI: prodClaudeModelAlias}
+	if community != nil {
+		fallbackModels = nil
+		defaultModels = map[string]string{}
+		for target, profile := range profiles[configuration.EnvironmentDev] {
+			defaultModels[target] = profile.Model
+		}
+	}
 	verifier, err := verify.NewManager(verify.ManagerConfig{
 		NodeLookup:          nodeLookup,
 		ProxyEnvironment:    networkProxy.ProbeEnvironment,
 		ProxyRisk:           networkProxy.EnvNeedsFix,
 		GatewayUnreachable:  networkProxy.DirectPathUnreachable,
 		TrafficDiverted:     networkProxy.TrafficDiverted,
-		FallbackModels:      verifyFallbackModels,
+		FallbackModels:      fallbackModels,
 		HomeDir:             homeDir,
 		Operations:          operations,
 		ConfigurationStatus: configurations.Status,
@@ -292,9 +331,7 @@ func main() {
 		RecordVerification: configurations.RecordVerification,
 		RecordGlobal:       configurations.RecordGlobalVerification,
 		RefreshGlobal:      configurations.RefreshGlobalModelCatalog,
-		DefaultModels: map[string]string{
-			verify.TargetCodexCLI: prodGatewayModelAlias, verify.TargetClaudeCLI: prodClaudeModelAlias,
-		},
+		DefaultModels:      defaultModels,
 		// One OpenAI-style list serves both families: the relay answers
 		// {base}/models with every model of the key's group.
 		VisibleModels: func(ctx context.Context, targetID string) ([]string, error) {
@@ -302,7 +339,18 @@ func main() {
 			if exchangeErr != nil {
 				return nil, exchangeErr
 			}
-			return gatewaymodels.List(ctx, modelListClient, prodCodexGatewayBaseURL, token)
+			baseURL := prodCodexGatewayBaseURL
+			if community != nil {
+				if credential.ScopeTarget(targetID) != credential.TargetCodexCLI {
+					return nil, nil
+				}
+				info, e := community.Settings(ctx, credential.BYOKSettings{TargetID: targetID})
+				if e != nil || !info.KeyConfigured {
+					return nil, credential.ErrAuthorizationMissing
+				}
+				baseURL = info.BaseURL
+			}
+			return gatewaymodels.List(ctx, modelListClient, baseURL, token)
 		},
 	})
 	if err != nil {
@@ -311,6 +359,7 @@ func main() {
 	}
 	os.Exit(app.Run(context.Background(), arguments, os.Stdin, os.Stdout, os.Stderr, app.Config{
 		BridgeVersion:  bridgeVersion,
+		Community:      community,
 		Platform:       platform,
 		Arch:           arch,
 		Detector:       detector,

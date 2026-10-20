@@ -1,7 +1,8 @@
 # 知办AI · Zhiban AI
 
-![知办AI：新一代 AI 数字员工](docs/images/zhiban-product-intro.png)
-![知办AI：桌面与移动协作界面展示](docs/images/zhiban-team-collaboration.png)
+<p>
+  <img src="docs/images/zhiban-product-intro.png" alt="知办AI：新一代 AI 数字员工" width="100%" align="top"><img src="docs/images/zhiban-team-collaboration.png" alt="知办AI：桌面与移动协作界面展示" width="100%" align="top">
+</p>
 
 **让数字员工加入你的团队，在自己的环境里开展 AI 协作。**
 
@@ -20,7 +21,13 @@
 
 ## 功能一览
 
-以下图片由项目维护者提供，展示知办AI的产品界面。截图中的示例员工、业务数据、技能目录及积分、套餐入口不代表社区版默认提供的内容；社区版当前支持范围见下方功能表。
+### Codex 与 Claude Code 一键安装
+
+在「本地开发工具」中安装、检测和配置 Codex、Claude。点击各工具的「API 设置」，填写自己的 API 地址、模型名称和 API Key，再应用配置并检测连接。API Key 仅保存在本机安全凭据库。Codex 需使用支持 OpenAI Responses 的服务，Claude 需使用支持 Anthropic Messages 的服务。
+
+![本地开发工具：Codex 安装状态与工具入口](docs/images/screenshots/local-dev-tools.png)
+
+![本地开发工具：下载、验证、安装与状态检测](docs/images/screenshots/local-dev-tools-install.png)
 
 ### 与数字员工对话
 
@@ -52,20 +59,18 @@
 
 ![知办AI：文件与云盘](docs/images/screenshots/drive.png)
 
-## 社区版能做什么
+## 核心模块
 
-| 模块 | 当前能力与范围 |
+| 模块 | 用途 |
 |---|---|
-| 桌面客户端 | macOS / Windows 桌面源码；社区版使用账号密码登录，macOS Debug 构建已验证 |
-| 对话与消息 | 会话列表、消息历史、Mock 对话；WuKong 服务端消息链路已验证，完整桌面 SDK 流程仍待验收 |
-| 数字员工 | 社区管理台创建、编辑、发布和删除员工；新租户提供默认 Mock 助手 |
-| 租户与组织 | 租户创建和切换、成员与部门管理；操作受服务端权限约束 |
-| 文件与云盘 | 对象存储、文件上传下载与云盘基础接口；聊天文件导入等扩展流程仍待验收 |
-| 自动任务 | 创建、编辑、删除、启停、立即执行和历史定位；服务端 Mock 手动及到点执行已验证，桌面操作与消息提醒待验收 |
-| 技能与知识库 | 提供已有目录/列表读取；技能安装和知识库检索仍待完善 |
-| Agent 集成 | 提供社区后端与 DSH 运行时源码，供开发者按协议扩展；默认 Compose 使用 Mock |
-
-移动端、商业支付及商业运营能力不在本次社区交付范围。完整浏览器交互、真实模型、Windows 目标机与签名安装包仍需进一步验收。
+| 桌面客户端 | 提供 macOS / Windows 桌面源码，通过账号密码登录自己的工作空间 |
+| 对话与消息 | 会话列表、消息历史与流式回复，使用 WuKongIM 处理实时消息 |
+| 数字员工 | 创建、编辑、发布和管理数字员工，按个人与组织职责开展协作 |
+| 租户与组织 | 管理租户、成员和部门，通过服务端权限控制访问 |
+| 文件与云盘 | 使用对象存储整理工作文件，支持基础上传、下载和目录管理 |
+| 自动任务 | 创建执行计划，启停或立即运行任务，并从历史记录定位结果 |
+| 技能与知识库 | 浏览技能目录与知识库列表，发现工作场景所需的资源 |
+| Agent 集成 | 通过社区后端与 DSH 运行时源码扩展自己的 Agent |
 
 ## 从本地开始
 
@@ -84,13 +89,13 @@
 | 管理 API | http://127.0.0.1:18081 |
 | WuKong WebSocket | ws://127.0.0.1:18083 |
 
-端口默认只绑定本机。桌面源码构建、SDK 准备、Bus 地址配置、停止服务和备份操作，请遵循完整的[安装与启动指南](docs/INSTALL.md)。社区账号由部署者初始化，不提供短信、扫码或自助注册。
+端口默认只绑定本机。桌面源码构建、SDK 准备、Bus 地址配置、停止服务和备份操作，请遵循完整的[安装与启动指南](docs/INSTALL.md)。账号由部署者初始化，使用账号密码登录。
 
 ## 配置模板
 
 独立配置模板仓库：[zbwork/zhiban-ai-config](https://github.com/zbwork/zhiban-ai-config)。模板按 development / test / production 和组件分类，提供环境变量、Agent Bus YAML、客户端编译参数及运行时配置的字段参考。
 
-**默认社区部署不依赖这个仓库。** 按上面的快速开始使用本仓库 deploy/community 即可；其中 .env.example 和 service.yaml 是默认 Compose 的配置入口。模板仓库用于需要单独整理环境配置、客户端编译参数或运行时设置的场景，不会被社区服务自动加载。
+快速开始使用本仓库 deploy/community 下的 .env.example 和 service.yaml 配置服务。需要单独管理多环境配置、客户端编译参数或运行时设置时，可以参考模板仓库，并在启动或构建时指定配置路径。
 
 使用模板时：
 
@@ -99,7 +104,7 @@
 3. 按组件启动或构建说明显式指定配置路径；不要把整套模板直接覆盖到 deploy/community，两个目录的配置格式与加载入口可能不同。
 4. 真实配置只保存在本地或部署环境。模板仓库的忽略规则用于阻止本地配置入库，提交前仍需检查暂存文件，不能把真实值写回 .example。
 
-模板不提供真实密钥、证书、原私有配置历史或商业部署脚本；部分字段属于可选或私有组件，出现字段不代表社区版已提供对应功能。详细操作见[配置模板 README](https://github.com/zbwork/zhiban-ai-config#readme)。
+按需选择配置模板并填写自己的参数，详细操作见[配置模板 README](https://github.com/zbwork/zhiban-ai-config#readme)。
 
 ## 项目结构
 
@@ -116,15 +121,11 @@ deploy/community/    Docker Compose 与初始化工具
 third_party/         随源码保留的第三方组件
 ```
 
-本地桥接和 DSH 源码随候选提供，不表示其所有产品入口已在默认社区部署中启用。
-
 ## 适合谁
 
 - 想搭建内部 AI 协作环境、愿意自行部署和维护的团队。
 - 希望对接自有 Agent、模型或业务系统的开发者。
 - 希望研究桌面、管理台、服务端协作实现的开源使用者。
-
-当前源码候选适合开发和评估。准备生产使用时，请结合自己的部署环境完成安全、备份和业务验收。
 
 ## 参与社区
 

@@ -1,3 +1,5 @@
+import 'package:zhiban_client/config/app_config.dart';
+import 'local_coding_api_settings_dialog.dart';
 import 'package:zhiban_client/network/user_refresh.dart';
 
 import 'package:zhiban_client/config/client_assets.dart';
@@ -32,12 +34,12 @@ enum _RowState {
   notInstalled, // 未安装
   installedOfficial, // 已安装 · 官方服务
   switched, // CLI:已切换且真实请求验证通过(运行正常,L3)
-  configured, // 桌面端:已切换且 L2 通过(已配置知办模型 API;桌面端无自动 L3)
+  configured, // 桌面端:已切换且 L2 通过(已配置自定义模型 API;桌面端无自动 L3)
   switchedUnverified, // 已切换但尚未检测
   needsAttention, // 需要处理(切换后无法连接 / 安装损坏 / 切换未完成 / 配置被改动)
   componentMissing, // 需要处理 · 缺少运行组件(M3 Task 8:Claude 桌面端的 Claude Code 宿主包)
   unsupported, // 暂不支持(§7.3 policy_conflict / §2.2 untrusted / version unknown)
-  enableUnsupported, // 桌面端暂不支持知办模型 API(supports_enable=false)
+  enableUnsupported, // 桌面端暂不支持自定义模型 API(supports_enable=false)
   processing, // 处理中(有 running 操作 / compound 未结束 / 批处理项进行中)
 }
 
@@ -235,7 +237,7 @@ class _RowView {
     return _verificationFailure(op, batchItem);
   }
 
-  /// 需要处理的原因是知办中转站自己拒绝了检测请求(503 过载、429 等,
+  /// 需要处理的原因是你配置的模型服务自己拒绝了检测请求(503 过载、429 等,
   /// 2026-09-15):修复并重试修不好,卡片说清原因、主按钮给「重新检测」。
   /// 本机问题(安装损坏、授权失效、代理拦截、配置被改、切换没写完)优先。
   LocalCodingRelayFailure? get relayFailure {
@@ -355,6 +357,24 @@ class _VendorCard extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (AppConfig.communityEdition)
+                TextButton.icon(
+                  onPressed: batch != null && !batch.done
+                      ? null
+                      : () async {
+                          final saved = await showLocalCodingApiSettings(
+                            context,
+                            vendor,
+                          );
+                          if (saved == true && context.mounted) {
+                            ref
+                                .read(localCodingToolsProvider.notifier)
+                                .refreshQuiet();
+                          }
+                        },
+                  icon: const Icon(CupertinoIcons.settings, size: 16),
+                  label: const Text('API 设置'),
+                ),
               _StatusBadge(
                 state: cardState,
                 detecting: inspecting,
@@ -401,8 +421,9 @@ class _VendorCard extends ConsumerWidget {
         ? batch.itemFor(target)
         : null;
     final authorizationLost = config.switchedToZhiban &&
-        snapshot.registrationAvailable &&
-        !snapshot.authorizationConnected;
+        (AppConfig.communityEdition
+            ? (snapshot.expectedProfileVersions[target] ?? '').isEmpty
+            : snapshot.registrationAvailable && !snapshot.authorizationConnected);
     // Codex(reqwest)读 NO_PROXY;Claude 桌面端取模型列表走系统网络栈,只认系统
     // 代理的绕过名单(契约 §2.7,2026-09-18)。Claude 命令行不读系统代理,不受影响。
     final verificationFailure = _verificationFailure(op, batchItem);
@@ -592,7 +613,7 @@ class _CardFacts {
         installedRows.where((r) => r.config.switchedToZhiban).length;
     if (switchedCount > 0) {
       return _Fact(
-        switchedCount == installedRows.length ? '知办模型 API' : '知办模型 API（部分）',
+        switchedCount == installedRows.length ? '自定义模型 API' : '自定义模型 API（部分）',
         rows.any((r) => r.needsRepair) ? _DotColor.warning : _DotColor.success,
       );
     }
@@ -659,7 +680,7 @@ class _CardFacts {
       case _RowState.switchedUnverified:
         return const _Fact('待检测', _DotColor.muted);
       case _RowState.configured:
-        return const _Fact('已配置知办模型 API', _DotColor.success);
+        return const _Fact('已配置自定义模型 API', _DotColor.success);
       case _RowState.switched:
       case _RowState.installedOfficial:
       case _RowState.enableUnsupported:
@@ -820,7 +841,7 @@ class _CardBodyState extends ConsumerState<_CardBody> {
   List<_RowView> get _missingRows => rows.where((r) => !r.installed).toList();
   List<_RowView> get _openableRows => rows.where((r) => r.openable).toList();
 
-  /// F31 §3.2.1 · 「一键接入知办 / 修复并重试」作用的形态:未安装、走官方服务、
+  /// F31 §3.2.1 · 「一键配置工具 / 修复并重试」作用的形态:未安装、走官方服务、
   /// 需要处理(中转站拒绝的除外)、版本或能力不够但有升级 / 接管路径的。已接入且
   /// 正常的不在内;来源不可信的不在内。
   List<_RowView> get _connectableRows => rows.where(_connectable).toList();
@@ -850,7 +871,7 @@ class _CardBodyState extends ConsumerState<_CardBody> {
     }
   }
 
-  /// 接入按钮可点:要装 / 换程序时 Bridge 得支持安装;本环境没开放知办模型 API
+  /// 接入按钮可点:要装 / 换程序时 Bridge 得支持安装;本环境没开放自定义模型 API
   /// 时只能装不能切(开发 / 测试包常见),没得装就灰掉。
   bool get _connectEnabled {
     final notifier = ref.read(localCodingToolsProvider.notifier);
@@ -1016,7 +1037,7 @@ class _CardBodyState extends ConsumerState<_CardBody> {
     if (!snapshot.registrationAvailable &&
         _connectableRows.isNotEmpty &&
         widget.cardState != _RowState.processing) {
-      return '当前环境暂未开放知办模型 API，可先安装并使用官方服务';
+      return '当前环境暂未开放自定义模型 API，可先安装并使用官方服务';
     }
     switch (widget.cardState) {
       case _RowState.processing:
@@ -1027,7 +1048,7 @@ class _CardBodyState extends ConsumerState<_CardBody> {
       case _RowState.unsupported:
         return _rowHint(_unsupportedRows.first) ?? '当前安装暂不支持知办接入。';
       case _RowState.notInstalled:
-        return '安装后自动接入知办模型 API，无需官方账号即可使用 $name；命令行版与桌面版会一起安装。';
+        return '安装后自动接入自定义模型 API，使用你填写的模型服务 $name；命令行版与桌面版会一起安装。';
       case _RowState.switched:
       case _RowState.configured:
         // 检测是靠备用模型通过的(契约 §2.7 L3 备用模型):服务可用,但用户配置的
@@ -1041,11 +1062,11 @@ class _CardBodyState extends ConsumerState<_CardBody> {
         }
         return '原配置已安全备份，随时可以恢复官方配置';
       case _RowState.switchedUnverified:
-        return '已切换为知办模型 API，尚未检测服务连接';
+        return '已切换为自定义模型 API，尚未检测服务连接';
       case _RowState.enableUnsupported:
         return _rowHint(rows
                 .firstWhere((r) => r.state == _RowState.enableUnsupported)) ??
-            '桌面端暂不支持知办模型 API。';
+            '桌面端暂不支持自定义模型 API。';
       case _RowState.installedOfficial:
         if (_unsupportedRows.isNotEmpty) {
           return _rowHint(_unsupportedRows.first) ?? '当前安装暂不支持知办接入。';
@@ -1055,16 +1076,16 @@ class _CardBodyState extends ConsumerState<_CardBody> {
         final stuck = rows.where(
             (r) => r.state == _RowState.enableUnsupported && !_connectable(r));
         if (stuck.isNotEmpty && _switchedRows.isEmpty) {
-          return _rowHint(stuck.first) ?? '桌面端暂不支持知办模型 API。';
+          return _rowHint(stuck.first) ?? '桌面端暂不支持自定义模型 API。';
         }
         if (_switchedRows.isNotEmpty && _connectableRows.isEmpty) {
-          return '部分形态已接入知办模型 API；其余形态暂不支持，可随时恢复官方配置';
+          return '部分形态已接入自定义模型 API；其余形态暂不支持，可随时恢复官方配置';
         }
         return _connectNote();
     }
   }
 
-  /// 「一键接入知办」旁的说明:接入时会先做什么(升级 / 接管到哪个版本)。
+  /// 「一键配置工具」旁的说明:接入时会先做什么(升级 / 接管到哪个版本)。
   String _connectNote() {
     final notifier = ref.read(localCodingToolsProvider.notifier);
     final changes = <String>[];
@@ -1076,9 +1097,9 @@ class _CardBodyState extends ConsumerState<_CardBody> {
       }
     }
     if (changes.isNotEmpty) {
-      return '接入时会先把${changes.join('、')}，之后无需官方账号即可使用知办模型 API';
+      return '接入时会先把${changes.join('、')}，之后使用你填写的模型服务自定义模型 API';
     }
-    return '接入知办模型 API 后无需官方账号即可使用';
+    return '接入自定义模型 API 后使用你填写的模型服务';
   }
 
   Widget _footer(BuildContext context,
@@ -1119,7 +1140,7 @@ class _CardBodyState extends ConsumerState<_CardBody> {
   }
 
   /// 底部按钮(F31 §3.2.1,2026-09-17):主按钮按卡状态取值,不再按功能开关堆 if。
-  /// 「一键接入知办」和「修复并重试」跑的是同一条链;中转站拒绝、已切换待检测只给
+  /// 「一键配置工具」和「修复并重试」跑的是同一条链;中转站拒绝、已切换待检测只给
   /// 「重新检测」;运行正常没有主操作,「打开」实心。
   List<Widget> _footerButtons(BuildContext context) {
     final notifier = ref.read(localCodingToolsProvider.notifier);
@@ -1207,7 +1228,7 @@ class _CardBodyState extends ConsumerState<_CardBody> {
       case _RowState.enableUnsupported:
         if (_connectableRows.isEmpty) return null;
         return (
-          label: '一键接入知办',
+          label: '一键配置工具',
           icon: CupertinoIcons.bolt_fill,
           onPressed:
               _connectEnabled ? () => _confirmAndConnect(context) : null,
@@ -1358,7 +1379,7 @@ class _CardBodyState extends ConsumerState<_CardBody> {
     final description = [
       '将升级 $changes。',
       _versionChangeNotice,
-      '已切换为知办模型 API 的形态升级后会自动重新检测服务连接。',
+      '已切换为自定义模型 API 的形态升级后会自动重新检测服务连接。',
       if (notes.isNotEmpty) '更新说明：$notes',
     ].join('\n');
     final ok = await showUiConfirmDialog(
@@ -1388,7 +1409,7 @@ class _CardBodyState extends ConsumerState<_CardBody> {
     await dialog;
   }
 
-  /// 「一键接入知办」(F31 §3.2.1):链前只弹一次确认框,列这次要做的事(升级 / 接管
+  /// 「一键配置工具」(F31 §3.2.1):链前只弹一次确认框,列这次要做的事(升级 / 接管
   /// 到哪个版本、备份并改写配置、桌面端要不要先退出);确认后整条链在进度弹框里跑。
   /// 首次接入保持用户网络设置,真实请求失败后才提供代理诊断与修复。
   Future<void> _confirmAndConnect(BuildContext context) => _connect(
@@ -1569,12 +1590,12 @@ String? _rowHint(_RowView row) {
       if (row.proxyRepairSuggested) {
         final via =
             row.proxyEndpoint.isEmpty ? '系统代理' : '系统代理（${row.proxyEndpoint}）';
-        return '$name 请求知办中转站失败，可能受$via影响；可点「修复并重试」尝试为知办中转站设置代理例外，或先重新检测';
+        return '$name 请求你配置的模型服务失败，可能受$via影响；可点「修复并重试」尝试为你配置的模型服务设置代理例外，或先重新检测';
       }
       if (row.config.switchedToZhiban && row.config.globalDrifted) {
         return row.config.globalSwitched
-            ? '$name 的知办模型 API 配置被修改，点「修复并重试」重写知办线路'
-            : '$name 的知办模型 API 配置缺少本机切换记录（可能重装或清理过知办），点「修复并重试」重新接入';
+            ? '$name 的自定义模型 API 配置被修改，点「修复并重试」重写知办线路'
+            : '$name 的自定义模型 API 配置缺少本机切换记录（可能重装或清理过知办），点「修复并重试」重新接入';
       }
       final relay = row.relayFailure;
       if (relay == LocalCodingRelayFailure.proxyDiverted) {
@@ -1589,7 +1610,7 @@ String? _rowHint(_RowView row) {
         return '$name 检测未通过：${localCodingRelayFailureSummary(relay, row.relayDetail)}；中转站原话见「诊断详情」';
       }
       if (row.config.switchedToZhiban) {
-        return '$name 当前无法连接知办模型 API，点「修复并重试」后继续使用';
+        return '$name 当前无法连接自定义模型 API，点「修复并重试」后继续使用';
       }
       return '$name 安装已损坏，点「修复并重试」按锁定版本重新安装';
     case _RowState.componentMissing:
@@ -1610,18 +1631,18 @@ String? _rowHint(_RowView row) {
           'homebrew' => '，终端运行 brew upgrade codex 即可升级',
           _ => row.upgradable ? '，可在版本行点「升级」' : '',
         };
-        return '$name 版本（${row.tool.installedVersion}）过旧，$minimum才能切换为知办模型 API；现在仍可照常使用官方服务$how';
+        return '$name 版本（${row.tool.installedVersion}）过旧，$minimum才能切换为自定义模型 API；现在仍可照常使用官方服务$how';
       }
       if (row.tool.thirdPartyUnsupported) {
         final version = row.tool.installedVersion.isEmpty
             ? ''
             : '（${row.tool.installedVersion}）';
-        return '$name 版本$version过旧，还不支持第三方模型配置，更新 $name 后才能切换为知办模型 API；现在仍可照常使用官方服务';
+        return '$name 版本$version过旧，还不支持第三方模型配置，更新 $name 后才能切换为自定义模型 API；现在仍可照常使用官方服务';
       }
       if (row.sharedConfigTooOld) {
-        return '$name 与 Codex 命令行共用配置，命令行版本过旧，需先升级命令行才能切换为知办模型 API；现在仍可照常使用官方服务';
+        return '$name 与 Codex 命令行共用配置，命令行版本过旧，需先升级命令行才能切换为自定义模型 API；现在仍可照常使用官方服务';
       }
-      return '$name 暂不支持知办模型 API，将继续以官方服务使用；命令行仍可切换。';
+      return '$name 暂不支持自定义模型 API，将继续以官方服务使用；命令行仍可切换。';
     case _RowState.configured:
       return '桌面端无法自动发起真实请求，验证止于配置与凭证；打开桌面端发一条消息即可确认。';
     default:
@@ -1687,9 +1708,9 @@ Widget _actionButton(
   }
 }
 
-/// 图 4 · 「切换为知办模型 API」确认弹框:三步说明 + 本次涉及的形态 +
+/// 图 4 · 「切换为自定义模型 API」确认弹框:三步说明 + 本次涉及的形态 +
 /// 「之后可随时恢复官方配置」。
-/// 「一键接入知办」的确认框(F31 §3.2.1):链前只弹这一次,列这次要做的事——升级 /
+/// 「一键配置工具」的确认框(F31 §3.2.1):链前只弹这一次,列这次要做的事——升级 /
 /// 接管到哪个版本(接管写明原来的版本保留)、备份并改写配置、桌面端要不要先退出。
 /// 不写安装位置与 PATH 改动(2026-09-16 产品拍板:写多了像有风险,反而劝退)。
 class _ConnectConfirmDialog extends StatelessWidget {
@@ -1747,8 +1768,8 @@ class _ConnectConfirmDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             UiSheetHeader(
-              title: '一键接入知办',
-              subtitle: '知办将把 $name 接入知办模型 API，无需官方账号即可使用。',
+              title: '一键配置工具',
+              subtitle: '知办将把 $name 接入自定义模型 API，使用你填写的模型服务。',
               onClose: () => Navigator.of(context).pop(false),
             ),
             const SizedBox(height: 20),
@@ -1775,7 +1796,7 @@ class _ConnectConfirmDialog extends StatelessWidget {
               const _NumberedStep(
                 index: 2,
                 icon: CupertinoIcons.pencil,
-                label: '写入知办模型 API 配置',
+                label: '写入自定义模型 API 配置',
                 connector: true,
               ),
               const _NumberedStep(
@@ -1785,7 +1806,7 @@ class _ConnectConfirmDialog extends StatelessWidget {
                 connector: false,
               ),
             ] else
-              Text('配置已指向知办模型 API，只重新检测服务连接。', style: small),
+              Text('配置已指向自定义模型 API，只重新检测服务连接。', style: small),
             const SizedBox(height: 16),
             Text('本次接入：$names', style: small),
             if (quit.isNotEmpty) ...[
@@ -1925,7 +1946,7 @@ class _ItemProgress {
 }
 
 /// 图 11 · 进度弹框(按形态分块)。安装:下载安装包 / 验证安装包 / 安装应用 /
-/// 检测软件状态;切换:备份原有配置 / 写入知办模型 API 配置 / 检测服务连接。
+/// 检测软件状态;切换:备份原有配置 / 写入自定义模型 API 配置 / 检测服务连接。
 /// 弹框自己观察 provider 的批处理 + 各项 operation / compound;全部成功自动
 /// 关闭,任一项失败停留并给出诊断入口。
 /// v3.11(2026-09-14):运行中可用右上角 × / Esc 关闭,批处理在后台继续(provider
@@ -3839,11 +3860,11 @@ class _DiagnosticsDialogState extends ConsumerState<_DiagnosticsDialog> {
       case 'app.install':
         return '下载安装';
       case 'app.switchToZhiban':
-        return '切换为知办模型 API';
+        return '切换为自定义模型 API';
       case 'app.repairSwitch':
         return '修复并重试';
       case 'app.connect':
-        return '一键接入知办';
+        return '一键配置工具';
       case 'app.verify':
         return '检测服务连接';
       default:
