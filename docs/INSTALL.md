@@ -16,7 +16,7 @@
 
 社区桌面只提供账号密码登录，账号由部署者 bootstrap 初始化；不使用短信、扫码或自助注册。构建时显式指定自己的 Bus 地址，例如本地 Debug 使用 `--dart-define=APP_ENV=dev --dart-define=API_BASE_URL_DEV=http://127.0.0.1:18080/api/agent-bus/v1`；Release 使用 `--dart-define=API_BASE_URL_PROD=<自己的Bus地址及/api/agent-bus/v1前缀>`。
 
-先在仓库根执行 `cd apps/zhiban-local-bridge && go mod vendor`，按 go.mod/go.sum 准备桥接依赖，再返回仓库根。macOS 与 Windows 的桌面打包都使用 vendor；macOS 打包阶段刻意关闭网络且使用隔离模块缓存，因此单独执行 go build 成功不能代替此准备步骤。vendor 由构建者生成，不随候选源码导出。
+先在仓库根执行 `cd apps/zhiban-local-bridge && go mod vendor`，按 go.mod/go.sum 准备桥接依赖，再返回仓库根。macOS 与 Windows 的桌面打包都使用 vendor；macOS 打包阶段刻意关闭网络且使用隔离模块缓存，因此单独执行 go build 成功不能代替此准备步骤。vendor 由构建者生成，已加入 Git 忽略规则，不提交到源码仓库。macOS 工程中的 CocoaPods 资源复制构建步骤需要保留并提交；它引用 pod install 生成的资源清单，不包含本机绝对路径。
 
 桌面使用 Flutter、Xcode、CocoaPods 与原生 DingRTC SDK。DingRTC 二进制不随源码分发；进入 `apps/zhiban-app` 后先执行 `flutter pub get`，再执行 `./scripts/install_dingrtc_macos_sdk.sh`，脚本从阿里云官方地址下载 3.9.0 SDK 并执行 pod install，最后执行 `flutter build macos --debug` 并传入上文自己的 Bus 地址参数。SDK 使用受阿里云原授权约束。跳过安装步骤会在 DingRtcBridge.swift 报找不到 DingRTC 模块。详细 SDK 说明位于 `apps/zhiban-app/macos/Frameworks/DingRTC/README.md`。
 

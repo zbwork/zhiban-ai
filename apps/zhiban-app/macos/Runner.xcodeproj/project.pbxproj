@@ -252,6 +252,7 @@
 				F63A1B5C53CDB5F35D7761EE /* [CP] Embed Pods Frameworks */,
 				A11C0DE20000000000000002 /* Sign Sparkle Nested Code */,
 				A11C0DE10000000000000001 /* Build & Embed Local Coding Bridge */,
+				A25792C3BA9205139F7F4158 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -459,6 +460,23 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
 			shellScript = "\"${PROJECT_DIR}/SparkleSigning/sign_nested_code.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A25792C3BA9205139F7F4158 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		F63A1B5C53CDB5F35D7761EE /* [CP] Embed Pods Frameworks */ = {
