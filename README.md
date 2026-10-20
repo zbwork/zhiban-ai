@@ -1,14 +1,13 @@
 # 知办AI · Zhiban AI
 
-![知办AI：团队、数字员工与工作空间](docs/images/zhiban-community-cover.png)
+![知办AI：新一代 AI 数字员工](docs/images/zhiban-product-intro.png)
+![知办AI：桌面与移动协作界面展示](docs/images/zhiban-team-collaboration.png)
 
 **让数字员工加入你的团队，在自己的环境里开展 AI 协作。**
 
 知办AI 是面向团队的 AI 协作平台，你可以把它理解为开源版本的“Workbuddy”：把对话、数字员工、技能与文件放进同一个工作空间，让 AI 参与日常工作。项目提供桌面客户端、服务端、管理台和 Agent 接入能力，支持自行部署。你可以从本地 Mock 助手开始，再按需接入自己的模型与运行时。
 
 [快速开始](docs/INSTALL.md) · [反馈问题](https://github.com/zbwork/zhiban-ai/issues) · [参与贡献](CONTRIBUTING.md) · [官网](https://www.zbwork.cn/)
-
-> 当前为 **v0.1.0-rc.1 源码候选**。macOS Debug、社区后端、管理台及 Docker 镜像已取得构建证据；尚无正式发布的签名安装包。封面为 AI 生成的概念插画，不是产品截图。
 
 ## 为什么做知办AI
 
@@ -86,6 +85,21 @@
 | WuKong WebSocket | ws://127.0.0.1:18083 |
 
 端口默认只绑定本机。桌面源码构建、SDK 准备、Bus 地址配置、停止服务和备份操作，请遵循完整的[安装与启动指南](docs/INSTALL.md)。社区账号由部署者初始化，不提供短信、扫码或自助注册。
+
+## 配置模板
+
+独立配置模板仓库：[zbwork/zhiban-ai-config](https://github.com/zbwork/zhiban-ai-config)。模板按 development / test / production 和组件分类，提供环境变量、Agent Bus YAML、客户端编译参数及运行时配置的字段参考。
+
+**默认社区部署不依赖这个仓库。** 按上面的快速开始使用本仓库 deploy/community 即可；其中 .env.example 和 service.yaml 是默认 Compose 的配置入口。模板仓库用于需要单独整理环境配置、客户端编译参数或运行时设置的场景，不会被社区服务自动加载。
+
+使用模板时：
+
+1. 选择所需环境与组件，复制对应的 .example 文件，并去掉文件名末尾的 .example。例如 .env.example → .env、bus.yaml.example → bus.yaml。
+2. 按组件要求填写自己的服务地址、口令、模型参数及证书路径。空字符串、0 和 false 都是占位，不能直接作为可运行配置。
+3. 按组件启动或构建说明显式指定配置路径；不要把整套模板直接覆盖到 deploy/community，两个目录的配置格式与加载入口可能不同。
+4. 真实配置只保存在本地或部署环境。模板仓库的忽略规则用于阻止本地配置入库，提交前仍需检查暂存文件，不能把真实值写回 .example。
+
+模板不提供真实密钥、证书、原私有配置历史或商业部署脚本；部分字段属于可选或私有组件，出现字段不代表社区版已提供对应功能。详细操作见[配置模板 README](https://github.com/zbwork/zhiban-ai-config#readme)。
 
 ## 项目结构
 
