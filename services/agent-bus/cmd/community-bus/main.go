@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"github.com/redis/go-redis/v9"
+	communityapps "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/apps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/busrouter"
 	communitychat "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/chat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/config"
@@ -14,33 +15,42 @@ import (
 	communityim "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/im"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/captcha"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/encode"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/jwt"
+	oauthjwt "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/oauth2/jwt"
+	oauthkeys "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/oauth2/keys"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/pgcli"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/secretbox"
 	account "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/account"
 	agentrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agent"
+	agentkbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agentkb"
 	audit "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/authaudit"
 	convrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/conversation"
 	staterepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/convstate"
+	driverepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/drive"
 	eventrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/event"
 	kbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/knowledge"
 	msgrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/message"
 	rbac "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/rbac"
 	envrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/runtimeenv"
 	session "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/session"
-	skillrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/skill"
 	tenant "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/tenant"
 	agentsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/agent"
 	authsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/auth"
 	personal "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/communityagent"
-	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/communitycatalog"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/contacts"
 	cronsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/cron"
-	skillsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/skill"
+	drivesvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/drive"
+	svckb "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/knowledge"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/knowledge/provider/stub"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientapps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcatalog"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientchat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcontacts"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcron"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientknowledge"
 	httpsession "github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/session"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/wellknown"
 	"log"
 	"net/http"
 	"os"
@@ -89,19 +99,61 @@ func run(ctx context.Context, path string) error {
 	defer chatSvc.StopCancelListener()
 	handlers := busrouter.Handlers{Session: &httpsession.Handlers{Auth: auth}, Chat: &clientchat.Handlers{Chat: chatSvc}, Contacts: &clientcontacts.Handlers{Contacts: contactsSvc}}
 	handlers.Agents = &clientcatalog.AgentHandlers{Agents: agentrepo.New(pool), Personal: &personal.Personal{Agents: agentsvc.New(agentrepo.New(pool), nil, nil, pool, eventrepo.New(pool)), Environments: envrepo.New(pool)}}
-	handlers.Catalog = &clientcatalog.Handlers{Skill: skillsvc.New(skillrepo.NewCommunity(pool))}
+	handlers.Catalog = &clientcatalog.Handlers{Skill: communitychat.NewSkills(pool)}
+	handlers.Agents.Skills = handlers.Catalog.Skill
 	cronService := communitycron.Compose(ctx, pool, chatSvc, contactsSvc, communityim.DirectConversations(pool, cfg, contactsSvc))
 	handlers.Cron = &clientcron.Handlers{Cron: cronService}
 	cronCtx, stopCron := context.WithCancel(ctx)
 	cronDone := make(chan struct{})
 	go func() { defer close(cronDone); cronsvc.NewLoop(cronService, 5*time.Second).Run(cronCtx) }()
 	defer func() { stopCron(); <-cronDone }()
-	handlers.Knowledge = &clientcatalog.KnowledgeHandler{Service: &communitycatalog.Knowledge{Repo: kbrepo.New(pool)}}
+	var driveLookup svckb.DriveFileLookup
+	if storage != nil {
+		driveLookup = drivesvc.NewKBSnapshotAdapter(drivesvc.NewSnapshotSvc(pool, driverepo.NewSpaceRepo(pool), driverepo.NewFolderRepo(pool), driverepo.NewFileRepo(pool), drivesvc.NewACLService(pool), storage))
+	}
+	handlers.KnowledgeAPI = &clientknowledge.Handlers{Knowledge: svckb.New(svckb.Deps{Repo: kbrepo.New(pool), Pool: pool, Audit: eventrepo.New(pool), Provider: stub.New(pool), Config: svckb.Config{PersistOriginals: true, ExtractDocuments: true}, ObjectStores: storage, DriveFiles: driveLookup, AgentKBRepo: agentkbrepo.New(pool)})}
+	handlers.Agents.Environments = envrepo.New(pool)
+	handlers.Agents.Knowledge = handlers.KnowledgeAPI.Knowledge
+	communitychat.WireKnowledge(chatSvc, pool, handlers.KnowledgeAPI.Knowledge)
 	if storage != nil {
 		handlers.Drive = communitydrive.Compose(pool, storage)
 	}
 	mux := http.NewServeMux()
+	if cfg.AppIssuer != "" {
+		box, err := secretbox.New("prod")
+		if err != nil {
+			return errors.New("application encryption key missing or invalid")
+		}
+		manager, err := oauthkeys.NewPostgresManager(ctx, pool, box)
+		if err != nil {
+			return err
+		}
+		if _, err = manager.Bootstrap(ctx); err != nil {
+			return err
+		}
+		appService := communityapps.New(pool, cfg.AppIssuer)
+		handlers.Apps = &clientapps.Handlers{App: appService, JWTSigner: oauthjwt.NewSigner(manager), Issuer: cfg.AppIssuer}
+		handlers.Agents.Apps = appService
+		mux.HandleFunc("POST /api/external/v1/oauth/token", handlers.Apps.Token)
+		discovery := wellknown.DefaultConfig(cfg.AppIssuer, cfg.AppIssuer)
+		discovery.GrantTypesSupported = []string{"authorization_code", "refresh_token"}
+		(&wellknown.Handlers{Config: discovery, KeysMgr: manager}).Register(mux)
+	}
 	handlers.Register(mux, middleware.Auth(issuer, auth, false), account.New(pool))
+	mux.Handle("GET /api/agent-bus/v1/runtime-environments", middleware.Auth(issuer, auth, false)(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		envs, err := envrepo.New(pool).ListTenantCustom(r.Context(), middleware.MustTenantID(r.Context()))
+		if err != nil {
+			encode.JSONError(w, err)
+			return
+		}
+		items := []map[string]any{}
+		for _, e := range envs {
+			if e.Framework == "generic" && e.HostingKind == "embedded" && e.Enabled && e.Status == "active" && !e.IsDeleted {
+				items = append(items, map[string]any{"uuid": e.UUID, "name": e.Name, "framework": e.Framework, "status": e.Status, "enabled": true, "is_usable": true, "hosting_kind": e.HostingKind})
+			}
+		}
+		encode.JSON(w, map[string]any{"tenant_enabled": items})
+	})))))
 	accountStream := clientchat.NewAccountStreamMiddleware(chatSvc, clientchat.AccountStreamConfig{})
 	state := &clientchat.StateHandlers{ConvState: staterepo.New(pool), ConvAccess: convrepo.New(pool)}
 	mux.Handle("POST /api/agent-bus/v1/chat/conversations/{uuid}/read", middleware.Auth(issuer, auth, false)(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(http.HandlerFunc(state.MarkConversationRead)))))

@@ -29,12 +29,12 @@ func Compose(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client, c confi
 	svc.SetRuntimeEnvFrameworkLookupOnService(service, frameworkLookup{runtimeenv.New(pool)})
 	switch c.Model.Provider {
 	case "mock":
-		svc.SetGenericRuntime(service, mock.New())
+		svc.SetGenericRuntime(service, &skillRuntime{Adapter: mock.New(), skills: NewSkills(pool)})
 	case "openai-compatible":
 		if c.Model.APIKey == "" {
 			return nil, errors.New("model API key required")
 		}
-		svc.SetGenericRuntime(service, llm.New(openai.New(c.Model.BaseURL, c.Model.APIKey, c.Model.Name, 120)))
+		svc.SetGenericRuntime(service, &skillRuntime{Adapter: llm.New(openai.New(c.Model.BaseURL, c.Model.APIKey, c.Model.Name, 120)), skills: NewSkills(pool)})
 	default:
 		return nil, errors.New("unsupported model provider")
 	}

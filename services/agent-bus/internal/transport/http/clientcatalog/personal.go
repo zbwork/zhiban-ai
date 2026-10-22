@@ -2,6 +2,7 @@ package clientcatalog
 
 import (
 	"encoding/json"
+	domskill "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/skill"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/encode"
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
@@ -79,14 +80,24 @@ func personalInput(w http.ResponseWriter, r *http.Request) (svc.PersonalInput, e
 						return in, bad
 					}
 					in.Metadata[k] = enabled
-				case "selected_app_uuids", "selected_knowledge_base_uuids":
+				case "selected_knowledge_base_uuids":
 					var list []string
-					if json.Unmarshal(v, &list) != nil || len(list) > 0 {
+					if json.Unmarshal(v, &list) != nil || len(list) > 50 {
 						return in, bad
 					}
-				case "selected_app_labels", "selected_knowledge_base_labels":
+				case "selected_knowledge_base_labels":
 					var labels map[string]string
-					if json.Unmarshal(v, &labels) != nil || len(labels) > 0 {
+					if json.Unmarshal(v, &labels) != nil || len(labels) > 50 {
+						return in, bad
+					}
+				case "selected_app_uuids":
+					var list []string
+					if json.Unmarshal(v, &list) != nil || len(list) > 50 {
+						return in, bad
+					}
+				case "selected_app_labels":
+					var labels map[string]string
+					if json.Unmarshal(v, &labels) != nil || len(labels) > 50 {
 						return in, bad
 					}
 				default:
@@ -122,6 +133,52 @@ func (h *AgentHandlers) save(w http.ResponseWriter, r *http.Request, uuid string
 func (h *AgentHandlers) Delete(w http.ResponseWriter, r *http.Request) {
 	if err := h.Personal.Delete(r.Context(), middleware.MustAccountID(r.Context()), middleware.MustTenantID(r.Context()), r.PathValue("uuid")); err != nil {
 		encode.JSONError(w, err)
+		return
+	}
+	encode.JSON(w, map[string]bool{"ok": true})
+}
+
+// EmptyBindings handles the post-save capability replacement contract.
+func (h *AgentHandlers) EmptyBindings(w http.ResponseWriter, r *http.Request) {
+	employee, err := h.Personal.Get(r.Context(), middleware.MustAccountID(r.Context()), middleware.MustTenantID(r.Context()), r.PathValue("uuid"))
+	if err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	var body map[string][]string
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	if err := dec.Decode(&body); err != nil || dec.Decode(new(any)) != io.EOF || len(body) != 1 {
+		encode.JSONError(w, apperr.ErrInvalidParams)
+		return
+	}
+	keys := map[string]string{"skill-bindings": "skill_slugs", "app-bindings": "app_uuids", "kb-bindings": "kb_uuids"}
+	field := r.PathValue("field")
+	key, ok := keys[field]
+	values, exists := body[key]
+	if !ok || !exists || len(values) > 50 {
+		encode.JSONError(w, apperr.ErrInvalidParams)
+		return
+	}
+	if field == "skill-bindings" && h.Skills != nil {
+		err = h.Skills.ReplaceClientAgentSkillBindings(r.Context(), domskill.ReplaceClientAgentSkillBindingsInput{AccountID: middleware.MustAccountID(r.Context()), TenantID: middleware.MustTenantID(r.Context()), AgentUUID: employee.UUID, SkillCodes: values})
+		if err != nil {
+			encode.JSONError(w, err)
+			return
+		}
+	} else if field == "app-bindings" && h.Apps != nil {
+		err = h.Apps.BindAgentApps(r.Context(), middleware.MustTenantID(r.Context()), employee.ID, values)
+		if err != nil {
+			encode.JSONError(w, err)
+			return
+		}
+	} else if field == "kb-bindings" && h.Knowledge != nil {
+		err = h.Knowledge.ReplaceAgentKBBindings(r.Context(), middleware.MustAccountID(r.Context()), middleware.MustTenantID(r.Context()), employee.ID, values)
+		if err != nil {
+			encode.JSONError(w, err)
+			return
+		}
+	} else if len(values) > 0 {
+		encode.JSONError(w, apperr.ErrInvalidParams.Withf("community runtime does not support this capability"))
 		return
 	}
 	encode.JSON(w, map[string]bool{"ok": true})

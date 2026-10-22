@@ -177,7 +177,7 @@ class LocalCodingToolState {
   LocalCodingFormFactor get formFactor => _formFactor ?? target.formFactor;
 
   /// 契约 §2.7.3 · 桌面端是否有可写的第三方推理配置;为 false 时该行只能
-  /// 用官方服务,显示"桌面端暂不支持知办模型 API"。CLI 恒为 true。
+  /// 用官方服务,显示"桌面端暂不支持自定义模型 API"。CLI 恒为 true。
   final bool supportsEnable;
 
   /// 契约 §2.7.3 · 已安装桌面端的运行组件(M3 Task 8)。
@@ -196,7 +196,7 @@ class LocalCodingToolState {
   /// 卡在旧版本上没有任何可点的东西。
   final String adoptVersion;
 
-  /// 2026-09-15 · 与 `DETECT-VERSION_TOO_OLD` 一起出现:能切换为知办模型 API 的
+  /// 2026-09-15 · 与 `DETECT-VERSION_TOO_OLD` 一起出现:能切换为自定义模型 API 的
   /// 最低版本(此时 supportsEnable 为 false,官方服务照常可用)。
   final String minimumVersion;
 
@@ -502,7 +502,7 @@ class LocalCodingConfigurationStatus {
   }
 }
 
-/// 「当前服务」:官方服务 / 知办模型 API / 无法判断(用户自行改过、配置不可解析)。
+/// 「当前服务」:官方服务 / 自定义模型 API / 无法判断(用户自行改过、配置不可解析)。
 /// 旧 Bridge 不带 current_service 字段时按官方服务处理。
 enum LocalCodingCurrentService {
   official('official'),
@@ -557,7 +557,7 @@ enum LocalCodingConfigurationType {
 }
 
 /// verify.execute 的 scope:overlay 走知办隔离配置,global 走用户全局配置
-/// (「切换为知办模型 API」之后的真实请求验证)。
+/// (「切换为自定义模型 API」之后的真实请求验证)。
 enum LocalCodingVerifyScope {
   overlay('overlay'),
   global('global');
@@ -662,7 +662,7 @@ class LocalCodingLaunchResult {
   }
 }
 
-/// 契约 §2.7 network.* · 系统代理会不会拦截 Codex 到知办中转站的请求。
+/// 契约 §2.7 network.* · 系统代理会不会拦截 Codex 到你配置的模型服务的请求。
 /// 老 Bridge 不支持时整份为 null。
 class LocalCodingProxyStatus {
   const LocalCodingProxyStatus({
@@ -1000,7 +1000,7 @@ class LocalCodingOperation {
   final bool cancellable;
   final String errorCode;
 
-  /// 检测失败时知办中转站自己的回答("HTTP 503 · <中转站原话>",Bridge 已打码;
+  /// 检测失败时你配置的模型服务自己的回答("HTTP 503 · <中转站原话>",Bridge 已打码;
   /// 契约 §2.7 verify.execute error_detail)。其它失败为空。
   final String errorDetail;
   final String traceId;
@@ -1437,7 +1437,7 @@ String localCodingModelWarningText(LocalCodingModelWarning warning) {
   return '当前配置的模型线路暂时不可用$paren，其它模型可用（如 ${warning.workingModel}），可在工具里换一个模型';
 }
 
-/// 检测失败里"知办中转站自己拒绝了请求"的几类(2026-09-15):一键修复修不好,
+/// 检测失败里"你配置的模型服务自己拒绝了请求"的几类(2026-09-15):一键修复修不好,
 /// 卡片要说清是中转站的问题,原话放诊断详情。其它失败(网络、授权、进程)为 null。
 enum LocalCodingRelayFailure {
   upstreamUnavailable, // HTTP 5xx / 上游过载
@@ -1498,14 +1498,14 @@ String localCodingRelayFailureSummary(
   final paren = status.isEmpty ? '' : '（$status）';
   return switch (failure) {
     LocalCodingRelayFailure.upstreamUnavailable =>
-      '知办中转站暂时不可用$paren，不是本机问题，稍后再检测',
+      '你配置的模型服务暂时不可用$paren，不是本机问题，稍后再检测',
     LocalCodingRelayFailure.quotaExhausted =>
-      '知办中转站拒绝了请求$paren，可能是用量已用完或请求过于频繁，稍后再检测',
+      '你配置的模型服务拒绝了请求$paren，可能是用量已用完或请求过于频繁，稍后再检测',
     LocalCodingRelayFailure.modelDenied =>
-      '知办中转站没有为当前模型开放可用线路$paren，需要管理员处理',
-    LocalCodingRelayFailure.rejected => '知办中转站返回错误$paren，不是本机问题',
+      '你配置的模型服务没有为当前模型开放可用线路$paren，需要管理员处理',
+    LocalCodingRelayFailure.rejected => '你配置的模型服务返回错误$paren，不是本机问题',
     LocalCodingRelayFailure.proxyDiverted =>
-      '请求知办中转站失败，可能受代理软件的分流规则影响；在代理软件里把 airick.cn 设为直连，或暂时关闭 TUN / 增强模式后再检测',
+      '请求你配置的模型服务失败，可能受代理软件的分流规则影响；在代理软件里把 airick.cn 设为直连，或暂时关闭 TUN / 增强模式后再检测',
     LocalCodingRelayFailure.insufficientCredit =>
       '积分已用完，知办暂停了模型服务；在「设置 → 套餐与积分」充值（成员请联系企业管理员），到账后再检测即可，不需要重新接入',
     LocalCodingRelayFailure.memberKeyDisabled =>

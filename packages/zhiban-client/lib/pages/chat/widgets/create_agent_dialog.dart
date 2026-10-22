@@ -142,6 +142,7 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
               widget.initialDraft?.executionLocus == 'cloud'));
 
   bool get _canSelectLocal =>
+      !AppConfig.communityEdition &&
       PlatformUtils.isDesktop &&
       (AppConfig.cloudAgentCreationEnabled ||
           widget.initialDraft?.executionLocus != 'cloud');
@@ -152,7 +153,9 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
     final initial = widget.initialDraft;
     _localEngine = initial?.localEngine ?? 'dsh';
     _executionLocus = initial?.executionLocus ??
-        (PlatformUtils.isDesktop
+        (AppConfig.communityEdition
+            ? 'cloud'
+            : PlatformUtils.isDesktop
             ? 'local'
             : AppConfig.cloudAgentCreationEnabled
                 ? 'cloud'
@@ -871,7 +874,8 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
       const SizedBox(height: 10),
       LayoutBuilder(builder: (context, constraints) {
         final choices = <Widget>[
-          if (PlatformUtils.isDesktop || _executionLocus == 'local')
+          if (!AppConfig.communityEdition &&
+              (PlatformUtils.isDesktop || _executionLocus == 'local'))
             _ExecutionChoice(
               label: '这台电脑',
               subtitle: '处理本机文件、办公和编程',

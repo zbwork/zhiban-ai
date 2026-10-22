@@ -4,16 +4,16 @@ import 'package:zhiban_client/config/app_config.dart';
 void main() {
   tearDown(() => AppConfig.applyEnvOverride(null));
 
-  test('production environment uses the public service endpoints', () {
+  test('production environment uses explicitly configured endpoints', () {
     AppConfig.applyEnvOverride(AppEnv.prod);
 
     expect(
       AppConfig.apiUrl(),
-      'https://zb.qkfintech.cn/api/agent-bus/v1'
+      const String.fromEnvironment('API_BASE_URL_PROD'),
     );
     expect(
       AppConfig.adminWebUrl(),
-      'https://zb-console.qkfintech.cn'
+      const String.fromEnvironment('ADMIN_WEB_URL_PROD'),
     );
   });
 

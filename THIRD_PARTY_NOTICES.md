@@ -48615,4 +48615,110 @@ npm ci --ignore-scripts 安装 791 个包，已收集 336 组去重许可文本�
 
 待找原文的包：@aws-sdk/credential-provider-http@3.972.71, @aws-sdk/credential-provider-login@3.972.76, @aws-sdk/nested-clients@3.997.43, @earendil-works/pi-ai@0.82.1, @esbuild/darwin-arm64@0.28.2, @humanfs/types@0.15.0, @img/sharp-libvips-darwin-arm64@1.3.2, @koromix/koffi-darwin-arm64@3.1.5, @napi-rs/canvas-darwin-arm64@1.0.9, @openai/codex@0.132.0, @openai/codex@0.132.0-darwin-arm64, @rollup/rollup-darwin-arm64@4.62.4, @tokenizer/token@0.3.0, abstract-logging@2.0.1, binary@0.3.0, buffers@0.1.1, chainsaw@0.1.0, data-uri-to-buffer@4.0.1, esrecurse@4.3.0, hash.js@1.1.7, https@1.0.0, imurmurhash@0.1.4, isarray@1.0.0, keyv@4.5.4, natural-compare@1.4.0, pg-types@2.2.0, pgpass@1.0.5, saxes@5.0.1, stackback@0.0.2, tr46@0.0.3。
 
-DSH buffers 0.1.1 核对：由 exceljs 4.4.0 → unzipper 0.10.14 → binary 0.3.0 引入；npm 元数据未提供 license/licenses/gitHead，包内无独立许可，记录的原仓库访问返回 404。发布前须取得可验证的授权依据或替换依赖，不将其默认声明为 MIT。
+DSH buffers 0.1.1 核对：由 exceljs 4.4.0 → unzipper 0.10.14 → binary 0.3.0 引入；npm 元数据未提供 license/licenses/gitHead，包内无独立许可，记录的原仓库访问返回 404。项目负责人已于 2026-10-22 接受该版本许可信息缺失的已知风险，决定继续纳入候选，不再将本项作为发布阻断。上游授权信息仍记为 UNKNOWN，不将其声明为 MIT。
+
+## DSH README 内嵌许可补充（2026-10-22）
+
+### DSH / hash.js@1.1.7 / package/README.md
+
+来源：npm 官方版本包，SHA-512 与锁文件一致；以下为包内 README 许可段原文。
+
+```text
+#### LICENSE
+
+This software is licensed under the MIT License.
+
+Copyright Fedor Indutny, 2014.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to permit
+persons to whom the Software is furnished to do so, subject to the
+following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### DSH / imurmurhash@0.1.4 / package/README.md
+
+来源：npm 官方版本包，SHA-512 与锁文件一致；以下为包内 README 许可段原文。
+
+```text
+License (MIT)
+-------------
+Copyright (c) 2013 Gary Court, Jens Taylor
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### DSH / pg-types@2.2.0 / package/README.md
+
+来源：npm 官方版本包，SHA-512 与锁文件一致；以下为包内 README 许可段原文。
+
+```text
+## license
+
+The MIT License (MIT)
+
+Copyright (c) 2014 Brian M. Carlson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+### DSH / pgpass@1.0.5 / package/README.md
+
+来源：npm 官方版本包，SHA-512 与锁文件一致；以下为包内 README 许可段原文。
+
+```text
+## License
+
+Copyright (c) 2013-2016 Hannes Hörl
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```

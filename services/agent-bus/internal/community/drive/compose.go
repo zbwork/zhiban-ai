@@ -24,6 +24,9 @@ func (s *Storage) Resolve(ctx context.Context, tenantID int64) (object.Store, er
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if s == nil || s.store == nil {
+		return nil, apperr.ErrUpstreamUnavailable.Withf("object storage not configured")
+	}
 	return s.store, nil
 }
 func NewStorage(c config.Config) (*Storage, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	runtimeadapter "github.com/zbwork/zhiban-ai/services/agent-bus/internal/adapter/runtime"
 	dommsg "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/message"
+	"strings"
 	"time"
 )
 
@@ -44,6 +45,8 @@ func (s *impl) runGenericRuntime(ctx context.Context, streamID string, in runAge
 	}
 	req := runtimeadapter.StreamRequest{StreamID: streamID, TenantID: in.TenantID, AccountID: in.AccountID, AgentUUID: in.Agent.UUID, ConversationID: in.Conversation.ID, UserMessage: in.PromptText, UserBlocks: in.UserBlocks, ModelHint: selectedConversationModel(in.UserMetadata)}
 
+	kc := s.prepareRuntimeKnowledgeContext(ctx, ChatRAGRequest{TenantID: in.TenantID, AccountID: in.AccountID, Agent: in.Agent, Conversation: in.Conversation, RoomUUID: in.RoomUUID, MessageUUID: messageUUID, QueryOriginal: in.PromptText, InvocationSource: "pre_retrieve"})
+	req.UserMessage = promptTextWithKnowledgeContext(req.UserMessage, kc)
 	req.SystemPrompt = in.Agent.Description
 	if in.Agent.CurrentVersion > 0 {
 		version, err := s.agents.GetVersion(ctx, in.Agent.ID, in.Agent.CurrentVersion)
@@ -51,7 +54,10 @@ func (s *impl) runGenericRuntime(ctx context.Context, streamID string, in runAge
 			finish(nil, "failed", "chat.version_unavailable")
 			return
 		}
-		if prompt, ok := version.Snapshot["system_prompt"].(string); ok {
+		if description, ok := version.Snapshot["description"].(string); ok {
+			req.SystemPrompt = description
+		}
+		if prompt, ok := version.Snapshot["system_prompt"].(string); ok && strings.TrimSpace(prompt) != "" {
 			req.SystemPrompt = prompt
 		}
 	}
@@ -85,7 +91,7 @@ func (s *impl) runGenericRuntime(ctx context.Context, streamID string, in runAge
 			return
 		}
 		if ev.Final && ev.Kind == "final" {
-			finish(ev.Blocks, "final", "")
+			finish(finalBlocksWithKnowledgeContextSources(ev.Blocks, kc), "final", "")
 			return
 		}
 		if ev.Kind != "delta" {

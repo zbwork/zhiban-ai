@@ -67,9 +67,9 @@ func (s *impl) LinkFromDrive(ctx context.Context, accountID, tenantID int64, per
 	}
 
 	// MIME / size 闸 (与 UploadDocument 完全一致).
-	mime := strings.ToLower(strings.TrimSpace(snap.MimeType))
-	if mime == "" {
-		mime = "text/plain"
+	mime, err := normalizeDocumentMIME(snap.MimeType)
+	if err != nil {
+		return nil, err
 	}
 	if !isAllowedDocMIME(mime) {
 		return nil, apperr.New(apperr.InvalidParams, ErrCodeKBDocFormat).

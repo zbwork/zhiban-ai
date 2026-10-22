@@ -61,7 +61,7 @@ String localCodingVendorName(LocalCodingVendor vendor) => vendor.displayName;
 enum LocalCodingBatchKind {
   install,
 
-  /// F31 §3.2.1(2026-09-17)· 「一键接入知办 / 修复并重试」:每个形态
+  /// F31 §3.2.1(2026-09-17)· 「一键配置工具 / 修复并重试」:每个形态
   /// ①程序到位 → ②写配置 → ③验证,每步按 [LocalCodingConnectPlan] 决定做不做。
   connect,
   switchToZhiban,
@@ -631,7 +631,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
     return startInstall(target);
   }
 
-  /// 「切换为知办模型 API」/「一键修复」(已切换态):备份并改写用户全局配置
+  /// 「切换为自定义模型 API」/「一键修复」(已切换态):备份并改写用户全局配置
   /// (Bridge 内部先备份、写入失败自动回滚)→ 真实请求验证。失败停在该段。
   Future<Object?> switchToZhiban(
     LocalCodingTarget target, {
@@ -753,10 +753,10 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
     );
   }
 
-  /// 「一键接入知办」/「修复并重试」(F31 §3.2.1):一条幂等链,对该厂商的每个
+  /// 「一键配置工具」/「修复并重试」(F31 §3.2.1):一条幂等链,对该厂商的每个
   /// 形态依次 ①程序到位 → ②写配置 → ③验证,每步按 [connectPlanFor] 决定做不做;
   /// 某一形态失败只让该形态进入"需要处理",不回滚另一形态;①失败时配置未动,
-  /// 官方服务照常可用。取代此前的 下载安装(落位即切换)/ 切换为知办模型 API /
+  /// 官方服务照常可用。取代此前的 下载安装(落位即切换)/ 切换为自定义模型 API /
   /// 一键修复 / 页脚升级与接管 四个入口,页脚不再按功能开关堆 if。
   Future<Object?> connectTargets(List<LocalCodingTarget> targets) {
     final plans = {
@@ -794,7 +794,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
         } else if (!connectAllowed) {
           return _failure(const LocalCodingToolsException(
             'profiles_unavailable',
-            '当前环境暂未开放知办模型 API，可先使用官方服务',
+            '当前环境暂未开放自定义模型 API，可先使用官方服务',
           ));
         }
         // Codex 桌面端与命令行共用配置:命令行仍低于最低版本时不能替它写配置,
@@ -828,7 +828,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
       onAllSucceeded: (vendor) => connectAllowed
           ? LocalCodingPageBanner(
               kind: LocalCodingPageBannerKind.installComplete,
-              title: '接入完成，${localCodingVendorName(vendor)} 已可以使用知办模型 API',
+              title: '接入完成，${localCodingVendorName(vendor)} 已可以使用自定义模型 API',
               text: localCodingRelaunchHint,
             )
           : LocalCodingPageBanner(
@@ -902,7 +902,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
             }
           }
         }
-        // 已切换为知办模型 API 的形态:换了版本要重新确认能连上。
+        // 已切换为自定义模型 API 的形态:换了版本要重新确认能连上。
         if (!_switchedToZhiban(target)) return outcome;
         final verifyError =
             await startVerify(target, scope: LocalCodingVerifyScope.global);
@@ -916,7 +916,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
     );
   }
 
-  /// 快照里该 target 当前是否已切换为知办模型 API。
+  /// 快照里该 target 当前是否已切换为自定义模型 API。
   bool _switchedToZhiban(LocalCodingTarget target) =>
       state.value?.snapshot.configurations[target]?.switchedToZhiban ?? false;
 
@@ -1115,7 +1115,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
               kind: LocalCodingPageBannerKind.needsAttention,
               title: localCodingInspectDoneTitle,
               text: relayText == null
-                  ? '${localCodingVendorName(vendor)} 暂时连不上知办模型 API，可在卡片上查看原因'
+                  ? '${localCodingVendorName(vendor)} 暂时连不上自定义模型 API，可在卡片上查看原因'
                   : '${localCodingVendorName(vendor)}：$relayText',
             ),
           ));
@@ -1135,7 +1135,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
         _ => fallback,
       };
 
-  /// 契约 §2.7 network.* · 一键为知办中转站设置代理例外(NO_PROXY + 系统代理的绕过
+  /// 契约 §2.7 network.* · 一键为你配置的模型服务设置代理例外(NO_PROXY + 系统代理的绕过
   /// 名单),成功后刷新快照。检测 / 修复由调用方接着做;返回 null 表示成功。
   /// [vendor] 只决定提示里让用户重开哪个应用。
   Future<Object?> applyProxyFix(
@@ -1151,7 +1151,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
         banner: LocalCodingPageBanner(
           kind: LocalCodingPageBannerKind.repairComplete,
           text:
-              '已为知办中转站设置代理例外。请重开 ${localCodingVendorName(vendor)} 桌面端；终端请新开窗口后使用',
+              '已为你配置的模型服务设置代理例外。请重开 ${localCodingVendorName(vendor)} 桌面端；终端请新开窗口后使用',
         ),
       ));
       return null;
@@ -1346,7 +1346,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
       case 'tool_unsupported':
         return const ['当前安装来源或版本不受支持;可点「查看原因」了解详情'];
       case 'profiles_unavailable':
-        return const ['当前环境未开放知办模型 API 切换,请联系管理员'];
+        return const ['当前环境未开放自定义模型 API 切换,请联系管理员'];
       default:
         return const [];
     }
@@ -1677,7 +1677,7 @@ class LocalCodingToolsNotifier extends AsyncNotifier<LocalCodingToolsPageData> {
             text: switch (compound.kind) {
               LocalCodingCompoundKind.installAndEnable => '安装、接入、验证已全部完成',
               LocalCodingCompoundKind.switchToZhiban =>
-                '切换完成，$name 已可以使用知办模型 API',
+                '切换完成，$name 已可以使用自定义模型 API',
               LocalCodingCompoundKind.repairSwitch => '修复完成，$name 已可以正常使用',
             },
           ),

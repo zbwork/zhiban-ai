@@ -27,12 +27,6 @@ func (s *Personal) Get(ctx context.Context, accountID, tenantID int64, uuid stri
 	if e == nil || e.TenantID != tenantID || e.CreatorID != accountID || e.Source != "personal" {
 		return nil, apperr.ErrNotFound
 	}
-	if e.RuntimeEnvironmentID == nil {
-		return nil, apperr.ErrForbidden
-	}
-	if err := (&Service{Environments: s.Environments}).checkEnvironment(ctx, tenantID, *e.RuntimeEnvironmentID); err != nil {
-		return nil, err
-	}
 	return e, nil
 }
 func (s *Personal) Save(ctx context.Context, accountID, tenantID int64, uuid string, in PersonalInput) (*dom.DigitalEmployee, error) {

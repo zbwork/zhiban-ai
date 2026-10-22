@@ -79,7 +79,9 @@ func (p *Provider) StreamChat(ctx context.Context, req model.ChatRequest) (model
 		resp.Body.Close()
 		return nil, fmt.Errorf("model gateway HTTP %d", resp.StatusCode)
 	}
-	return &stream{body: resp.Body, sc: bufio.NewScanner(resp.Body)}, nil
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 4096), 1<<20)
+	return &stream{body: resp.Body, sc: scanner}, nil
 }
 
 func (p *Provider) Embed(ctx context.Context, req model.EmbeddingRequest) (*model.EmbeddingResponse, error) {
@@ -143,6 +145,7 @@ type stream struct {
 }
 
 type chunkResp struct {
+	Error   json.RawMessage `json:"error"`
 	Choices []struct {
 		Delta struct {
 			Content string `json:"content"`
@@ -170,12 +173,34 @@ func (s *stream) Recv() (model.ChatChunk, error) {
 		}
 		var c chunkResp
 		if err := json.Unmarshal([]byte(raw), &c); err != nil {
+			s.done = true
 			return model.ChatChunk{Err: err}, nil
+		}
+		if len(c.Error) > 0 && string(c.Error) != "null" {
+			s.done = true
+			return model.ChatChunk{Err: errors.New("model gateway stream error")}, nil
 		}
 		if len(c.Choices) > 0 {
 			ch := c.Choices[0]
 			done := ch.FinishReason != nil && *ch.FinishReason != ""
 			s.done = done
+			if done {
+				var finishErr error
+				switch *ch.FinishReason {
+				case "stop":
+				case "length":
+					finishErr = errors.New("model response exceeded length limit")
+				case "content_filter":
+					finishErr = errors.New("model response blocked by content filter")
+				case "tool_calls", "function_call":
+					finishErr = errors.New("model requested unsupported tool execution")
+				default:
+					finishErr = errors.New("model returned unsupported finish reason")
+				}
+				if finishErr != nil {
+					return model.ChatChunk{Err: finishErr}, nil
+				}
+			}
 			return model.ChatChunk{Delta: ch.Delta.Content, Done: done}, nil
 		}
 	}

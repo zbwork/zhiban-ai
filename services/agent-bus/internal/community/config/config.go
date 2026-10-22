@@ -12,6 +12,7 @@ import (
 )
 
 type Config struct {
+	AppIssuer         string
 	StorageQuotaBytes int64
 	HTTP              string
 	PostgresDSN       string
@@ -43,7 +44,7 @@ func Decode(r io.Reader) (Config, error) {
 	if err := decoder.Decode(&extra); err != io.EOF {
 		return c, errors.New("expected one YAML document")
 	}
-	for _, value := range []*string{&c.HTTP, &c.PostgresDSN, &c.RedisAddr, &c.RedisPassword, &c.JWTPrivateKeyFile, &c.JWTIssuer, &c.Model.Provider, &c.Model.BaseURL, &c.Model.APIKey, &c.Model.Name, &c.Object.Endpoint, &c.Object.ReadEndpoint, &c.Object.Bucket, &c.Object.AccessKey, &c.Object.SecretKey, &c.WuKong.URL, &c.WuKong.Token, &c.WuKong.WSAddr, &c.WuKong.TCPAddr} {
+	for _, value := range []*string{&c.AppIssuer, &c.HTTP, &c.PostgresDSN, &c.RedisAddr, &c.RedisPassword, &c.JWTPrivateKeyFile, &c.JWTIssuer, &c.Model.Provider, &c.Model.BaseURL, &c.Model.APIKey, &c.Model.Name, &c.Object.Endpoint, &c.Object.ReadEndpoint, &c.Object.Bucket, &c.Object.AccessKey, &c.Object.SecretKey, &c.WuKong.URL, &c.WuKong.Token, &c.WuKong.WSAddr, &c.WuKong.TCPAddr} {
 		missing := false
 		*value = os.Expand(*value, func(key string) string {
 			v, ok := os.LookupEnv(key)
@@ -55,6 +56,13 @@ func Decode(r io.Reader) (Config, error) {
 		if missing {
 			return c, errors.New("required configuration environment variable missing")
 		}
+	}
+	if c.AppIssuer != "" {
+		u, err := url.Parse(c.AppIssuer)
+		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+			return c, errors.New("appissuer requires an HTTPS public origin")
+		}
+		c.AppIssuer = strings.TrimRight(c.AppIssuer, "/")
 	}
 	if c.StorageQuotaBytes == 0 {
 		c.StorageQuotaBytes = 10 << 30

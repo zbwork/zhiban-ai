@@ -51,6 +51,8 @@ func run(ctx context.Context, path string) error {
 		locks[name] = &sync.Mutex{}
 	}
 	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() { defer wg.Done(); communitydrive.RunKnowledgeCleanup(ctx, pool, storage) }()
 	if cfg.WuKong.URL != "" {
 		wg.Add(1)
 		go func() {

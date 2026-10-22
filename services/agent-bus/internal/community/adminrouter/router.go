@@ -3,6 +3,7 @@ package adminrouter
 
 import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminapps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminorg"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminsession"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/admintenant"
@@ -11,6 +12,7 @@ import (
 )
 
 type Handlers struct {
+	Apps    *adminapps.Handlers
 	Session *adminsession.Handlers
 	Tenant  *admintenant.Handlers
 	Org     *adminorg.Handlers
@@ -27,6 +29,9 @@ func (h Handlers) Register(mux *http.ServeMux, authMw func(http.Handler) http.Ha
 	}
 	tenantPerm := func(code string, handler http.Handler) http.Handler {
 		return adminAuth(middleware.RequirePasswordValid(middleware.RequireTenant(middleware.RequirePermission(code)(handler))))
+	}
+	if h.Apps != nil {
+		h.Apps.Register(mux, tenantPerm)
 	}
 	if h.Agents != nil {
 		mux.Handle("GET /api/admin/v1/tenant/agents", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Agents.List)))

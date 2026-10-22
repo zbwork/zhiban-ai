@@ -1,4 +1,5 @@
 http: ${COMMUNITY_HTTP}
+appissuer: ${COMMUNITY_APP_ISSUER}
 postgresdsn: ${AGBUS_POSTGRES_DSN}
 redisaddr: redis:6379
 jwtprivatekeyfile: /run/community/jwt.pem

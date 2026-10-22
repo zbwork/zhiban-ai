@@ -9,6 +9,8 @@ x-app: &app
   environment: &env
     AGBUS_POSTGRES_DSN: postgres://community:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/community?sslmode=disable&search_path=agent_bus,public
     COMMUNITY_HTTP: 0.0.0.0:8080
+    COMMUNITY_APP_ISSUER: ${COMMUNITY_APP_ISSUER:-}
+    AGBUS_SECRETBOX_KEY: ${AGBUS_SECRETBOX_KEY:-}
     OBJECT_PASSWORD: ${OBJECT_PASSWORD:?Set OBJECT_PASSWORD}
     WUKONG_WEBHOOK_SECRET: ${WUKONG_WEBHOOK_SECRET:?Set WUKONG_WEBHOOK_SECRET}
   volumes:

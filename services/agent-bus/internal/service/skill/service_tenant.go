@@ -823,7 +823,10 @@ func (s *Service) GetSkillRail(ctx context.Context, in domskill.GetSkillRailInpu
 	if err != nil {
 		return nil, err
 	}
-	disables, _ := s.repo.ListTenantDisables(ctx, in.TenantID)
+	disables, err := s.repo.ListTenantDisables(ctx, in.TenantID)
+	if err != nil {
+		return nil, err
+	}
 	disabledSet := map[int64]bool{}
 	for _, d := range disables {
 		disabledSet[d.SkillID] = true

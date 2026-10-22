@@ -134,12 +134,20 @@ func (s *SnapshotSvc) GetDriveFileForRead(
 	if err != nil {
 		return nil, apperr.ErrInternal.Withf("drive.preview_unavailable").Wrap(fmt.Errorf("storage resolve: %w", err))
 	}
-	out, err := store.PresignGet(ctx, object.PresignGetInput{
+	input := object.PresignGetInput{
 		Key:      f.StorageKey,
 		TTL:      s.ttl,
 		Inline:   false,
 		FileName: f.Name,
-	})
+	}
+	// Backend consumers use the internal endpoint when client URLs use a public host.
+	presign := store.PresignGet
+	if internal, ok := store.(interface {
+		PresignGetInternal(context.Context, object.PresignGetInput) (*object.PresignGetOutput, error)
+	}); ok {
+		presign = internal.PresignGetInternal
+	}
+	out, err := presign(ctx, input)
 	if err != nil {
 		return nil, apperr.ErrInternal.Withf("drive.preview_unavailable").Wrap(fmt.Errorf("presign get: %w", err))
 	}

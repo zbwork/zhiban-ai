@@ -6,8 +6,8 @@ class AppConfig {
   /// Public export selects the backend capability set at build time.
   static const bool communityEdition = true;
 
-  /// 暂停客户端云端新建/位置切换，保留已有云端员工与运行实现。
-  static const cloudAgentCreationEnabled = bool.fromEnvironment(
+  /// 社区版使用部署内运行环境；商业版沿用云端新建开关。
+  static const cloudAgentCreationEnabled = communityEdition || bool.fromEnvironment(
     'CLOUD_AGENT_CREATION_ENABLED',
     defaultValue: false,
   );

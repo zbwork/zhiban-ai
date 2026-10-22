@@ -7,6 +7,7 @@ import (
 	"flag"
 	"github.com/redis/go-redis/v9"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/adminrouter"
+	communityapps "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/apps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/config"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/captcha"
@@ -28,6 +29,7 @@ import (
 	membersvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/membership"
 	rbacsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/rbac"
 	tenantsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/tenant"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminapps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminorg"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminsession"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/admintenant"
@@ -76,6 +78,9 @@ func run(ctx context.Context, path string) error {
 		Session: &adminsession.Handlers{Auth: auth, RBAC: rbacsvc.New(rbacRepo)},
 		Org:     &adminorg.Handlers{Department: deptsvc.New(pool, pub), Membership: membersvc.New(pool, pub)},
 		Tenant:  &admintenant.Handlers{Tenant: tenantService, AllowExistingEmailAdmin: true},
+	}
+	if cfg.AppIssuer != "" {
+		handlers.Apps = &adminapps.Handlers{App: communityapps.New(pool, cfg.AppIssuer)}
 	}
 	mux := http.NewServeMux()
 	handlers.Register(mux, middleware.Auth(issuer, auth, false))

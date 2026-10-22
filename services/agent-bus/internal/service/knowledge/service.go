@@ -13,10 +13,14 @@
 package knowledge
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"strconv"
 	"strings"
 	"time"
@@ -326,6 +330,10 @@ type AgentKBRepo interface {
 
 // Config service 配置.
 type Config struct {
+	// TextOnlyDocuments restricts PG text ingestion; binary parsing requires a configured parser.
+	TextOnlyDocuments  bool
+	PersistOriginals   bool
+	ExtractDocuments   bool
 	DocMaxBytes        int64
 	PlatformQuotaBytes int64
 	DefaultTopK        int
@@ -786,7 +794,11 @@ func (s *impl) ReplaceAgentKBBindings(ctx context.Context, accountID, tenantID, 
 		seen[kb.ID] = struct{}{}
 		kbIDs = append(kbIDs, kb.ID)
 	}
-	return s.agentKBRepo.ReplaceForAgent(ctx, agentID, accountID, kbIDs)
+	if err := s.agentKBRepo.ReplaceForAgent(ctx, agentID, accountID, kbIDs); err != nil {
+		return err
+	}
+	s.publishAudit(ctx, "audit.agent.kb_bindings_updated", tenantID, map[string]any{"account_id": accountID, "agent_id": agentID, "kb_count": len(kbIDs)})
+	return nil
 }
 
 func (s *impl) ReplaceAdminAgentKBBindings(ctx context.Context, accountID, tenantID, agentID int64, kbUUIDs []string) error {
@@ -1051,6 +1063,13 @@ func (s *impl) DeleteKB(ctx context.Context, accountID, tenantID int64, perms []
 	if err := assertCanModify(kb, accountID, perms); err != nil {
 		return err
 	}
+	var originalKeys []string
+	if s.cfg.PersistOriginals {
+		originalKeys, err = s.repo.ListDocumentStorageKeys(ctx, kb.ID)
+		if err != nil {
+			return apperr.ErrInternal.Wrap(err)
+		}
+	}
 	if err := s.runTx(ctx, func(tx pgx.Tx) error {
 		releaseBytes, err := s.repo.SumKBQuotaTrackedFileSize(ctx, tx, kb.ID)
 		if err != nil {
@@ -1075,6 +1094,17 @@ func (s *impl) DeleteKB(ctx context.Context, accountID, tenantID int64, perms []
 			return e
 		}
 		return apperr.ErrInternal.Wrap(err)
+	}
+	if len(originalKeys) > 0 && s.objectStores != nil {
+		if store, err := s.objectStores.Resolve(ctx, tenantID); err != nil {
+			s.logger.Warn(ctx, "kb original cleanup storage unavailable", "kb_uuid", kb.UUID)
+		} else {
+			for _, key := range originalKeys {
+				if err = store.Delete(ctx, key); err != nil {
+					s.logger.Warn(ctx, "kb original cleanup failed", "kb_uuid", kb.UUID, "err", err)
+				}
+			}
+		}
 	}
 	s.notify(ctx, "knowledge_bases:"+strconv.FormatInt(kb.ID, 10))
 
@@ -1382,6 +1412,32 @@ func (s *impl) DownloadDocument(ctx context.Context, accountID, tenantID int64, 
 	if doc.KBID != kb.ID {
 		return nil, apperr.New(apperr.NotFound, ErrCodeKBNotFound).Withf("doc not in this kb")
 	}
+	if doc.StorageKey != "" && s.objectStores != nil {
+		store, err := s.objectStores.Resolve(ctx, tenantID)
+		if err != nil {
+			return nil, apperr.ErrUpstreamUnavailable.Withf("object storage unavailable")
+		}
+		input := object.PresignGetInput{Key: doc.StorageKey, TTL: 5 * time.Minute}
+		var url *object.PresignGetOutput
+		if internal, ok := store.(interface {
+			PresignGetInternal(context.Context, object.PresignGetInput) (*object.PresignGetOutput, error)
+		}); ok {
+			url, err = internal.PresignGetInternal(ctx, input)
+		} else {
+			url, err = store.PresignGet(ctx, input)
+		}
+		if err != nil {
+			return nil, apperr.ErrUpstreamUnavailable.Withf("original unavailable")
+		}
+		content, err := fetchDriveBytes(ctx, url.URL, s.cfg.DocMaxBytes)
+		if err != nil {
+			return nil, err
+		}
+		if int64(len(content)) > s.cfg.DocMaxBytes {
+			return nil, apperr.ErrInvalidParams.Withf("original exceeds size limit")
+		}
+		return &DocumentDownload{Title: doc.Title, MimeType: doc.MimeType, Content: content}, nil
+	}
 	providerDocID := strings.TrimSpace(doc.ProviderDocID)
 	if providerDocID == "" {
 		return nil, apperr.New(apperr.NotFound, ErrCodeKBNotFound).Withf("document original unavailable")
@@ -1414,9 +1470,12 @@ func (s *impl) UploadDocument(ctx context.Context, accountID, tenantID int64, pe
 	if err := assertCanModify(kb, accountID, perms); err != nil {
 		return nil, err
 	}
-	mime := strings.ToLower(strings.TrimSpace(req.MimeType))
-	if mime == "" {
-		mime = "text/plain"
+	mime, err := normalizeDocumentMIME(req.MimeType)
+	if err != nil {
+		return nil, err
+	}
+	if s.cfg.TextOnlyDocuments && !(strings.HasPrefix(mime, "text/") || mime == "application/json") {
+		return nil, apperr.New(apperr.InvalidParams, ErrCodeKBDocFormat).Withf("community knowledge ingestion supports text, Markdown, CSV and JSON")
 	}
 	if !isAllowedDocMIME(mime) {
 		return nil, apperr.New(apperr.InvalidParams, ErrCodeKBDocFormat).
@@ -1434,7 +1493,14 @@ func (s *impl) UploadDocument(ctx context.Context, accountID, tenantID int64, pe
 	if title == "" {
 		title = "untitled.txt"
 	}
-	chunks := chunkText(string(req.Content))
+	text := string(req.Content)
+	if s.cfg.ExtractDocuments {
+		text, err = extractDocumentText(ctx, req.Content, mime)
+		if err != nil {
+			return nil, apperr.New(apperr.InvalidParams, ErrCodeKBDocFormat).Withf("%v", err)
+		}
+	}
+	chunks := chunkText(text)
 
 	// Codex round-3 P1-5: Dify ingest 不能在 PG tx 内 (会延长 PG tx 持锁时间 + 把
 	// 外部 HTTP 失败和 PG 事务回滚耦合). 改 3 阶段:
@@ -1466,6 +1532,18 @@ func (s *impl) UploadDocument(ctx context.Context, accountID, tenantID int64, pe
 		return nil, apperr.ErrInternal.Wrap(err)
 	}
 
+	if s.cfg.PersistOriginals {
+		storageErr := s.persistOriginal(ctx, tenantID, kb, doc, req.Content, title, mime)
+		if storageErr != nil {
+			_ = s.runTx(ctx, func(tx pgx.Tx) error {
+				if err := s.repo.MarkDocumentFailed(ctx, tx, doc.ID, "original storage failed"); err != nil {
+					return err
+				}
+				return s.releaseKnowledgeQuota(ctx, tx, tenantID, doc.FileSize)
+			})
+			return nil, storageErr
+		}
+	}
 	// RAGFlow path: 真上传成功后再标 ready; 失败落 failed, 让 admin 文档页可见可重试。
 	if s.ragflowExt != nil {
 		return s.uploadDocumentToRagflowSync(ctx, accountID, tenantID, kb, doc, title, mime, req.Content, len(chunks))
@@ -1626,6 +1704,13 @@ func (s *impl) DeleteDocument(ctx context.Context, accountID, tenantID int64, pe
 		return apperr.ErrInternal.Wrap(err)
 	}
 
+	if doc.StorageKey != "" && s.objectStores != nil {
+		if store, err := s.objectStores.Resolve(ctx, tenantID); err != nil {
+			s.logger.Warn(ctx, "kb original cleanup storage unavailable", "doc_uuid", doc.UUID)
+		} else if err = store.Delete(ctx, doc.StorageKey); err != nil {
+			s.logger.Warn(ctx, "kb original cleanup failed", "doc_uuid", doc.UUID, "err", err)
+		}
+	}
 	// Phase 2: provider 端删除 (无 tx). 失败不回滚 PG, 仅写 audit + log; 残留处理留 reaper.
 	if delErr := s.provider.DeleteDocument(ctx, provider.DeleteDocumentReq{
 		TenantID: tenantID, KBID: kb.ID, DocumentID: doc.ID, ProviderDocID: doc.ProviderDocID,
@@ -2380,6 +2465,17 @@ func chunkText(text string) []string {
 	return out
 }
 
+func normalizeDocumentMIME(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "text/plain", nil
+	}
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(raw))
+	if err != nil {
+		return "", apperr.New(apperr.InvalidParams, ErrCodeKBDocFormat).Withf("invalid document media type")
+	}
+	return mediaType, nil
+}
+
 func isAllowedDocMIME(mime string) bool {
 	switch mime {
 	case "text/plain", "text/markdown", "text/md", "text/x-markdown",
@@ -2442,4 +2538,32 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return string(r[:n]) + "…"
+}
+
+func (s *impl) persistOriginal(ctx context.Context, tenantID int64, kb *domkb.KnowledgeBase, doc *domkb.Document, content []byte, title, mime string) error {
+	if s.objectStores == nil {
+		return apperr.ErrUpstreamUnavailable.Withf("object storage required")
+	}
+	store, err := s.objectStores.Resolve(ctx, tenantID)
+	if err != nil {
+		return apperr.ErrUpstreamUnavailable.Withf("object storage unavailable")
+	}
+	putter, ok := store.(managedObjectPutter)
+	if !ok {
+		return apperr.ErrUpstreamUnavailable.Withf("object upload unavailable")
+	}
+	key := managedDocumentStorageKey(domkb.Actor{ScopeKind: domkb.ScopeTenant, TenantID: &tenantID}, kb, doc.UUID, title)
+	if err = putter.PutObject(ctx, key, bytes.NewReader(content), int64(len(content)), mime); err != nil {
+		return apperr.ErrUpstreamUnavailable.Withf("original upload failed")
+	}
+	digest := sha256.Sum256(content)
+	hash := hex.EncodeToString(digest[:])
+	if err = s.repo.UpdateDocumentStorage(ctx, doc.ID, key, hash, title); err != nil {
+		_ = store.Delete(ctx, key)
+		return apperr.ErrInternal.Wrap(err)
+	}
+	doc.StorageKey = key
+	doc.ContentSHA256 = hash
+	doc.OriginalName = title
+	return nil
 }

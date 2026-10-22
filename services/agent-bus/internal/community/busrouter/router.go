@@ -2,24 +2,28 @@ package busrouter
 
 import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientapps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcatalog"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientchat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcontacts"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcron"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientdrive"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientknowledge"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/session"
 	"net/http"
 )
 
 type Handlers struct {
-	Catalog   *clientcatalog.Handlers
-	Agents    *clientcatalog.AgentHandlers
-	Cron      *clientcron.Handlers
-	Knowledge *clientcatalog.KnowledgeHandler
-	Chat      *clientchat.Handlers
-	Session   *session.Handlers
-	Contacts  *clientcontacts.Handlers
-	Drive     *clientdrive.Handlers
+	Apps         *clientapps.Handlers
+	Catalog      *clientcatalog.Handlers
+	Agents       *clientcatalog.AgentHandlers
+	Cron         *clientcron.Handlers
+	Knowledge    *clientcatalog.KnowledgeHandler
+	KnowledgeAPI *clientknowledge.Handlers
+	Chat         *clientchat.Handlers
+	Session      *session.Handlers
+	Contacts     *clientcontacts.Handlers
+	Drive        *clientdrive.Handlers
 }
 
 func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Handler, membership middleware.TenantMembershipReader) {
@@ -29,8 +33,18 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	authT := func(handler http.Handler) http.Handler {
 		return auth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(membership)(handler)))
 	}
+	if h.Apps != nil {
+		h.Apps.Register(mux, authT)
+	}
 	if h.Agents != nil {
 		if h.Agents.Personal != nil {
+			for _, field := range []string{"skill-bindings", "app-bindings", "kb-bindings"} {
+				bindingField := field
+				mux.Handle("PUT /api/agent-bus/v1/agents/{uuid}/"+field, authT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					r.SetPathValue("field", bindingField)
+					h.Agents.EmptyBindings(w, r)
+				})))
+			}
 			mux.Handle("POST /api/agent-bus/v1/agents", authT(http.HandlerFunc(h.Agents.Create)))
 			mux.Handle("PUT /api/agent-bus/v1/agents/{uuid}", authT(http.HandlerFunc(h.Agents.Update)))
 			mux.Handle("DELETE /api/agent-bus/v1/agents/{uuid}", authT(http.HandlerFunc(h.Agents.Delete)))
@@ -57,7 +71,9 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 		mux.Handle("POST /api/agent-bus/v1/cron/runs/{uuid}/open-chat", authT(http.HandlerFunc(h.Cron.OpenChat)))
 		mux.Handle("GET /api/agent-bus/v1/cron/runs", authT(http.HandlerFunc(h.Cron.ListRuns)))
 	}
-	if h.Knowledge != nil {
+	if h.KnowledgeAPI != nil {
+		h.KnowledgeAPI.Register(mux, authT)
+	} else if h.Knowledge != nil {
 		mux.Handle("GET /api/agent-bus/v1/knowledge-bases", authT(http.HandlerFunc(h.Knowledge.List)))
 	}
 	mux.HandleFunc("GET  /api/agent-bus/v1/auth/captcha", h.Session.Captcha)
