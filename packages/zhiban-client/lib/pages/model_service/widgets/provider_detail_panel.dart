@@ -1,3 +1,4 @@
+import 'package:zhiban_client/config/app_config.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -168,9 +169,10 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
   }
 
   bool get _isManaged =>
-      widget.catalogEntry?.id == 'beebridge' ||
-      (_localId != null &&
-          _findLocalProvider(_localId!)?.catalogId == 'beebridge');
+      !AppConfig.communityEdition &&
+      (widget.catalogEntry?.id == 'beebridge' ||
+          (_localId != null &&
+              _findLocalProvider(_localId!)?.catalogId == 'beebridge'));
 
   Future<void> _refreshManaged() async {
     final selection = _selectionIdentity;
@@ -178,6 +180,7 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
     try {
       final status = await ref.refresh(managedModelServiceProvider.future);
       if (!mounted || selection != _selectionIdentity) return;
+      ref.invalidate(managedModelKeyProvider);
       if (!status.keyReady || status.status != 'ready') {
         BotToast.showText(text: '检测失败：${status.message}');
         return;
@@ -608,8 +611,9 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
   @override
   Widget build(BuildContext context) {
     var provider = _displayProvider;
-    final managed = provider.catalogId == 'beebridge' ||
-        widget.catalogEntry?.id == 'beebridge';
+    final managed = !AppConfig.communityEdition &&
+        (provider.catalogId == 'beebridge' ||
+            widget.catalogEntry?.id == 'beebridge');
     final managedState =
         managed ? ref.watch(managedModelServiceProvider) : null;
     final managedKey = managed ? ref.watch(managedModelKeyProvider) : null;
@@ -685,7 +689,7 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
                           ? '读取中…'
                           : managedKey?.hasError == true
                               ? '密钥读取失败，请点击检测'
-                              : '未初始化，请点击检测')
+                              : '尚未读取到密钥，请点击检测')
                       : (_loadingKey ? '读取中…' : '输入 API 密钥'),
                   obscure: _obscureApiKey,
                   onToggleObscure: () =>

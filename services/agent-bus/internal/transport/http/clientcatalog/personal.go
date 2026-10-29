@@ -44,10 +44,20 @@ func personalInput(w http.ResponseWriter, r *http.Request) (svc.PersonalInput, e
 			err = json.Unmarshal(val, &in.Status)
 		case "runtime_environment_uuid":
 			err = json.Unmarshal(val, &in.RuntimeUUID)
-		case "source", "visibility", "execution_locus", "model_source":
+		case "execution_locus":
+			err = json.Unmarshal(val, &in.ExecutionLocus)
+			if in.ExecutionLocus != "cloud" && in.ExecutionLocus != "local" {
+				return in, bad
+			}
+		case "local_engine":
+			err = json.Unmarshal(val, &in.LocalEngine)
+			if in.LocalEngine != "" && in.LocalEngine != "dsh" && in.LocalEngine != "codex_app_server" {
+				return in, bad
+			}
+		case "source", "visibility", "model_source":
 			var v string
 			err = json.Unmarshal(val, &v)
-			allowed := map[string]string{"source": "personal", "visibility": "private", "execution_locus": "cloud", "model_source": "platform_whitelist"}
+			allowed := map[string]string{"source": "personal", "visibility": "private", "model_source": "platform_whitelist"}
 			if v != allowed[key] {
 				return in, bad
 			}

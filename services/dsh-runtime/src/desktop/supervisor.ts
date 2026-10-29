@@ -273,7 +273,9 @@ export class LocalSupervisor {
           if (terminal?.event === 'message.completed') {
             const code = err instanceof LocalError ? err.code : '';
             terminal = code === 'local.deliverable_missing'
-              ? failed('zap.deliverable_missing', '未生成全部要求的文件。已验证的文件仍可查看。')
+              ? run.policy.wasExplicitlyDenied
+                ? failed('zap.approval_denied', '你已拒绝本次操作，相关操作未执行。已生成的文件仍可查看。')
+                : failed('zap.deliverable_missing', '未生成全部要求的文件。已验证的文件仍可查看。')
               : code === 'local.deliverable_content_mismatch'
                 ? failed('zap.deliverable_content_mismatch', '文件已生成，但内容或大小未满足交付要求。已验证的文件仍可查看。')
                 : failed('zap.deliverable_verification_failed', '部分文件未通过交付校验。已验证的文件仍可查看。');

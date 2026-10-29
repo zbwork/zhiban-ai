@@ -186,7 +186,9 @@ class ConversationModelSources {
         'enabled': p.enabled,
         'protocol': protocol,
         'base_url': p.baseUrl,
-        'api_key': p.catalogId == 'beebridge' ? '' : keys[p.id],
+        'api_key': p.catalogId == 'beebridge' && !AppConfig.communityEdition
+            ? ''
+            : keys[p.id],
         'headers': p.customHeaders,
         'models': [
           for (final m in p.models)

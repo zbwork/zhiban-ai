@@ -73,7 +73,17 @@ func (s *Personal) Save(ctx context.Context, accountID, tenantID int64, uuid str
 	for key, val := range in.Metadata {
 		e.Metadata[key] = val
 	}
-	if in.RuntimeUUID != "" {
+	if uuid == "" && in.ExecutionLocus == "local" {
+		e.ExecutionLocus, e.LocalEngine = "local", in.LocalEngine
+	} else if uuid != "" && ((in.ExecutionLocus != "" && in.ExecutionLocus != e.ExecutionLocus) || (in.LocalEngine != "" && in.LocalEngine != e.LocalEngine)) {
+		return nil, apperr.ErrInvalidParams.Withf("execution location and engine are immutable")
+	}
+	if e.ExecutionLocus == "local" {
+		e.RuntimeEnvironmentID = nil
+		if key, _ := e.Metadata["agent_key"].(string); strings.TrimSpace(key) == "" {
+			e.Metadata["agent_key"] = "default"
+		}
+	} else if in.RuntimeUUID != "" {
 		env, err := s.Environments.GetByUUID(ctx, in.RuntimeUUID)
 		if err != nil {
 			return nil, err
@@ -95,11 +105,13 @@ func (s *Personal) Save(ctx context.Context, accountID, tenantID int64, uuid str
 			}
 		}
 	}
-	if e.RuntimeEnvironmentID == nil {
-		return nil, apperr.ErrInvalidParams.Withf("community runtime unavailable")
-	}
-	if err := (&Service{Environments: s.Environments}).checkEnvironment(ctx, tenantID, *e.RuntimeEnvironmentID); err != nil {
-		return nil, err
+	if e.ExecutionLocus != "local" {
+		if e.RuntimeEnvironmentID == nil {
+			return nil, apperr.ErrInvalidParams.Withf("community runtime unavailable")
+		}
+		if err := (&Service{Environments: s.Environments}).checkEnvironment(ctx, tenantID, *e.RuntimeEnvironmentID); err != nil {
+			return nil, err
+		}
 	}
 	wantPublished := e.Status == "published" || uuid == ""
 	if in.Status != "" {
@@ -139,5 +151,6 @@ type PersonalInput struct {
 	Name, Intro, Description, WelcomeMsg, AvatarURL, PositionLabel *string
 	Tags                                                           []string
 	RuntimeUUID, Status                                            string
+	ExecutionLocus, LocalEngine                                    string
 	Metadata                                                       map[string]any
 }

@@ -41,8 +41,7 @@ final managedModelServiceProvider =
 
 /// Only watched by the detail page; never persisted or collected by Mana Dio.
 final managedModelKeyProvider = FutureProvider.autoDispose<String>((ref) async {
-  final status = await ref.watch(managedModelServiceProvider.future);
-  if (!status.keyReady) return '';
+  if (AppConfig.communityEdition) return '';
   final response = await sensitiveRequest.post('/model-service/key');
   return responseAsMap(response)['api_key'] as String? ?? '';
 });

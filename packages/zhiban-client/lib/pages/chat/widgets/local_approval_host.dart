@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:zhiban_client/config/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -86,7 +85,7 @@ class _LocalApprovalHostState extends ConsumerState<LocalApprovalHost>
   }
 
   Future<void> _refresh() async {
-    if (AppConfig.communityEdition || !mounted || !_foreground || _loading) return;
+    if (!mounted || !_foreground || _loading) return;
     _loading = true;
     final epoch = _epoch;
     try {

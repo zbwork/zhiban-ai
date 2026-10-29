@@ -1,3 +1,4 @@
+import 'package:zhiban_client/config/app_config.dart';
 import 'package:zhiban_client/services/conversation_model_sources.dart';
 import 'package:zhiban_client/services/conversation_models.dart';
 import 'package:bot_toast/bot_toast.dart';
@@ -220,7 +221,8 @@ class _AddModelDialogState extends ConsumerState<_AddModelDialog> {
       _liveError = null;
     });
     try {
-      if (widget.provider.catalogId == 'beebridge') {
+      if (!AppConfig.communityEdition &&
+          widget.provider.catalogId == 'beebridge') {
         final refreshed = await ConversationModelSources().refreshManaged();
         ConversationModels.instance.applyCatalog(refreshed.items);
         if (!mounted) return;

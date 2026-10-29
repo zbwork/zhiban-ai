@@ -71,6 +71,11 @@ def main():
             # Avoid disturbing a running helper when the build is identical.
             if not output.exists() or output.read_bytes() != executable.read_bytes():
                 executable.replace(output)
+        # A move preserves the private build directory's ACL. Inherit the
+        # application directory's permissions so unelevated clients can read
+        # and execute the public helper, including on byte-identical rebuilds.
+        subprocess.run([str(Path(os.environ['SystemRoot']) / 'System32/icacls.exe'),
+                        str(output), '/inheritancelevel:e'], check=True)
     print('Local coding Bridge: Windows x64 build/protocol verified')
 
 

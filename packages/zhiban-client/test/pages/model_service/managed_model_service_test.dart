@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import 'package:zhiban_client/network/network.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -88,6 +90,45 @@ void main() {
     expect(find.text('添加模型'), findsOneWidget);
     expect(find.widgetWithText(TextField, '搜索模型...'), findsOneWidget);
     expect(calls, 2);
+  });
+
+  testWidgets('检测不可用时仍展示已取得的成员 Key', (tester) async {
+    const bee = CatalogProviderEntry(id: 'beebridge', name: 'BeeBridge',
+      endpointType: AiEndpointType.openaiCompatible, baseUrl: 'https://example.test/v1');
+    await tester.pumpWidget(ProviderScope(overrides: [
+      modelCatalogProvider.overrideWith((ref) async => const ModelCatalog(providers: [bee], modelsByProviderId: {})),
+      managedModelServiceProvider.overrideWith((ref) async => const ManagedModelService(
+        status: 'unavailable', keyReady: true, models: [], message: '模型服务连接失败')),
+      managedModelKeyProvider.overrideWith((ref) async => 'existing-member-key'),
+    ], child: MaterialApp(builder: BotToastInit(), home: Scaffold(body:
+      ProviderDetailPanel.draft(catalogEntry: bee, onMaterialized: (_) {})))));
+    await tester.pumpAndSettle();
+    expect(tester.widgetList<TextField>(find.byType(TextField)).first.controller?.text, 'existing-member-key');
+    await tester.tap(find.text('检测'));
+    await tester.pumpAndSettle();
+    expect(find.text('检测失败：模型服务连接失败'), findsOneWidget);
+    expect(tester.widgetList<TextField>(find.byType(TextField)).first.controller?.text, 'existing-member-key');
+    expect(find.text('检测成功，密钥可用'), findsNothing);
+  });
+
+  test('成员 Key 读取不等待模型初始化或检测', () async {
+    var statusReads = 0;
+    final interceptor = InterceptorsWrapper(onRequest: (options, handler) {
+      expect(options.path, '/model-service/key');
+      handler.resolve(Response(requestOptions: options, statusCode: 200,
+        data: {'api_key': 'existing-member-key'}));
+    });
+    sensitiveRequest.interceptors.insert(0, interceptor);
+    addTearDown(() => sensitiveRequest.interceptors.remove(interceptor));
+    final container = ProviderContainer(overrides: [
+      managedModelServiceProvider.overrideWith((ref) async {
+        statusReads++;
+        throw StateError('模型检测不可用');
+      }),
+    ]);
+    addTearDown(container.dispose);
+    expect(await container.read(managedModelKeyProvider.future), 'existing-member-key');
+    expect(statusReads, 0);
   });
 
   test('新会话不继承上一租户托管状态', () async {

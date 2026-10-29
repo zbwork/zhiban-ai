@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zhiban_client/pages/model_service/models/ai_endpoint_type.dart';
@@ -58,6 +59,8 @@ ProviderContainer containerFor(MemoryStore store,
           const ModelCatalog(providers: [bee], modelsByProviderId: {})),
     ]);
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   test('first setup enables BeeBridge and adds the current member models once',
       () async {
     final store = MemoryStore();
@@ -91,6 +94,7 @@ void main() {
       ..providers = [
         const AiProviderConfig(
             id: 'bee-original',
+            enabled: true,
             name: 'BeeBridge',
             catalogId: 'beebridge',
             models: [

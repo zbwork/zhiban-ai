@@ -563,6 +563,9 @@ func TestGlobalCodexSwitchWritesImageGenerationHeaderInProviderTable(t *testing.
 	if start < 0 || auth < 0 || header < start || header > auth || strings.Count(switched, "x-openai-actor-authorization") != 1 {
 		t.Fatalf("header must sit once in the provider table, before .auth:\n%s", switched)
 	}
+	if strings.Count(switched, `"Accept-Language" = "zh-CN"`) != 1 {
+		t.Fatalf("managed provider must carry the Chinese language header once:\n%s", switched)
+	}
 	if codexImageGenerationHeaderMissing([]byte(switched)) {
 		t.Fatal("codexImageGenerationHeaderMissing() = true right after the switch")
 	}
@@ -589,38 +592,45 @@ func TestGlobalCodexSwitchWritesImageGenerationHeaderInProviderTable(t *testing.
 
 func TestGlobalCodexMissingImageGenerationHeaderIsAddedBySilentUpgrade(t *testing.T) {
 	t.Parallel()
-	f := newGlobalFixture(t)
-	f.switchTo(t, TargetCodexCLI)
-	// A config switched before the header existed, with the user's model choice.
-	switched := strings.Replace(string(mustReadFile(t, f.codexPath)), codexImageGenerationHeaderLine+"\n", "", 1)
-	old := strings.Replace(switched, `model = "gpt-5.6-luna"`, `model = "gpt-5.5"`, 1)
-	mustWriteFile(t, f.codexPath, []byte(old), 0o600)
-	// Its manifest recorded the region the older Bridge wrote.
-	item := f.manifest(t, TargetCodexCLI)
-	item.ManagedSHA256 = codexManagedFingerprint([]byte(old))
-	item.AppliedSHA256 = digest([]byte(old))
-	encoded, err := json.Marshal(item)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustWriteFile(t, f.manager.globalManifestPath(TargetCodexCLI), encoded, 0o600)
-	status, _ := f.manager.Status(context.Background(), TargetCodexCLI)
-	if status.GlobalDrifted || !status.GlobalUpgradeAvailable {
-		t.Fatalf("Status() without the header = %+v", status)
-	}
-	plan, err := f.manager.PlanWithType(context.Background(), TargetCodexCLI, "codex-install", PlanTypeSwitchGlobal)
-	if err != nil || plan.Action != ActionSwitchGlobal {
-		t.Fatalf("upgrade plan = %+v, %v", plan, err)
-	}
-	if _, err := f.manager.Execute(context.Background(), plan.PlanID); err != nil {
-		t.Fatal(err)
-	}
-	upgraded := string(mustReadFile(t, f.codexPath))
-	if codexImageGenerationHeaderMissing([]byte(upgraded)) || !strings.Contains(upgraded, `model = "gpt-5.5"`) {
-		t.Fatalf("upgraded config = %q", upgraded)
-	}
-	if status, _ := f.manager.Status(context.Background(), TargetCodexCLI); status.GlobalUpgradeAvailable || status.GlobalDrifted {
-		t.Fatalf("Status() after upgrade = %+v", status)
+	for name, legacyHeaders := range map[string]string{
+		"no headers": "",
+		"actor only": "http_headers = { \"x-openai-actor-authorization\" = \"zhiban-ai\" }\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newGlobalFixture(t)
+			f.switchTo(t, TargetCodexCLI)
+			// A config switched before the header existed, with the user's model choice.
+			switched := strings.Replace(string(mustReadFile(t, f.codexPath)), codexImageGenerationHeaderLine+"\n", legacyHeaders, 1)
+			old := strings.Replace(switched, `model = "gpt-5.6-luna"`, `model = "gpt-5.5"`, 1)
+			mustWriteFile(t, f.codexPath, []byte(old), 0o600)
+			// Its manifest recorded the region the older Bridge wrote.
+			item := f.manifest(t, TargetCodexCLI)
+			item.ManagedSHA256 = codexManagedFingerprint([]byte(old))
+			item.AppliedSHA256 = digest([]byte(old))
+			encoded, err := json.Marshal(item)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mustWriteFile(t, f.manager.globalManifestPath(TargetCodexCLI), encoded, 0o600)
+			status, _ := f.manager.Status(context.Background(), TargetCodexCLI)
+			if status.GlobalDrifted || !status.GlobalUpgradeAvailable {
+				t.Fatalf("Status() without the header = %+v", status)
+			}
+			plan, err := f.manager.PlanWithType(context.Background(), TargetCodexCLI, "codex-install", PlanTypeSwitchGlobal)
+			if err != nil || plan.Action != ActionSwitchGlobal {
+				t.Fatalf("upgrade plan = %+v, %v", plan, err)
+			}
+			if _, err := f.manager.Execute(context.Background(), plan.PlanID); err != nil {
+				t.Fatal(err)
+			}
+			upgraded := string(mustReadFile(t, f.codexPath))
+			if codexImageGenerationHeaderMissing([]byte(upgraded)) || !strings.Contains(upgraded, `model = "gpt-5.5"`) {
+				t.Fatalf("upgraded config = %q", upgraded)
+			}
+			if status, _ := f.manager.Status(context.Background(), TargetCodexCLI); status.GlobalUpgradeAvailable || status.GlobalDrifted {
+				t.Fatalf("Status() after upgrade = %+v", status)
+			}
+		})
 	}
 }
 

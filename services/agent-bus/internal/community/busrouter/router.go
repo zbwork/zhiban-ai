@@ -9,6 +9,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcron"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientdrive"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientknowledge"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientlocal"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/session"
 	"net/http"
 )
@@ -24,6 +25,7 @@ type Handlers struct {
 	Session      *session.Handlers
 	Contacts     *clientcontacts.Handlers
 	Drive        *clientdrive.Handlers
+	Local        *clientlocal.Handlers
 }
 
 func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Handler, membership middleware.TenantMembershipReader) {
@@ -35,6 +37,9 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	}
 	if h.Apps != nil {
 		h.Apps.Register(mux, authT)
+	}
+	if h.Local != nil {
+		h.Local.Register(mux, authT)
 	}
 	if h.Agents != nil {
 		if h.Agents.Personal != nil {

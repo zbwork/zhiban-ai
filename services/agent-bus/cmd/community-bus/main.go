@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"github.com/redis/go-redis/v9"
+	websearchadapter "github.com/zbwork/zhiban-ai/services/agent-bus/internal/adapter/websearch"
 	communityapps "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/apps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/busrouter"
 	communitychat "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/chat"
@@ -13,8 +14,10 @@ import (
 	communitycron "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/cron"
 	communitydrive "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/drive"
 	communityim "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/im"
+	communitylocal "github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/local"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/captcha"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/crypto/aesgcm"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/encode"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/jwt"
 	oauthjwt "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/oauth2/jwt"
@@ -30,31 +33,41 @@ import (
 	driverepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/drive"
 	eventrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/event"
 	kbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/knowledge"
+	localmediarepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/localmedia"
+	localruntimerepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/localruntime"
 	msgrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/message"
+	modelsourcerepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/modelsource"
 	rbac "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/rbac"
 	envrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/runtimeenv"
 	session "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/session"
 	tenant "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/tenant"
 	agentsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/agent"
 	authsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/auth"
+	chatsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/chat"
 	personal "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/communityagent"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/contacts"
 	cronsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/cron"
 	drivesvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/drive"
 	svckb "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/knowledge"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/knowledge/provider/stub"
+	localmediasvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/localmedia"
+	modelsourcesvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/modelsource"
+	websearchsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/websearch"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientapps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcatalog"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientchat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcontacts"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcron"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientknowledge"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientlocal"
 	httpsession "github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/session"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/wellknown"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -97,7 +110,55 @@ func run(ctx context.Context, path string) error {
 		return err
 	}
 	defer chatSvc.StopCancelListener()
-	handlers := busrouter.Handlers{Session: &httpsession.Handlers{Auth: auth}, Chat: &clientchat.Handlers{Chat: chatSvc}, Contacts: &clientcontacts.Handlers{Contacts: contactsSvc}}
+	// Member model platforms (ADR-0042): without the data key, sync and model calls fail closed.
+	modelCipher, _, err := aesgcm.NewFromEnvAny("AGBUS_AGENT_MODEL_KMS_DATA_KEY", "AGBUS_KMS_DATA_KEY")
+	if err != nil {
+		log.Print("model platforms disabled: AGBUS_AGENT_MODEL_KMS_DATA_KEY not set")
+		modelCipher = nil
+	}
+	modelSources := modelsourcesvc.New(modelsourcerepo.New(pool), modelCipher, nil, pem, "", "").WithoutManagedBeeBridge()
+	localService, localModels, err := communitylocal.Compose(pool, cfg.JWTPrivateKeyFile, modelSources)
+	if err != nil {
+		return err
+	}
+	communitychat.WireLocal(chatSvc, pool, localService)
+	chatsvc.SetConversationModelSelector(chatSvc, localModels)
+	localImages := localmediasvc.New(localmediarepo.New(pool), localModels)
+	localSearch := websearchsvc.New(websearchadapter.New(cfg.WebSearch.Endpoint, cfg.WebSearch.APIKey))
+	localOutputs := communitydrive.LocalOutputs(pool, storage, localruntimerepo.New(pool))
+	if localOutputs != nil {
+		// Desktops upload archived files through this Bus origin; object storage stays private.
+		origin := strings.TrimSpace(os.Getenv("AGBUS_EXTERNAL_URL"))
+		if origin == "" {
+			if _, port, err := net.SplitHostPort(cfg.HTTP); err == nil {
+				origin = "http://127.0.0.1:" + port
+			}
+		}
+		if err := localOutputs.ConfigureLocalUploadProxy(origin, pem); err != nil {
+			return err
+		}
+	}
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				sweep, cancel := context.WithTimeout(ctx, 4*time.Second)
+				_, err := localService.Expire(sweep)
+				if err == nil {
+					err = localImages.Expire(sweep)
+				}
+				cancel()
+				if err != nil && ctx.Err() == nil {
+					log.Printf("local runtime expiry sweep failed: %v", err)
+				}
+			}
+		}
+	}()
+	handlers := busrouter.Handlers{Session: &httpsession.Handlers{Auth: auth}, Chat: &clientchat.Handlers{Chat: chatSvc}, Contacts: &clientcontacts.Handlers{Contacts: contactsSvc}, Local: &clientlocal.Handlers{Local: localService, Models: localModels, Sources: modelSources, Images: localImages, Search: localSearch, Outputs: localOutputs}}
 	handlers.Agents = &clientcatalog.AgentHandlers{Agents: agentrepo.New(pool), Personal: &personal.Personal{Agents: agentsvc.New(agentrepo.New(pool), nil, nil, pool, eventrepo.New(pool)), Environments: envrepo.New(pool)}}
 	handlers.Catalog = &clientcatalog.Handlers{Skill: communitychat.NewSkills(pool)}
 	handlers.Agents.Skills = handlers.Catalog.Skill

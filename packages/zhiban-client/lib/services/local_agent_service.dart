@@ -64,7 +64,7 @@ class LocalAgentService extends ChangeNotifier {
   final Map<String, Map<String, dynamic>> approvals = {};
   final Map<String, String> activeRuns = {};
   bool get online => status == 'online' && _ipc != null;
-  bool get supported => !AppConfig.communityEdition && !kIsWeb && (Platform.isMacOS || Platform.isWindows);
+  bool get supported => !kIsWeb && (Platform.isMacOS || Platform.isWindows);
 
   static Map<String, dynamic>? identity(String token) {
     try {
@@ -216,7 +216,6 @@ class LocalAgentService extends ChangeNotifier {
   }
 
   Future<void> _start() async {
-    if (AppConfig.communityEdition) return;
     if (!supported) throw StateError('请在电脑端使用本机数字员工');
     final generation = ++_generation;
     final prefs = await SharedPreferences.getInstance();

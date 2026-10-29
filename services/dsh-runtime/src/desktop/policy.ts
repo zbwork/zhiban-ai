@@ -9,6 +9,9 @@ interface Pending { request: ApprovalRequest; digest: string; resolve: (approved
 
 /** Owned by the App control plane; workers can request but cannot resolve approvals. */
 export class LocalPolicy {
+  private explicitlyDenied = false;
+  get wasExplicitlyDenied(): boolean { return this.explicitlyDenied; }
+
   private currentMode: PermissionMode = 'assist';
   private revision = 1;
   private generation = new AbortController();
@@ -55,6 +58,7 @@ export class LocalPolicy {
   approve(id: string, revision: number, approved: boolean, scope: 'once' | 'task' = 'once'): void {
     const pending = this.pending.get(id);
     if (!pending || revision !== this.revision || revision !== pending.request.revision || pending.request.expiresAt < Date.now()) throw new LocalError('local.approval_stale');
+    if (!approved) this.explicitlyDenied = true;
     if (approved && scope === 'task' && pending.request.intent.operation !== 'upload') this.taskGrants.add(pending.digest);
     this.pending.delete(id);
     clearTimeout(pending.timer);

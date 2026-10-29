@@ -347,7 +347,6 @@ void main() {
                             initialDraft: CreateAgentDraft(
                           name: 'QA',
                           description: '负责测试',
-                          skillLabels: {'qa': '测试技能'},
                           avatarUrl: '',
                           runtimeEnvironmentUuid: 'openclaw',
                           internalDescription: '原备注',
@@ -386,6 +385,8 @@ void main() {
       expect(result?.runtimeEnvironmentUuid, locus == 'cloud' ? 'hermes' : '');
       expect(result?.executionLocus, locus);
       if (locus == 'local') expect(result?.localEngine, 'codex_app_server');
+      expect(result, isNotNull);
+      expect(result!.skillSlugs, isEmpty);
       expect(result?.internalDescription, '原备注');
       expect(tester.takeException(), isNull);
     });

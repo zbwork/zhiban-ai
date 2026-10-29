@@ -111,7 +111,8 @@ const codexAnalyticsOffLine = "analytics.enabled = false"
 // header or the user signed in with ChatGPT. The value is not checked. The same
 // header also enables the standalone web search tool, which the relay does not
 // serve (/v1/alpha/search → 500); accepted, see contract §2.7.2 "Codex 内置生图".
-const codexImageGenerationHeaderLine = `http_headers = { "x-openai-actor-authorization" = "zhiban-ai" }`
+// Accept-Language expresses the managed provider's HTTP language preference.
+const codexImageGenerationHeaderLine = `http_headers = { "x-openai-actor-authorization" = "zhiban-ai", "Accept-Language" = "zh-CN" }`
 
 // GlobalStatus is the "当前服务" view of the user's own configuration.
 type GlobalStatus struct {
@@ -358,7 +359,7 @@ func claudeDesktopDisplayCurrent(targetID string, before, desired []byte) bool {
 }
 
 // codexImageGenerationHeaderMissing reports whether the Zhiban provider table
-// of a switched config.toml lacks the header that enables Codex image generation.
+// of a switched config.toml lacks the current managed headers (actor and language).
 func codexImageGenerationHeaderMissing(content []byte) bool {
 	_, rest := splitCodexTopLevel(string(content))
 	inside, sawTable := false, false

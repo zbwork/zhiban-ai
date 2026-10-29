@@ -23,6 +23,8 @@ type Config struct {
 	Model             struct{ Provider, BaseURL, APIKey, Name string }
 	Object            struct{ Endpoint, ReadEndpoint, Bucket, AccessKey, SecretKey string }
 	WuKong            struct{ URL, Token, WSAddr, TCPAddr string }
+	// WebSearch is optional; an empty endpoint disables the local web search tool.
+	WebSearch struct{ Endpoint, APIKey string }
 }
 
 func Load(path string) (Config, error) {
@@ -44,7 +46,7 @@ func Decode(r io.Reader) (Config, error) {
 	if err := decoder.Decode(&extra); err != io.EOF {
 		return c, errors.New("expected one YAML document")
 	}
-	for _, value := range []*string{&c.AppIssuer, &c.HTTP, &c.PostgresDSN, &c.RedisAddr, &c.RedisPassword, &c.JWTPrivateKeyFile, &c.JWTIssuer, &c.Model.Provider, &c.Model.BaseURL, &c.Model.APIKey, &c.Model.Name, &c.Object.Endpoint, &c.Object.ReadEndpoint, &c.Object.Bucket, &c.Object.AccessKey, &c.Object.SecretKey, &c.WuKong.URL, &c.WuKong.Token, &c.WuKong.WSAddr, &c.WuKong.TCPAddr} {
+	for _, value := range []*string{&c.AppIssuer, &c.HTTP, &c.PostgresDSN, &c.RedisAddr, &c.RedisPassword, &c.JWTPrivateKeyFile, &c.JWTIssuer, &c.Model.Provider, &c.Model.BaseURL, &c.Model.APIKey, &c.Model.Name, &c.Object.Endpoint, &c.Object.ReadEndpoint, &c.Object.Bucket, &c.Object.AccessKey, &c.Object.SecretKey, &c.WuKong.URL, &c.WuKong.Token, &c.WuKong.WSAddr, &c.WuKong.TCPAddr, &c.WebSearch.Endpoint, &c.WebSearch.APIKey} {
 		missing := false
 		*value = os.Expand(*value, func(key string) string {
 			v, ok := os.LookupEnv(key)

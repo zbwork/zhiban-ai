@@ -142,7 +142,6 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
               widget.initialDraft?.executionLocus == 'cloud'));
 
   bool get _canSelectLocal =>
-      !AppConfig.communityEdition &&
       PlatformUtils.isDesktop &&
       (AppConfig.cloudAgentCreationEnabled ||
           widget.initialDraft?.executionLocus != 'cloud');
@@ -153,9 +152,7 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
     final initial = widget.initialDraft;
     _localEngine = initial?.localEngine ?? 'dsh';
     _executionLocus = initial?.executionLocus ??
-        (AppConfig.communityEdition
-            ? 'cloud'
-            : PlatformUtils.isDesktop
+        (PlatformUtils.isDesktop
             ? 'local'
             : AppConfig.cloudAgentCreationEnabled
                 ? 'cloud'
@@ -789,8 +786,6 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
     final capabilityFields = <Widget>[
       _FieldBlock(
         label: '核心技能',
-        requiredMark: true,
-        validator: (_) => _selectedSkillLabels.isEmpty ? '请至少选择一项核心技能' : null,
         child: _CapabilityAssemblyRow(
           buttonLabel: '选择技能',
           selectedLabels: _selectedSkillLabels,
@@ -874,8 +869,7 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
       const SizedBox(height: 10),
       LayoutBuilder(builder: (context, constraints) {
         final choices = <Widget>[
-          if (!AppConfig.communityEdition &&
-              (PlatformUtils.isDesktop || _executionLocus == 'local'))
+          if (PlatformUtils.isDesktop || _executionLocus == 'local')
             _ExecutionChoice(
               label: '这台电脑',
               subtitle: '处理本机文件、办公和编程',
@@ -1197,22 +1191,14 @@ class _FieldBlock extends StatelessWidget {
     required this.label,
     required this.child,
     this.requiredMark = false,
-    this.validator,
   });
 
   final String label;
   final Widget child;
   final bool requiredMark;
-  final FormFieldValidator<Object?>? validator;
 
   @override
   Widget build(BuildContext context) {
-    if (validator != null) {
-      return FormField<Object?>(
-        validator: validator,
-        builder: (field) => _buildField(field.errorText),
-      );
-    }
     return _buildField(null);
   }
 

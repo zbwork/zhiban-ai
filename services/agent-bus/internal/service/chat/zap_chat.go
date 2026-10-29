@@ -1749,6 +1749,8 @@ const ErrCodeRuntimeUpstreamFailure = "chat.runtime_upstream_failure"
 // Only fixed product text is exposed, never the runtime-provided error body.
 func deliverableRuntimeError(code string) (string, string) {
 	switch strings.TrimSpace(code) {
+	case "zap.approval_denied":
+		return "chat.approval_denied", "你已拒绝本次操作，相关操作未执行。已生成的文件仍可查看。"
 	case "zap.local_archive_failed":
 		return "chat.local_archive_failed", "文件已生成，但云盘保存未完成，可先查看本机文件。"
 	case "zap.deliverable_missing":

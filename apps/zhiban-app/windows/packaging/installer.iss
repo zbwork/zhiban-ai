@@ -30,7 +30,7 @@
 #if !FileExists(MySourceDir + "\local-agent\manifest.json") || !FileExists(MySourceDir + "\local-agent\node\node.exe") || !FileExists(MySourceDir + "\local-agent\dsh-runtime\native\zhiban-local-sandbox.exe") || !FileExists(MySourceDir + "\local-agent\dsh-runtime\native\zhiban-windows-path.node")
   #error 缺少 Local Agent 运行组件，请重新运行 flutter build windows --release
 #endif
-#if !FileExists(MySourceDir + "\data\flutter_assets\assets\file_preview\viewer.html") || !FileExists(MySourceDir + "\WebView2Loader.dll")
+#if !FileExists(MySourceDir + "\data\flutter_assets\packages\zhiban_client\assets\file_preview\viewer.html") || !FileExists(MySourceDir + "\WebView2Loader.dll")
   #error 缺少文件预览组件，请重新运行 flutter build windows --release
 #endif
 

@@ -1,4 +1,5 @@
 #include <winsock2.h>
+#include <ws2ipdef.h>
 #include "desktop_network_bridge.h"
 
 #include <iphlpapi.h>

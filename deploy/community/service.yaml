@@ -16,3 +16,6 @@ object:
   bucket: community
   accesskey: community
   secretkey: ${OBJECT_PASSWORD}
+websearch:
+  endpoint: ${AGBUS_WEB_SEARCH_ENDPOINT}
+  apikey: ${AGBUS_WEB_SEARCH_API_KEY}
