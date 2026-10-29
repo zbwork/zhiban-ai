@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"math"
 	"mime"
 	"strings"
@@ -226,14 +227,14 @@ func (s *Service) Create(ctx context.Context, task dom.Task) (*dom.Task, error) 
 	selected, err := s.models.SelectLocalModel(ctx, task.Scope, task.EmployeeID, task.Model)
 	if err != nil {
 		logpkg.Default().Warn(ctx, "local_runtime.task_model_rejected", "run_uuid", task.UUID, "message_uuid", task.MessageUUID, "stream_id", task.StreamID, "account_id", task.Scope.AccountID, "tenant_id", task.Scope.TenantID, "requested_model", boundedModelDiagnostic(task.Model), "error", errString(err))
-		return nil, err
+		return nil, errors.Join(dom.ErrModelUnavailable, err)
 	}
 	var payload map[string]any
 	if err = json.Unmarshal(task.Payload, &payload); err != nil || payload == nil {
 		return nil, dom.ErrDenied
 	}
 	if selected.Model == "" || selected.Binding == "" {
-		return nil, dom.ErrDenied
+		return nil, dom.ErrModelUnavailable
 	}
 	if task.LocalEngine == "" {
 		task.LocalEngine = dom.EngineDSH
@@ -242,7 +243,7 @@ func (s *Service) Create(ctx context.Context, task dom.Task) (*dom.Task, error) 
 		return nil, dom.ErrDenied
 	}
 	if task.LocalEngine == dom.EngineCodex && selected.Protocol != "openai-compatible" {
-		return nil, dom.ErrDenied
+		return nil, dom.ErrModelUnavailable
 	}
 	payload["model_protocol"] = selected.Protocol
 	payload["model_binding"] = selected.Binding
@@ -253,7 +254,7 @@ func (s *Service) Create(ctx context.Context, task dom.Task) (*dom.Task, error) 
 		allowFallback, _ := payload["allow_model_fallback"].(bool)
 		plan, e := planner.PlanLocalRecovery(ctx, task.Scope, task.EmployeeID, selected.Model, allowFallback)
 		if e != nil {
-			return nil, e
+			return nil, errors.Join(dom.ErrModelUnavailable, e)
 		}
 		payload["model_recovery"] = plan
 	}

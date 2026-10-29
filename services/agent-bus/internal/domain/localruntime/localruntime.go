@@ -9,11 +9,12 @@ import (
 )
 
 var (
-	ErrDenied          = errors.New("local_runtime.denied")
-	ErrOffline         = errors.New("local_runtime.device_offline")
-	ErrUpgradeRequired = errors.New("local_runtime.upgrade_required")
-	ErrConflict        = errors.New("local_runtime.conflict")
-	ErrSequence        = errors.New("local_runtime.sequence_gap")
+	ErrModelUnavailable = errors.New("local_runtime.model_unavailable")
+	ErrDenied           = errors.New("local_runtime.denied")
+	ErrOffline          = errors.New("local_runtime.device_offline")
+	ErrUpgradeRequired  = errors.New("local_runtime.upgrade_required")
+	ErrConflict         = errors.New("local_runtime.conflict")
+	ErrSequence         = errors.New("local_runtime.sequence_gap")
 )
 
 type Scope struct {

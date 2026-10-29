@@ -101,7 +101,8 @@ func (s *impl) runLocalChat(ctx context.Context, in ZapDispatchInput, d *zapDisp
 			return
 		}
 		logpkg.Default().Warn(ctx, "local_chat.task_create_failed", "account_id", in.AccountID, "tenant_id", in.TenantID, "employee_id", in.Agent.ID, "message_uuid", in.AgentMessageUUID, "stream_id", in.StreamID, "requested_model", boundedChatModel(get("conversation_model")), "task_model", boundedChatModel(get("local_model_hint")), "error", boundedChatModel(err.Error()))
-		finish(nil, "failed", "local_runtime.device_unavailable", "电脑已离线、授权已失效或当前会话已有任务", nil)
+		code, message := localTaskCreateError(err)
+		finish(nil, "failed", code, message, nil)
 		return
 	}
 	logpkg.Default().Info(ctx, "local_chat.task_dispatched", "account_id", in.AccountID, "tenant_id", in.TenantID, "employee_id", in.Agent.ID, "message_uuid", in.AgentMessageUUID, "stream_id", in.StreamID, "run_uuid", task.UUID, "requested_model", boundedChatModel(get("conversation_model")), "task_model", boundedChatModel(task.Model))
@@ -369,4 +370,19 @@ func localPromptText(in ZapDispatchInput) string {
 		return strings.TrimSpace(extractPromptText(in.UserBlocks))
 	}
 	return in.PromptText
+}
+
+func localTaskCreateError(err error) (string, string) {
+	switch {
+	case errors.Is(err, domlocal.ErrModelUnavailable):
+		return "local_runtime.model_unavailable", "所选模型不可用，请检查模型配置或切换模型。"
+	case errors.Is(err, domlocal.ErrOffline):
+		return "local_runtime.device_offline", "电脑已离线，请打开当前环境的电脑客户端并重试。"
+	case errors.Is(err, domlocal.ErrDenied):
+		return "local_runtime.denied", "本机运行授权无效，请重新登录并检查本地运行状态。"
+	case errors.Is(err, domlocal.ErrConflict):
+		return "local_runtime.conflict", "任务或会话状态冲突，请确认已有任务结束后重试。"
+	default:
+		return "local_runtime.task_create_failed", "本机任务创建失败，请稍后重试。"
+	}
 }
