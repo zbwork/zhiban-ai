@@ -611,10 +611,18 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
 
   Future<void> _openExternalUrl(String url) async {
     final uri = Uri.tryParse(url);
-    if (uri == null) return;
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened && mounted) {
-      BotToast.showText(text: '无法打开链接');
+    if (uri == null ||
+        (uri.scheme != 'https' && uri.scheme != 'http') ||
+        uri.host.isEmpty) {
+      return;
+    }
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        BotToast.showText(text: '无法打开链接');
+      }
+    } catch (_) {
+      if (mounted) BotToast.showText(text: '无法打开链接');
     }
   }
 
@@ -645,6 +653,7 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
       _baseUrlController.text = provider.baseUrl;
     }
     final docsUrl = _catalogDocsUrlFor(provider);
+    final websiteUrl = _resolveCatalogEntry(provider)?.websiteUrl;
     final scheme = Theme.of(context).colorScheme;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
@@ -679,9 +688,27 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
             ],
           ),
           const SizedBox(height: 20),
-          Text(
-            'API 密钥',
-            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+          Row(
+            children: [
+              Text(
+                'API 密钥',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+              if (websiteUrl != null && websiteUrl.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => _openExternalUrl(websiteUrl),
+                  style: TextButton.styleFrom(
+                    foregroundColor: scheme.primary,
+                    textStyle: const TextStyle(fontSize: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    minimumSize: const Size(0, 24),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('获取密钥'),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 6),
           Row(

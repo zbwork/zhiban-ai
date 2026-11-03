@@ -11,6 +11,7 @@ class CatalogProviderEntry {
     this.defaultFirst = false,
     this.iconAssetPath,
     this.docsUrl,
+    this.websiteUrl,
     this.anthropicBasePath,
   });
 
@@ -18,6 +19,7 @@ class CatalogProviderEntry {
   final String name;
   final AiEndpointType endpointType;
   final String baseUrl;
+
   /// Additional Anthropic endpoint on the catalog's canonical origin.
   final String? anthropicBasePath;
 
@@ -31,6 +33,9 @@ class CatalogProviderEntry {
   /// 厂商官方文档地址，目录里没有收录时为 null（UI 应隐藏文档入口）。
   final String? docsUrl;
 
+  /// 厂商官网或开放平台，供用户申请 API 密钥。
+  final String? websiteUrl;
+
   factory CatalogProviderEntry.fromJson(Map<String, dynamic> json) {
     final icon = json['icon'] as String?;
     return CatalogProviderEntry(
@@ -41,6 +46,7 @@ class CatalogProviderEntry {
       defaultFirst: json['defaultFirst'] == true,
       iconAssetPath: icon == null ? null : 'assets/icons/providers/$icon.svg',
       docsUrl: json['docsUrl'] as String?,
+      websiteUrl: json['websiteUrl'] as String?,
       anthropicBasePath: json['anthropicBasePath'] as String?,
     );
   }
