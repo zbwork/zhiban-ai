@@ -32,14 +32,21 @@ export function localTools(opts: LocalToolOptions): DesktopTool[] {
   const edit = write.extend({ expected_sha256: z.string().regex(/^[0-9a-f]{64}$/) });
   async function execute(run: ActiveLocalRun, script: string, args: Record<string, unknown>, signal: AbortSignal, writable: boolean) {
     const workspace = await realpath(run.config.workspace);
-    const argv = confineDesktop([process.execPath, '-e', script], {
+    const errorCodes: Record<string, string> = { ENOENT: 'local.file_missing', ENOTDIR: 'local.file_not_directory', EISDIR: 'local.file_not_regular', EACCES: 'local.file_access_denied', EPERM: 'local.file_access_denied', EEXIST: 'local.file_exists', FILE_LIMIT: 'local.file_size_limit', FILE_CHANGED: 'local.file_changed' };
+    // Static child scripts return only an allowlisted code, never raw stderr/paths.
+    const guarded = `try { ${script} } catch (error) { const allowed = ${JSON.stringify(Object.keys(errorCodes))}; process.stdout.write(JSON.stringify({local_file_error: allowed.includes(error.code) ? error.code : 'UNKNOWN'})); process.exitCode = 1; }`;
+    const argv = confineDesktop([process.execPath, '-e', guarded], {
       // These fixed scripts use only Node built-ins. On Windows, granting the
       // dependency tree propagates ACLs through every package on each file call.
       readOnly: [workspace, ...(process.platform === 'win32' ? [] : opts.runtimeReadRoots ?? [])], readWrite: writable ? [workspace] : [], brokerPort: opts.brokerPort,
       deny: [opts.privateRoot],
     });
     const result = await runOwnedCommand(argv, { cwd: workspace, env: desktopEnvironment(workspace), signal, input: JSON.stringify(args) });
-    if (result.code !== 0) throw new LocalError('local.file_operation_failed');
+    if (result.code !== 0) {
+      let code = 'local.file_operation_failed';
+      try { code = errorCodes[(JSON.parse(result.stdout) as { local_file_error: string }).local_file_error] ?? code; } catch { /* Keep unknown process failures generic. */ }
+      throw new LocalError(code);
+    }
     return JSON.parse(result.stdout) as unknown;
   }
   // All interpolated code below is static; caller parameters travel as a separate argv value.
@@ -105,7 +112,7 @@ export function localTools(opts: LocalToolOptions): DesktopTool[] {
       name: 'read_file', description: '读取已授权工作目录内的文本文件，最多 256 KB；返回内容及 SHA-256。', operation: 'read', schema: file, inputSchema: schemaFor(file),
       call: async (run, args, signal) => {
         validateRelativePath(String(args['path']));
-        return execute(run, prelude + `const fd=fs.openSync(a.path,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW); try { const st=fs.fstatSync(fd); if(!st.isFile()||st.nlink!==1||st.size>256000) throw Error('limit'); const b=Buffer.alloc(st.size+1); const n=fs.readSync(fd,b,0,b.length,0); if(n!==st.size) throw Error('changed'); const bytes=b.subarray(0,n); out({text:bytes.toString('utf8'),sha256:crypto.createHash('sha256').update(bytes).digest('hex')}); } finally{fs.closeSync(fd);}`, args, signal, false);
+        return execute(run, prelude + `const fd=fs.openSync(a.path,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW); try { const st=fs.fstatSync(fd); if(!st.isFile()||st.nlink!==1) throw Object.assign(Error(),{code:'EISDIR'}); if(st.size>256000) throw Object.assign(Error(),{code:'FILE_LIMIT'}); const b=Buffer.alloc(st.size+1); const n=fs.readSync(fd,b,0,b.length,0); if(n!==st.size) throw Object.assign(Error(),{code:'FILE_CHANGED'}); const bytes=b.subarray(0,n); out({text:bytes.toString('utf8'),sha256:crypto.createHash('sha256').update(bytes).digest('hex')}); } finally{fs.closeSync(fd);}`, args, signal, false);
       },
     },
     {

@@ -34,9 +34,7 @@ class PromptInputOverlayMetrics {
 }
 
 typedef PromptInputOverlayBuilder = Widget Function(
-  BuildContext context,
-  PromptInputOverlayMetrics metrics
-);
+    BuildContext context, PromptInputOverlayMetrics metrics);
 
 class PromptInput extends StatefulWidget {
   const PromptInput({
@@ -66,6 +64,8 @@ class PromptInput extends StatefulWidget {
     this.showAiDisclaimer = true,
     this.runtimeControls,
     this.sendReady = true,
+    this.onOpenApps,
+    this.sentTextHistory = const [],
   });
 
   final FocusNode focusNode;
@@ -81,6 +81,7 @@ class PromptInput extends StatefulWidget {
   final bool isSending;
   final bool enabled;
   final bool sendReady;
+  final VoidCallback? onOpenApps;
   final ValueChanged<String>? onNotify;
 
   /// 当前会话 uuid：用于「应用」按钮拉取会话可用应用。空时应用广场显示空态。
@@ -130,6 +131,9 @@ class PromptInput extends StatefulWidget {
   final bool showAiDisclaimer;
   final Widget? runtimeControls;
 
+  /// Current conversation's persisted user text, oldest first.
+  final List<String> sentTextHistory;
+
   @override
   State<PromptInput> createState() => PromptInputState();
 }
@@ -147,6 +151,72 @@ class PromptInputState extends State<PromptInput> {
   final GlobalKey _inputCardKey = GlobalKey();
   final GlobalKey _textFieldKey = GlobalKey();
   bool _pasteImageInFlight = false;
+  List<String>? _historySnapshot;
+  int _historyIndex = 0;
+  TextEditingValue? _historyDraft;
+  String? _historyText;
+  bool _restoringHistory = false;
+
+  void _resetHistory() {
+    _historySnapshot = null;
+    _historyDraft = null;
+    _historyText = null;
+  }
+
+  void _onHistoryEdit() {
+    if (!_restoringHistory &&
+        _historySnapshot != null &&
+        widget.controller.text != _historyText) {
+      _resetHistory();
+    }
+  }
+
+  bool _restoreHistory(bool previous) {
+    final keyboard = HardwareKeyboard.instance;
+    final value = widget.controller.value;
+    if (!widget.enabled ||
+        widget.overlayBuilder != null ||
+        keyboard.isShiftPressed ||
+        keyboard.isControlPressed ||
+        keyboard.isMetaPressed ||
+        keyboard.isAltPressed ||
+        (value.composing.isValid && !value.composing.isCollapsed) ||
+        !value.selection.isCollapsed ||
+        (_richController != null &&
+            (_richController!.attachments.isNotEmpty ||
+                _richController!.draftBlocks.length != 1 ||
+                !_richController!.draftBlocks.single.isText))) {
+      return false;
+    }
+    if (_historySnapshot == null) {
+      if (!previous || value.text.isNotEmpty) return false;
+      final history = widget.sentTextHistory
+          .where((text) => text.trim().isNotEmpty)
+          .toList();
+      if (history.isEmpty) return false;
+      _historySnapshot = history;
+      _historyIndex = history.length;
+      _historyDraft = value;
+    }
+    final history = _historySnapshot!;
+    _historyIndex =
+        (_historyIndex + (previous ? -1 : 1)).clamp(0, history.length);
+    final next = _historyIndex == history.length
+        ? _historyDraft!
+        : TextEditingValue(
+            text: history[_historyIndex],
+            selection:
+                TextSelection.collapsed(offset: history[_historyIndex].length));
+    _historyText = next.text;
+    _restoringHistory = true;
+    try {
+      widget.controller.value = next;
+    } finally {
+      _restoringHistory = false;
+    }
+    if (_historyIndex == history.length) _resetHistory();
+    return true;
+  }
 
   /// 已选择的技能（slug, 展示名）。点击技能 chip 即追加，再次点击同一项忽略。
   /// 不会拼接到文本里——发送时把 slug 列表通过 onSend 透出，后端在调
@@ -157,6 +227,7 @@ class PromptInputState extends State<PromptInput> {
   void initState() {
     super.initState();
     widget.focusNode.addListener(_onFocusChange);
+    widget.controller.addListener(_onHistoryEdit);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncOverlayPortal());
   }
 
@@ -199,6 +270,18 @@ class PromptInputState extends State<PromptInput> {
   @override
   void didUpdateWidget(covariant PromptInput oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onHistoryEdit);
+      widget.controller.addListener(_onHistoryEdit);
+    }
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.conversationUuid != widget.conversationUuid ||
+        oldWidget.sentTextHistory.length != widget.sentTextHistory.length ||
+        (widget.sentTextHistory.isNotEmpty &&
+            oldWidget.sentTextHistory.lastOrNull !=
+                widget.sentTextHistory.last)) {
+      _resetHistory();
+    }
     if (oldWidget.focusNode != widget.focusNode) {
       oldWidget.focusNode.removeListener(_onFocusChange);
       widget.focusNode.addListener(_onFocusChange);
@@ -210,6 +293,7 @@ class PromptInputState extends State<PromptInput> {
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onHistoryEdit);
     widget.focusNode.removeListener(_onFocusChange);
     super.dispose();
   }
@@ -300,6 +384,10 @@ class PromptInputState extends State<PromptInput> {
   }
 
   Future<void> _openAppPlaza() async {
+    if (widget.onOpenApps != null) {
+      widget.onOpenApps!();
+      return;
+    }
     // 「应用」→ 应用广场（会话维度可用应用 + 启动）。
     await showAppsPlazaSheet(context,
         conversationUuid: widget.conversationUuid);
@@ -333,6 +421,11 @@ class PromptInputState extends State<PromptInput> {
 
   KeyEventResult _handleInputKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if ((event.logicalKey == LogicalKeyboardKey.arrowUp ||
+            event.logicalKey == LogicalKeyboardKey.arrowDown) &&
+        _restoreHistory(event.logicalKey == LogicalKeyboardKey.arrowUp)) {
+      return KeyEventResult.handled;
+    }
     final rich = _richController;
     if (rich != null && event.logicalKey == LogicalKeyboardKey.arrowRight) {
       return rich.moveToNextTextBlockFromCaretEnd()
@@ -412,9 +505,8 @@ class PromptInputState extends State<PromptInput> {
       if (notifier != null) {
         notifier('有文件上传失败，请移除后重试');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('有文件上传失败，请移除后重试'))
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('有文件上传失败，请移除后重试')));
       }
       return;
     }
@@ -679,10 +771,8 @@ class PromptInputState extends State<PromptInput> {
           onKeyEvent: _handleInputKey,
           child: Shortcuts(
             shortcuts: const <ShortcutActivator, Intent>{
-              SingleActivator(
-                LogicalKeyboardKey.enter,
-                shift: true
-              ): _InsertNewLineIntent(),
+              SingleActivator(LogicalKeyboardKey.enter, shift: true):
+                  _InsertNewLineIntent(),
             },
             child: Actions(
               actions: <Type, Action<Intent>>{

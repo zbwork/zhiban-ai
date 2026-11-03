@@ -32,6 +32,11 @@ class OpenClawDigitalEmployeeGallery extends ConsumerStatefulWidget {
     this.mobile = false,
     this.mobileFilterEnabled = true,
     this.filterTrailing,
+    this.localCatalog,
+    this.onLocalCreate,
+    this.onLocalEdit,
+    this.onLocalDelete,
+    this.onLocalOpen,
   });
 
   final Future<CreateAgentDraft?> Function(BuildContext context)
@@ -50,6 +55,11 @@ class OpenClawDigitalEmployeeGallery extends ConsumerStatefulWidget {
 
   /// 桌面端过滤 tab 行右侧的操作区（搜索框 + 新建按钮），与 tab 同一行。
   final Widget? filterTrailing;
+  final DigitalEmployeeCatalog? localCatalog;
+  final Future<void> Function()? onLocalCreate;
+  final Future<void> Function(AgentItem)? onLocalEdit;
+  final Future<void> Function(AgentItem)? onLocalDelete;
+  final Future<void> Function(AgentItem)? onLocalOpen;
 
   @override
   OpenClawDigitalEmployeeGalleryState createState() =>
@@ -76,6 +86,10 @@ class OpenClawDigitalEmployeeGalleryState
   }
 
   Future<void> _createAgent() async {
+    if (widget.localCatalog != null) {
+      await widget.onLocalCreate?.call();
+      return;
+    }
     final draft = await widget.requestCreateAgentDraft(context);
     if (draft == null) return;
     if (!mounted) return;
@@ -182,6 +196,10 @@ class OpenClawDigitalEmployeeGalleryState
   }
 
   Future<void> _editAgent(AgentItem agent) async {
+    if (widget.localCatalog != null) {
+      await widget.onLocalEdit?.call(agent);
+      return;
+    }
     // 打开编辑框前要回读 GET /agents/{uuid}（契约要求），期间给 loading 反馈。
     final closeDetailLoading = BotToast.showLoading();
     final AgentItem editableAgent;
@@ -454,6 +472,10 @@ class OpenClawDigitalEmployeeGalleryState
   }
 
   Future<void> _deleteAgent(AgentItem agent) async {
+    if (widget.localCatalog != null) {
+      await widget.onLocalDelete?.call(agent);
+      return;
+    }
     final confirm = await showUiConfirmDialog(
       context,
       title: '删除数字员工',
@@ -488,6 +510,10 @@ class OpenClawDigitalEmployeeGalleryState
   }
 
   Future<void> _openAgentConversation(AgentItem agent) async {
+    if (widget.localCatalog != null) {
+      await widget.onLocalOpen?.call(agent);
+      return;
+    }
     ref.read(selectedHumanDirectProvider.notifier).state = null;
     ref.read(selectedGroupProvider.notifier).state = null;
     ref.read(selectedAgentProvider.notifier).select(agent);
@@ -530,10 +556,9 @@ class OpenClawDigitalEmployeeGalleryState
         existing?.conversationId ?? pendingConversationFor(agent.agentId);
     // 二次返修: 用当前 AgentItem 维护左侧会话项 —— 既有会话也用真人头像/名覆盖服务端
     // placeholder（机器人旧头像），不再仅在 pending 分支插入。
-    ref.read(conversationsProvider.notifier).upsertAgentConversation(
-          agent: agent,
-          conversationId: conversationId
-        );
+    ref
+        .read(conversationsProvider.notifier)
+        .upsertAgentConversation(agent: agent, conversationId: conversationId);
     if (!mounted) return;
     await widget.onOpenConversation(conversationId, agent);
   }
@@ -583,18 +608,18 @@ class OpenClawDigitalEmployeeGalleryState
       _refreshController.resetNoData();
     });
     if (widget.mobile && widget.mobileFilterEnabled) {
-      ref.listen<DigitalEmployeeCatalogFilter>(
-        digitalEmployeeFilterProvider,
-        (_, __) {
-          // 切换分类后重置当前分类的本地分页窗口；服务端目录快照和刷新入口不变。
-          if (!mounted) return;
-          setState(() => _mobileVisibleCount = _mobilePageSize);
-          _refreshController.resetNoData();
-        }
-      );
+      ref.listen<DigitalEmployeeCatalogFilter>(digitalEmployeeFilterProvider,
+          (_, __) {
+        // 切换分类后重置当前分类的本地分页窗口；服务端目录快照和刷新入口不变。
+        if (!mounted) return;
+        setState(() => _mobileVisibleCount = _mobilePageSize);
+        _refreshController.resetNoData();
+      });
     }
 
-    final catalogAsync = ref.watch(digitalEmployeeCatalogProvider);
+    final catalogAsync = widget.localCatalog == null
+        ? ref.watch(digitalEmployeeCatalogProvider)
+        : AsyncData(widget.localCatalog!);
     // 搜索/刷新触发的重载是「携带旧值的 Loading 态」：必须用 .value 拿旧
     // 数据继续渲染（asData 在 Loading 态恒为 null，会把整页替换成转圈、连带
     // 卸载过滤行里的搜索框导致输入文字丢失）。只有首载（无旧值）才显示 spinner。
@@ -625,7 +650,9 @@ class OpenClawDigitalEmployeeGalleryState
       return const DigitalEmployeeGallerySkeleton(mobile: false);
     }
 
-    final filtered = ref.watch(filteredDigitalEmployeesProvider);
+    final filtered = widget.localCatalog == null
+        ? ref.watch(filteredDigitalEmployeesProvider)
+        : catalog.itemsFor(ref.watch(digitalEmployeeFilterProvider));
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
       child: Padding(
@@ -756,10 +783,7 @@ class OpenClawDigitalEmployeeGalleryState
 }
 
 class DigitalEmployeeGallerySkeleton extends StatelessWidget {
-  const DigitalEmployeeGallerySkeleton({
-    super.key,
-    required this.mobile
-  });
+  const DigitalEmployeeGallerySkeleton({super.key, required this.mobile});
 
   final bool mobile;
 
@@ -910,7 +934,10 @@ int debugResolveDesktopAgentColumnCount(double availableWidth) {
 }
 
 @visibleForTesting
-double debugResolveDesktopAgentCardWidth(double availableWidth) {
+double debugResolveDesktopAgentCardWidth(double availableWidth) =>
+    desktopAgentCardWidth(availableWidth);
+
+double desktopAgentCardWidth(double availableWidth) {
   if (!availableWidth.isFinite || availableWidth <= 0) {
     return _desktopAgentCardMinWidth;
   }

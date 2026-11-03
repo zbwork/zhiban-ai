@@ -11,12 +11,15 @@ class CatalogProviderEntry {
     this.defaultFirst = false,
     this.iconAssetPath,
     this.docsUrl,
+    this.anthropicBasePath,
   });
 
   final String id;
   final String name;
   final AiEndpointType endpointType;
   final String baseUrl;
+  /// Additional Anthropic endpoint on the catalog's canonical origin.
+  final String? anthropicBasePath;
 
   /// 新增目录项在用户尚未明确保存其位置前，是否优先展示在默认列表第一项。
   /// 一旦持久化顺序包含该条目，用户顺序始终优先。
@@ -38,6 +41,7 @@ class CatalogProviderEntry {
       defaultFirst: json['defaultFirst'] == true,
       iconAssetPath: icon == null ? null : 'assets/icons/providers/$icon.svg',
       docsUrl: json['docsUrl'] as String?,
+      anthropicBasePath: json['anthropicBasePath'] as String?,
     );
   }
 

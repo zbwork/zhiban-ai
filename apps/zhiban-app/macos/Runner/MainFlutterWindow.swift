@@ -1,7 +1,9 @@
 import Cocoa
 import FlutterMacOS
+import PDFKit
 
 class MainFlutterWindow: NSWindow {
+  private var documentChannel: FlutterMethodChannel?
   private var updateChannel: FlutterMethodChannel?
   private var localCodingProjectChannel: FlutterMethodChannel?
   private var localAgentSleepObserver: NSObjectProtocol?
@@ -20,6 +22,39 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    documentChannel = FlutterMethodChannel(name: "cn.qkfintech.zhiban/local-documents", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    documentChannel?.setMethodCallHandler { call, result in
+      guard call.method == "extractPdf" else { result(FlutterMethodNotImplemented); return }
+      guard let args = call.arguments as? [String: Any],
+            let typed = args["bytes"] as? FlutterStandardTypedData,
+            typed.data.count <= 10 * 1024 * 1024 else {
+        result(FlutterError(code: "invalid_pdf", message: "PDF 不能超过 10 MiB", details: nil)); return
+      }
+      DispatchQueue.global(qos: .userInitiated).async {
+        var text = ""
+        var error: String?
+        if let document = PDFDocument(data: typed.data), !document.isLocked {
+          if document.pageCount > 500 {
+            error = "PDF 超过 500 页，请拆分后发送"
+          } else {
+            for index in 0..<document.pageCount {
+              text += (document.page(at: index)?.string ?? "") + "\n"
+              if text.count > 60000 { error = "PDF 文字超过 60,000 字符，请拆分后发送"; break }
+            }
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+              error = "PDF 没有可读取文字，扫描件请先识别文字"
+            }
+          }
+        } else { error = "PDF 损坏或已加密，请解密后重新添加" }
+        let output = text
+        let failure = error
+        DispatchQueue.main.async {
+          if let failure = failure { result(FlutterError(code: "pdf_read_failed", message: failure, details: nil)) }
+          else { result(output) }
+        }
+      }
+    }
+
     desktopNetworkBridge = DesktopNetworkBridge(messenger: flutterViewController.engine.binaryMessenger)
     localComputerBridge = LocalComputerBridge(messenger: flutterViewController.engine.binaryMessenger)
     let localLifecycle = FlutterMethodChannel(name: "nexwork/local_agent_lifecycle", binaryMessenger: flutterViewController.engine.binaryMessenger)

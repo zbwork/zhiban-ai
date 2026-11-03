@@ -98,15 +98,17 @@ Future<void> _showAnchoredPopover(
 Future<void> showSidebarProfilePopover(
   BuildContext anchorContext, {
   required AccountInfo? info,
+  bool localWorkspace = false,
 }) {
   final container = ProviderScope.containerOf(anchorContext, listen: false);
-  final cachedMe = container.read(authMeProvider).value;
+  final cachedMe = localWorkspace ? null : container.read(authMeProvider).value;
   return _showAnchoredPopover(
     anchorContext,
     direction: _PopoverDirection.below,
     barrierLabel: '关闭个人弹框',
     child: SidebarProfilePopover(
       info: info,
+      localWorkspace: localWorkspace,
       hostContext: anchorContext,
       initialMe: cachedMe,
       loadMe: () => container.read(authMeProvider.future),
@@ -140,12 +142,14 @@ class SidebarProfilePopover extends ConsumerStatefulWidget {
     required this.info,
     required this.hostContext,
     this.initialMe,
+    this.localWorkspace = false,
     @visibleForTesting this.loadMe,
     @visibleForTesting this.loadCurrentTenantId,
     @visibleForTesting this.localCodingToolsAvailable,
   });
 
   final AccountInfo? info;
+  final bool localWorkspace;
 
   /// F31 · "本地开发工具"行的显隐;null = 按平台与构建开关判定(仅测试覆盖)。
   final bool? localCodingToolsAvailable;
@@ -173,7 +177,7 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
   void initState() {
     super.initState();
     _me = widget.initialMe;
-    _load();
+    if (!widget.localWorkspace) _load();
   }
 
   Future<void> _load() async {
@@ -195,6 +199,7 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
   }
 
   String get _tenantLine {
+    if (widget.localWorkspace) return '本地工作区';
     final me = _me;
     if (me != null) {
       for (final s in me.tenantScopes) {
@@ -223,6 +228,10 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
   /// 弹框保持打开, 名片叠在其右侧出现; 点名片外任意处只关名片, 弹框还在。
   /// 自己的名片不能给自己发消息/打电话, 按钮禁用。
   void _openProfileCard() {
+    if (widget.localWorkspace) {
+      _openSettings();
+      return;
+    }
     final info = widget.info;
     // 锚点 = 本弹框卡片右上角 (context 即整个 popover 的 RenderBox)。
     // _ProfileCardRoute 内部是 left = anchor.dx + 10 / top = anchor.dy - 12,
@@ -275,9 +284,9 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
   /// F31 · 本地开发工具入口(2026-09-10 从"设置 → 支持与服务"挪到弹框一级,
   /// 设置页入口已移除)。显隐:桌面端 macOS / Windows + 构建开关。
   bool get _showLocalCodingTools =>
-      widget.localCodingToolsAvailable ??
-      ((PlatformUtils.isMacOS || PlatformUtils.isWindows) &&
-          AppConfig.localCodingToolsEnabled);
+      (widget.localCodingToolsAvailable ??
+          ((PlatformUtils.isMacOS || PlatformUtils.isWindows) &&
+              AppConfig.localCodingToolsEnabled));
 
   void _openLocalCodingTools() {
     final host = widget.hostContext;
@@ -298,6 +307,10 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
   }
 
   Future<void> _openHelp() async {
+    if (widget.localWorkspace) {
+      BotToast.showText(text: '帮助与客服需要登录后使用');
+      return;
+    }
     final host = widget.hostContext;
     final closeLoading = BotToast.showLoading();
     try {
@@ -367,11 +380,12 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
             label: '设置',
             onTap: _openSettings,
           ),
-          _ActionRow(
-            icon: CupertinoIcons.square_arrow_right,
-            label: '退出登录',
-            onTap: _logout,
-          ),
+          if (!widget.localWorkspace)
+            _ActionRow(
+              icon: CupertinoIcons.square_arrow_right,
+              label: '退出登录',
+              onTap: _logout,
+            ),
           if (_showAdminEntry) ...[
             const _PopoverDivider(),
             _ActionRow(

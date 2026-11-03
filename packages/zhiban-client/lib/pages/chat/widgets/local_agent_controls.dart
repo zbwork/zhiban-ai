@@ -15,6 +15,56 @@ import 'package:zhiban_client/routes/route_paths.dart';
 import 'package:zhiban_client/pages/model_service/widgets/add_provider_dialog.dart'
     show ProviderIcon;
 
+Widget? conversationModelPlatform(BuildContext context, LlmModelOption model) {
+  if (model.providerName.isEmpty) return null;
+  return Tooltip(
+    message: '模型平台：${model.providerName}',
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 105),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        ProviderIcon(
+            iconAssetPath: model.providerIconAssetPath,
+            name: model.providerName,
+            size: 20),
+        const SizedBox(width: 8),
+        Flexible(
+            child: Text(model.providerName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface))),
+      ]),
+    ),
+  );
+}
+
+Widget conversationModelIcon(BuildContext context, String id,
+    {double size = 24}) {
+  final name = id.toLowerCase().split('/').last;
+  final provider = name.startsWith('claude')
+      ? 'anthropic'
+      : name.startsWith('gemini')
+          ? 'google'
+          : name.startsWith('deepseek')
+              ? 'deepseek'
+              : name.startsWith('qwen')
+                  ? 'qwen'
+                  : name.startsWith('kimi') || name.startsWith('moonshot')
+                      ? 'moonshot'
+                      : name.startsWith('gpt-') ||
+                              RegExp(r'^o[1-9](?:-|$)').hasMatch(name)
+                          ? 'openai'
+                          : null;
+  return provider == null
+      ? Icon(CupertinoIcons.sparkles,
+          size: size, color: Theme.of(context).colorScheme.primary)
+      : ProviderIcon(
+          iconAssetPath: 'assets/icons/providers/$provider.svg',
+          name: id,
+          size: size);
+}
+
 const permissionLabels = {'ask': '请求批准', 'assist': '帮我批准', 'full': '完全访问'};
 const permissionDescriptions = {
   'ask': '编辑文件、执行命令与使用互联网前询问',
@@ -642,54 +692,8 @@ class _LocalAgentControlsState extends State<LocalAgentControls> {
     }
   }
 
-  Widget? _modelPlatform(LlmModelOption model) {
-    if (model.providerName.isEmpty) return null;
-    return Tooltip(
-      message: '模型平台：${model.providerName}',
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 105),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          ProviderIcon(
-              iconAssetPath: model.providerIconAssetPath,
-              name: model.providerName,
-              size: 20),
-          const SizedBox(width: 8),
-          Flexible(
-              child: Text(model.providerName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface))),
-        ]),
-      ),
-    );
-  }
-
-  Widget _modelIcon(String id, {double size = 24}) {
-    final name = id.toLowerCase().split('/').last;
-    final provider = name.startsWith('claude')
-        ? 'anthropic'
-        : name.startsWith('gemini')
-            ? 'google'
-            : name.startsWith('deepseek')
-                ? 'deepseek'
-                : name.startsWith('qwen')
-                    ? 'qwen'
-                    : name.startsWith('kimi') || name.startsWith('moonshot')
-                        ? 'moonshot'
-                        : name.startsWith('gpt-') ||
-                                RegExp(r'^o[1-9](?:-|$)').hasMatch(name)
-                            ? 'openai'
-                            : null;
-    return provider == null
-        ? Icon(CupertinoIcons.sparkles,
-            size: size, color: Theme.of(context).colorScheme.primary)
-        : ProviderIcon(
-            iconAssetPath: 'assets/icons/providers/$provider.svg',
-            name: id,
-            size: size);
-  }
+  Widget? _modelPlatform(LlmModelOption model) => conversationModelPlatform(context, model);
+  Widget _modelIcon(String id, {double size = 24}) => conversationModelIcon(context, id, size: size);
 
   @override
   Widget build(BuildContext context) {

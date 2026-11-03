@@ -63,9 +63,8 @@ void main() {
       escapedExecutable.path,
     ]);
     expect(chmod.exitCode, 0);
-    await Link('${helpersDirectory.path}/ZhibanLocalBridge.app').create(
-      escapedBundle.path
-    );
+    await Link('${helpersDirectory.path}/ZhibanLocalBridge.app')
+        .create(escapedBundle.path);
 
     await expectLater(
       BundledLocalCodingBridgeExecutableLocator(
@@ -105,9 +104,8 @@ void main() {
       escapedExecutable.path,
     ]);
     expect(chmod.exitCode, 0);
-    await Link('${appExecutable.parent.parent.path}/Helpers').create(
-      escapedHelpers.path
-    );
+    await Link('${appExecutable.parent.parent.path}/Helpers')
+        .create(escapedHelpers.path);
 
     await expectLater(
       BundledLocalCodingBridgeExecutableLocator(
@@ -182,15 +180,15 @@ void main() {
     );
   });
 
-  test('signature verifier rejects an ad-hoc app-like helper', () async {
+  test(
+      'community debug accepts intact helper; distribution and tampering reject',
+      () async {
     if (!Platform.isMacOS) return;
     final root = await Directory.systemTemp.createTemp(
       'zhiban-local-coding-adhoc-signature-',
     );
     addTearDown(() => root.delete(recursive: true));
-    final helperBundle = Directory(
-      '${root.path}/ZhibanLocalBridge.app'
-    );
+    final helperBundle = Directory('${root.path}/ZhibanLocalBridge.app');
     final helperExecutable = File(
       '${helperBundle.path}/Contents/MacOS/zhiban-local-bridge',
     );
@@ -223,9 +221,12 @@ void main() {
       helperBundle.path,
     ]);
     expect(sign.exitCode, 0, reason: '${sign.stderr}');
+    await const MacOSLocalCodingBridgeSignatureVerifier()
+        .verify(helperExecutable.path);
 
     await expectLater(
-      const MacOSLocalCodingBridgeSignatureVerifier().verify(
+      const MacOSLocalCodingBridgeSignatureVerifier(requireDistribution: true)
+          .verify(
         helperExecutable.path,
       ),
       throwsA(
@@ -235,6 +236,12 @@ void main() {
           'signature_mismatch',
         ),
       ),
+    );
+    await infoPlist.writeAsString('tampered');
+    await expectLater(
+      const MacOSLocalCodingBridgeSignatureVerifier()
+          .verify(helperExecutable.path),
+      throwsA(isA<LocalCodingBridgeException>()),
     );
   });
 

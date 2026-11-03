@@ -19,9 +19,7 @@ import 'prompt_input/prompt_input.dart';
 import 'prompt_input/rich_prompt_controller.dart';
 
 typedef AgentAppLaunchHandler = FutureOr<void> Function(
-  AgentAppItem app,
-  VoidCallback onPresented
-);
+    AgentAppItem app, VoidCallback onPresented);
 
 class ChatSessionView extends StatefulWidget {
   const ChatSessionView({
@@ -67,9 +65,14 @@ class ChatSessionView extends StatefulWidget {
     this.runtimeControls,
     this.runtimeApprovals,
     this.sendReady = true,
+    this.onOpenApps,
+    this.sentTextHistory = const [],
+    this.autoScrollOnMessageUpdate = true,
   });
 
   final ChatState state;
+  final List<String> sentTextHistory;
+  final bool autoScrollOnMessageUpdate;
   final RichPromptController? controller;
   final FocusNode? focusNode;
   final ValueChanged<ChatAttachmentPickKind>? onPickAttachment;
@@ -141,6 +144,7 @@ class ChatSessionView extends StatefulWidget {
   final Widget? runtimeControls;
   final Widget? runtimeApprovals;
   final bool sendReady;
+  final VoidCallback? onOpenApps;
 
   /// 滚动 + 高亮 cron 消息动画完成后回调（清掉 ChatNotifier 上的标记）。
   final VoidCallback? onHighlightConsumed;
@@ -309,7 +313,7 @@ class _ChatSessionViewState extends State<ChatSessionView> {
         final wasAtBottom = _messageListKey.currentState?.isNearBottom ?? false;
         _messageListKey.currentState?.resetLastMessageMinHeight();
         setState(() => _promptInset = h);
-        if (wasAtBottom) {
+        if (wasAtBottom && widget.autoScrollOnMessageUpdate) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
             _messageListKey.currentState?.scrollToBottom();
@@ -385,10 +389,7 @@ class _ChatSessionViewState extends State<ChatSessionView> {
       slug: skill.slug,
       name: label,
     );
-    _mobileSkillDraft?.addSelectedSkill(
-      slug: skill.slug,
-      name: label
-    );
+    _mobileSkillDraft?.addSelectedSkill(slug: skill.slug, name: label);
   }
 
   void _selectApp(AgentAppItem app) {
@@ -471,6 +472,8 @@ class _ChatSessionViewState extends State<ChatSessionView> {
                                 )
                               : ChatMessageList(
                                   key: _messageListKey,
+                                  autoScrollOnMessageUpdate:
+                                      widget.autoScrollOnMessageUpdate,
                                   activeConversationId:
                                       widget.state.activeConversationId,
                                   messages: displayMessages,
@@ -573,6 +576,8 @@ class _ChatSessionViewState extends State<ChatSessionView> {
                                       )
                                     else
                                       PromptInput(
+                                        sentTextHistory: widget.sentTextHistory,
+                                        onOpenApps: widget.onOpenApps,
                                         runtimeControls: widget.runtimeControls,
                                         sendReady: widget.sendReady,
                                         key: _promptInputKey,

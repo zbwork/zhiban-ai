@@ -35,8 +35,10 @@ class ProviderKeyTester {
 
     switch (endpointType) {
       case AiEndpointType.openaiCompatible:
+        final root = _stripSlash(trimmedBase);
+        final apiBase = Uri.parse(root).path.isEmpty ? '$root/v1' : root;
         return _get(
-          url: '${_stripSlash(trimmedBase)}/models',
+          url: '$apiBase/models',
           headers: {'Authorization': 'Bearer $trimmedKey'},
         );
       case AiEndpointType.anthropicMessages:
@@ -44,14 +46,12 @@ class ProviderKeyTester {
         final url = base.endsWith('/v1') ? '$base/models' : '$base/v1/models';
         return _get(
           url: url,
-          headers: {
-            'x-api-key': trimmedKey,
-            'anthropic-version': '2023-06-01'
-          },
+          headers: {'x-api-key': trimmedKey, 'anthropic-version': '2023-06-01'},
         );
       case AiEndpointType.googleGenerativeAi:
         final base = _stripSlash(trimmedBase);
-        final url = base.endsWith('/v1beta') ? '$base/models' : '$base/v1beta/models';
+        final url =
+            base.endsWith('/v1beta') ? '$base/models' : '$base/v1beta/models';
         return _get(url: url, queryParameters: {'key': trimmedKey});
       case AiEndpointType.custom:
         return const ProviderKeyTestResult.fail('自定义协议暂不支持自动检测，请手动确认密钥可用');
@@ -75,7 +75,7 @@ class ProviderKeyTester {
       final response = await dio.get<dynamic>(
         url,
         queryParameters: queryParameters,
-        options: Options(headers: headers),
+        options: Options(headers: headers, followRedirects: false),
       );
       final status = response.statusCode ?? 0;
       if (status >= 200 && status < 300) {
@@ -86,7 +86,8 @@ class ProviderKeyTester {
       }
       return ProviderKeyTestResult.fail('请求失败（HTTP $status）');
     } on DioException catch (error) {
-      return ProviderKeyTestResult.fail('网络请求失败：${error.message ?? error.type.name}');
+      return ProviderKeyTestResult.fail(
+          '网络请求失败，请检查模型地址、密钥和网络（${error.type.name}）');
     } finally {
       dio.close();
     }

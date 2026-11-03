@@ -26,9 +26,13 @@ class SkillDetailDialog extends StatelessWidget {
     super.key,
     required this.skill,
     this.enableInstall = false,
+    this.onInstall,
+    this.availabilityMessage,
   });
 
   final Skill skill;
+  final VoidCallback? onInstall;
+  final String? availabilityMessage;
 
   /// 技能广场入口传 true；技能选择器内的详情预览保持 false（选择器自身负责绑定）。
   final bool enableInstall;
@@ -70,6 +74,10 @@ class SkillDetailDialog extends StatelessWidget {
                       child: _SkillUsageImageGrid(images: usageImages),
                     ),
                   ],
+                  if (availabilityMessage != null) ...[
+                    const SizedBox(height: 14),
+                    Text(availabilityMessage!),
+                  ],
                   if (hasContent) ...[
                     const SizedBox(height: 14),
                     const _AiGeneratedHint(),
@@ -79,7 +87,8 @@ class SkillDetailDialog extends StatelessWidget {
               ),
             ),
           ),
-          if (enableInstall) _SkillDetailInstallBar(skill: skill),
+          if (enableInstall)
+            _SkillDetailInstallBar(skill: skill, onInstall: onInstall),
         ],
       ),
     );
@@ -87,7 +96,9 @@ class SkillDetailDialog extends StatelessWidget {
 }
 
 class _SkillDetailInstallBar extends StatelessWidget {
-  const _SkillDetailInstallBar({required this.skill});
+  const _SkillDetailInstallBar({required this.skill, this.onInstall});
+
+  final VoidCallback? onInstall;
 
   final Skill skill;
 
@@ -113,7 +124,8 @@ class _SkillDetailInstallBar extends StatelessWidget {
             ),
           ),
           // 保持详情弹框打开，在其上层弹出目标数字员工选择器（对齐竞品交互）。
-          onPressed: () => showSkillInstallAgentDialog(context, skill: skill),
+          onPressed: onInstall ??
+              () => showSkillInstallAgentDialog(context, skill: skill),
           child: const Text('添加'),
         ),
       ),

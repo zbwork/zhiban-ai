@@ -1,4 +1,12 @@
 {
+  "local.file_not_directory": "该路径是文件而非目录，list_files 只能列目录。读取文本内容请使用 read_file；只需文件列表时使用已有列表回答，不必继续读取。",
+  "local.file_not_regular": "该路径不是可读取的普通文件。目录请使用 list_files，不读取目录、链接或特殊文件。",
+  "local.file_missing": "文件或目录不存在，请用 list_files 核对实际相对路径后再操作，不要重复猜测。",
+  "local.file_exists": "目标文件已存在，未覆盖。修改需先 read_file 获取摘要再用 edit_file，或另存新文件名。",
+  "local.file_access_denied": "文件访问被拒绝，请检查工作目录授权，不要绕过沙箱或重复同一操作。",
+  "local.file_size_limit": "文件超过该工具大小限制，请按实际限制分段处理或经已授权的 local_shell 处理，不反复调用相同读取。",
+  "local.file_changed": "文件读取或修改期间发生变化，请重新读取并核对摘要后重试。",
+  "local.file_operation_failed": "文件操作未完成，未确认结果。请核对相对路径、文件类型和授权，不得声称用户拒绝或文件已生成。",
   "local.skill_unavailable": "此 code 未在本轮关联技能中加载，请核对可用关联技能清单。Codex 随包 office-local、visual-materials 应用原生只读工具读取系统提示中的受管技能路径，不使用 read_skill_file；不要猜其他私有路径。",
   "local.web_search_invalid": "公开检索参数无效；query 为最多500字的公开关键词，limit 为1到10，不传 URL、凭据或文件。",
   "local.web_search_unavailable": "公开搜索服务未配置或暂时不可用，本轮停止搜索。请如实说明未查证，不要索取密钥、编造结果或自动改用浏览器搜索。",

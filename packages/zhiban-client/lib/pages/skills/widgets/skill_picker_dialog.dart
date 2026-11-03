@@ -36,9 +36,11 @@ class SkillPickerDialog extends ConsumerStatefulWidget {
     this.onTapCustomSkill,
     this.useRootNavigatorForDetail = true,
     this.asPage = false,
+    this.localSkills,
   });
 
   final Map<String, String> initialSelected;
+  final List<Skill>? localSkills;
 
   /// null = 新建模式（隐藏自定义技能分组）。
   final String? agentId;
@@ -90,6 +92,22 @@ class _SkillPickerDialogState extends ConsumerState<SkillPickerDialog> {
   }
 
   Future<void> _load() async {
+    if (widget.localSkills != null) {
+      final keyword = _searchController.text.trim().toLowerCase();
+      setState(() {
+        _skills = widget.localSkills!
+            .where((s) =>
+                (_selectedCategoryId == null ||
+                    s.categoryId == _selectedCategoryId) &&
+                '${s.slug} ${s.displayTitle} ${s.description}'
+                    .toLowerCase()
+                    .contains(keyword))
+            .toList();
+        _loading = false;
+        _loadError = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _loadError = null;
@@ -182,8 +200,9 @@ class _SkillPickerDialogState extends ConsumerState<SkillPickerDialog> {
   }
 
   Future<void> _showSkillDetail(Skill item) async {
-    final detail =
-        item.supportsInstallAction ? await _loadLegacySkillDetail(item) : item;
+    final detail = widget.localSkills == null && item.supportsInstallAction
+        ? await _loadLegacySkillDetail(item)
+        : item;
     if (!mounted || detail == null) return;
     await showDialog<void>(
       context: context,
@@ -492,10 +511,7 @@ class _CompactSkillMarketplaceToolbar extends StatelessWidget {
               const SizedBox(width: 10),
               SizedBox(
                 width: 106,
-                child: _SkillSortSelect(
-                  sort: sort,
-                  onChanged: onSortChanged
-                ),
+                child: _SkillSortSelect(sort: sort, onChanged: onSortChanged),
               ),
             ],
           ),
@@ -656,10 +672,7 @@ class _SkillResultsPane extends StatelessWidget {
                 const SizedBox(width: 12),
                 SizedBox(
                   width: 112,
-                  child: _SkillSortSelect(
-                    sort: sort,
-                    onChanged: onSortChanged
-                  ),
+                  child: _SkillSortSelect(sort: sort, onChanged: onSortChanged),
                 ),
               ],
             ),

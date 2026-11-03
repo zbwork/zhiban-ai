@@ -64,8 +64,10 @@ class ProviderModelFetcher {
 
     switch (endpointType) {
       case AiEndpointType.openaiCompatible:
+        final root = _stripSlash(trimmedBase);
+        final apiBase = Uri.parse(root).path.isEmpty ? '$root/v1' : root;
         return _fetch(
-          url: '${_stripSlash(trimmedBase)}/models',
+          url: '$apiBase/models',
           headers: {
             if (trimmedKey.isNotEmpty) 'Authorization': 'Bearer $trimmedKey',
             ...customHeaders,
@@ -132,7 +134,7 @@ class ProviderModelFetcher {
         final response = await dio.get<dynamic>(
           url,
           queryParameters: query,
-          options: Options(headers: headers),
+          options: Options(headers: headers, followRedirects: false),
         );
         final status = response.statusCode ?? 0;
         if (status < 200 || status >= 300) {
@@ -171,7 +173,7 @@ class ProviderModelFetcher {
       return const ProviderModelFetchResult.fail('模型列表分页未完成，请重试');
     } on DioException catch (error) {
       return ProviderModelFetchResult.fail(
-          '网络请求失败：${error.message ?? error.type.name}');
+          '网络请求失败，请检查模型地址、密钥和网络（${error.type.name}）');
     } catch (_) {
       return const ProviderModelFetchResult.fail('响应格式无法识别');
     } finally {

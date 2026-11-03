@@ -1,6 +1,5 @@
 import 'package:zhiban_client/pages/settings/clear_cache_flow.dart';
 
-
 import 'package:zhiban_client/config/client_assets.dart';
 import 'widgets/recharge_widgets.dart';
 import 'local_runtime_panel.dart';
@@ -55,7 +54,8 @@ import 'package:zhiban_ui/widgets/ui_switch.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.localWorkspace = false});
+  final bool localWorkspace;
 
   @override
   ConsumerState<SettingsPage> createState() => _SettingsPageState();
@@ -72,14 +72,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       backgroundColor: ColorConfig.pageBackground,
       body: SafeArea(
         child: SettingsProfilePanel(
+          localWorkspace: widget.localWorkspace,
           compact: false,
           accountInfoService: _accountInfoService,
           onClearCache: _clearCache,
-          onEditProfile: (context, info, service) => _showEditProfileDialog(
-            context,
-            info: info,
-            service: service
-          ),
+          onEditProfile: (context, info, service) =>
+              _showEditProfileDialog(context, info: info, service: service),
         ),
       ),
     );
@@ -97,9 +95,7 @@ class AboutPage extends StatelessWidget {
         title: '关于我们',
         backgroundColor: ColorConfig.pageBackground,
       ),
-      body: const SafeArea(
-        child: _AboutPanel(showHeader: false)
-      ),
+      body: const SafeArea(child: _AboutPanel(showHeader: false)),
     );
   }
 }
@@ -222,10 +218,7 @@ class _EnvSwitchPageState extends State<EnvSwitchPage> {
             children: [
               Text(
                 '当前：${current.displayName}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF667085)
-                ),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF667085)),
               ),
               const SizedBox(height: 4),
               const Text(
@@ -328,6 +321,7 @@ class SettingsProfilePanel extends ConsumerStatefulWidget {
   const SettingsProfilePanel({
     super.key,
     required this.compact,
+    this.localWorkspace = false,
     required this.accountInfoService,
     required this.onClearCache,
     required this.onEditProfile,
@@ -335,6 +329,7 @@ class SettingsProfilePanel extends ConsumerStatefulWidget {
 
   final bool compact;
   final AccountInfoService accountInfoService;
+  final bool localWorkspace;
   final VoidCallback onClearCache;
   final Future<bool?> Function(
     BuildContext context,
@@ -406,7 +401,11 @@ class _SettingsProfilePanelState extends ConsumerState<SettingsProfilePanel> {
 
   @override
   Widget build(BuildContext context) {
-    final asyncInfo = ref.watch(accountInfoProvider);
+    final asyncInfo = widget.localWorkspace
+        ? AsyncValue<AccountInfo>.data(AccountInfo.fromJson({
+            'account': {'displayName': '本地用户'}
+          }))
+        : ref.watch(accountInfoProvider);
     // asData 只匹配纯 AsyncData 状态；accountInfoProvider 被
     // ref.invalidate(authMeProvider) 触发静默刷新时会短暂进入
     // "loading 但带着上一次数据" 状态，此时 asData 是 null 但 value 仍能
@@ -432,15 +431,14 @@ class _SettingsProfilePanelState extends ConsumerState<SettingsProfilePanel> {
               child: Align(
                 alignment: Alignment.topCenter,
                 child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: compact ? 0 : 28
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 28),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 720),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: _ProfileBody(
                         info: info,
+                        localWorkspace: widget.localWorkspace,
                         loadingHero: loading,
                         onClearCache: widget.onClearCache,
                         onEditProfile: () => _editProfile(info),
@@ -519,6 +517,7 @@ class _ProfileBody extends ConsumerWidget {
   const _ProfileBody({
     required this.info,
     required this.loadingHero,
+    this.localWorkspace = false,
     required this.onClearCache,
     required this.onEditProfile,
     required this.onChangeAvatar,
@@ -528,6 +527,7 @@ class _ProfileBody extends ConsumerWidget {
 
   final AccountInfo? info;
   final bool loadingHero;
+  final bool localWorkspace;
   final VoidCallback onClearCache;
   final VoidCallback onEditProfile;
   final VoidCallback onChangeAvatar;
@@ -536,6 +536,7 @@ class _ProfileBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    void needsLogin() => BotToast.showText(text: '该功能需要登录后使用');
     final hideBillingEntry = info?.phone.trim() == '13900000003';
     final accountItems = [
       if (PlatformUtils.isMobile && !hideBillingEntry) ...[
@@ -554,9 +555,11 @@ class _ProfileBody extends ConsumerWidget {
         iconBackground: const Color(0xFFEAF3FF),
         title: '基础资料',
         subtitle: '管理个人信息与联系方式',
-        onTap: () => PlatformUtils.isMobile
-            ? context.push(RoutePaths.profileDetails, extra: info)
-            : showProfileDetailsDialog(context, info),
+        onTap: localWorkspace
+            ? needsLogin
+            : () => PlatformUtils.isMobile
+                ? context.push(RoutePaths.profileDetails, extra: info)
+                : showProfileDetailsDialog(context, info),
       ),
       _ActionItemData(
         icon: CupertinoIcons.lock_fill,
@@ -564,9 +567,11 @@ class _ProfileBody extends ConsumerWidget {
         iconBackground: const Color(0xFFE8FAEF),
         title: '登录状态',
         subtitle: '查看设备登录记录与活动状态',
-        onTap: () => PlatformUtils.isMobile
-            ? context.push(RoutePaths.loginStatus)
-            : _showLoginStatusDialog(context),
+        onTap: localWorkspace
+            ? needsLogin
+            : () => PlatformUtils.isMobile
+                ? context.push(RoutePaths.loginStatus)
+                : _showLoginStatusDialog(context),
       ),
       _ActionItemData(
         icon: CupertinoIcons.shield_fill,
@@ -574,9 +579,11 @@ class _ProfileBody extends ConsumerWidget {
         iconBackground: const Color(0xFFF0EAFE),
         title: '账号安全',
         subtitle: '查看账号保护与认证来源',
-        onTap: () => PlatformUtils.isMobile
-            ? context.push(RoutePaths.accountSecurity)
-            : _showAccountSecurityDialog(context),
+        onTap: localWorkspace
+            ? needsLogin
+            : () => PlatformUtils.isMobile
+                ? context.push(RoutePaths.accountSecurity)
+                : _showAccountSecurityDialog(context),
       ),
     ];
     final toolItems = <_ActionItemData>[
@@ -600,15 +607,22 @@ class _ProfileBody extends ConsumerWidget {
               builder: (context, _) =>
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     BillingStatusText(
-                        text: LocalAgentService.instance.online ? '已就绪' : '未连接',
+                        text: localWorkspace
+                            ? '按需启动'
+                            : LocalAgentService.instance.online
+                                ? '已就绪'
+                                : '未连接',
                         color: LocalAgentService.instance.online
                             ? const Color(0xFF12B76A)
                             : Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(width: 18),
                     const Icon(CupertinoIcons.chevron_right, size: 15),
                   ])),
-          onTap: () => showDialog<void>(
-              context: context, builder: (_) => const LocalRuntimePanel()),
+          onTap: localWorkspace
+              ? () => BotToast.showText(
+                  text: '本地引擎在发送消息时启动；请在员工中选择引擎，在对话中选择模型和工作目录')
+              : () => showDialog<void>(
+                  context: context, builder: (_) => const LocalRuntimePanel()),
         ),
     ];
     final chatItems = <_ActionItemData>[
@@ -637,7 +651,9 @@ class _ProfileBody extends ConsumerWidget {
           title: '分享给朋友',
           subtitle: '邀请好友使用 知办AI',
           // F29: 桌面弹框（专属邀请码/链接/二维码/海报）；移动端入口在「我的」抽屉，见 mine_drawer.dart。
-          onTap: () => showShareInviteDialog(context),
+          onTap: localWorkspace
+              ? needsLogin
+              : () => showShareInviteDialog(context),
         ),
         _ActionItemData(
           icon: CupertinoIcons.chat_bubble_text_fill,
@@ -645,7 +661,7 @@ class _ProfileBody extends ConsumerWidget {
           iconBackground: const Color(0xFFEAF3FF),
           title: '联系客服',
           subtitle: '反馈问题或获取帮助支持',
-          onTap: onOpenSupport,
+          onTap: localWorkspace ? needsLogin : onOpenSupport,
         ),
       ],
       _ActionItemData(
@@ -654,7 +670,9 @@ class _ProfileBody extends ConsumerWidget {
         iconBackground: const Color(0xFFFFF0EE),
         title: '清除缓存',
         subtitle: '清除本地缓存与环境配置，不影响登录',
-        onTap: onClearCache,
+        onTap: localWorkspace
+            ? () => BotToast.showText(text: '本地聊天与员工数据会保留，无需清除缓存')
+            : onClearCache,
       ),
       _ActionItemData(
         icon: CupertinoIcons.info_circle_fill,
@@ -672,8 +690,8 @@ class _ProfileBody extends ConsumerWidget {
             ? const _ProfileHeroSkeleton()
             : _ProfileHeroCard(
                 info: info,
-                onEditProfile: onEditProfile,
-                onChangeAvatar: onChangeAvatar,
+                onEditProfile: localWorkspace ? needsLogin : onEditProfile,
+                onChangeAvatar: localWorkspace ? needsLogin : onChangeAvatar,
                 uploadingAvatar: uploadingAvatar,
               ),
         const SizedBox(height: 16),
@@ -1131,7 +1149,8 @@ class _AccountStatusCard extends StatelessWidget {
             children: [
               _StatusRow(
                 label: '登录状态',
-                trailing: const BillingStatusText(text: '正常', color: Color(0xFF12B76A)),
+                trailing: const BillingStatusText(
+                    text: '正常', color: Color(0xFF12B76A)),
               ),
               _StatusRow(
                 label: '最近登录设备',
@@ -1146,7 +1165,8 @@ class _AccountStatusCard extends StatelessWidget {
               ),
               _StatusRow(
                 label: '数据同步',
-                trailing: const BillingStatusText(text: '已开启', color: Color(0xFF12B76A)),
+                trailing: const BillingStatusText(
+                    text: '已开启', color: Color(0xFF12B76A)),
               ),
               _StatusRow(
                 label: '资料完整度',
@@ -3669,10 +3689,7 @@ class _AboutPanelState extends State<_AboutPanel> {
     if (!mounted) return;
     context.push(
       RoutePaths.browser,
-      extra: {
-        'title': title,
-        'url': uri.toString()
-      },
+      extra: {'title': title, 'url': uri.toString()},
     );
   }
 

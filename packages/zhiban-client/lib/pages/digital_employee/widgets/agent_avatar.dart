@@ -1,5 +1,6 @@
 import 'package:zhiban_client/config/client_assets.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:zhiban_client/network/api_image_auth.dart';
 import 'package:zhiban_client/utils/url_utils.dart';
 import 'package:zhiban_client/widgets/ui/ui_network_image.dart';
@@ -7,11 +8,7 @@ import 'package:zhiban_client/widgets/ui/ui_network_image.dart';
 /// 圆形头像，支持网络图片 + 渐变 fallback；遇到 SVG URL 自动走 fallback
 /// （未集成 flutter_svg）。
 class AgentAvatar extends StatefulWidget {
-  const AgentAvatar({
-    super.key,
-    required this.url,
-    required this.size
-  });
+  const AgentAvatar({super.key, required this.url, required this.size});
 
   final String url;
   final double size;
@@ -86,15 +83,18 @@ class _AgentAvatarState extends State<AgentAvatar> {
         // UiNetworkImage 同步取已就绪的请求头，让缓存头像首帧直接显示；
         // 仅冷启动鉴权未就绪时由共享组件异步加载，不再外包 FutureBuilder。
         child: _hasUrl
-            ? UiNetworkImage(
-                imageUrl: _rawUrl,
-                width: widget.size,
-                height: widget.size,
-                fit: BoxFit.cover,
-                cacheKey: stableAvatarCacheKey(_rawUrl),
-                placeholderBuilder: (_, __) => fallback,
-                errorBuilder: (_, __, ___) => fallback,
-              )
+            ? _rawUrl.startsWith('file:')
+                ? Image.file(File.fromUri(Uri.parse(_rawUrl)),
+                    fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback)
+                : UiNetworkImage(
+                    imageUrl: _rawUrl,
+                    width: widget.size,
+                    height: widget.size,
+                    fit: BoxFit.cover,
+                    cacheKey: stableAvatarCacheKey(_rawUrl),
+                    placeholderBuilder: (_, __) => fallback,
+                    errorBuilder: (_, __, ___) => fallback,
+                  )
             : fallback,
       ),
     );

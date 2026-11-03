@@ -19,7 +19,7 @@ import type { ArtifactMeta } from './artifacts.js';
 export type LeaseState = boolean | 'offline';
 export interface StopLock { run: string; residual: number; at: number }
 
-export interface LocalRunConfig { modelRecovery?: RecoveryCandidate[]; context?: LocalContextInput; prompt?: string; skillsDir?: string; contextID?: string; workspace: string; persona: string; history: string; protocol: ModelServiceEndpointType; mode?: 'ask' | 'assist' | 'full' }
+export interface LocalRunConfig { toolGuide?: string; modelRecovery?: RecoveryCandidate[]; context?: LocalContextInput; prompt?: string; skillsDir?: string; contextID?: string; workspace: string; persona: string; history: string; protocol: ModelServiceEndpointType; mode?: 'ask' | 'assist' | 'full' }
 export interface LocalEngine { run(turn: DesktopTurn): Promise<TurnOutcome>; cancel(task: LocalTask): Promise<void>; stop(): Promise<void> }
 export interface ActiveLocalRun {
   task: LocalTask;

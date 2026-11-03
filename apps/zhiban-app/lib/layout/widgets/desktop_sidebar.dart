@@ -1,4 +1,5 @@
 import 'package:zhiban_client/config/client_assets.dart';
+import 'sidebar_community_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -16,10 +17,12 @@ class DesktopSidebar extends StatefulWidget {
     super.key,
     required this.navItems,
     this.chatUnreadCount = 0,
+    this.localWorkspace = false,
   });
 
   final List<MainNavItem> navItems;
   final int chatUnreadCount;
+  final bool localWorkspace;
 
   @override
   State<DesktopSidebar> createState() => _DesktopSidebarState();
@@ -102,7 +105,10 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
       padding: const EdgeInsets.only(top: 34, bottom: 12),
       child: Column(
         children: [
-          SidebarUserTop(collapsed: _contentCollapsed),
+          SidebarUserTop(
+            collapsed: _contentCollapsed,
+            localWorkspace: widget.localWorkspace,
+          ),
           const SizedBox(height: 18),
           Expanded(
             child: SingleChildScrollView(
@@ -124,7 +130,10 @@ class _DesktopSidebarState extends State<DesktopSidebar> {
               ),
             ),
           ),
-          SidebarBottomDock(collapsed: _contentCollapsed),
+          if (widget.localWorkspace)
+            SidebarCommunitySection(collapsed: _contentCollapsed)
+          else
+            SidebarBottomDock(collapsed: _contentCollapsed),
         ],
       ),
     );

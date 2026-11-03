@@ -16,7 +16,8 @@ const rejectInvalidXmlControls = (value: unknown, ctx: z.RefinementCtx): void =>
 };
 const officeCreateBase = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('docx'), path, title: z.string().max(200), paragraphs: z.array(z.string().max(12000)).min(1).max(500) }).strict(),
-  z.object({ kind: z.literal('xlsx'), path, sheets: z.array(z.object({ name: z.string().min(1).max(31).regex(/^[^\\/?*[\]:]+$/), headers: z.array(z.string().max(200)).min(1).max(32), rows: z.array(z.array(cell).max(32)).max(5000) }).strict()).min(1).max(10) }).strict(),
+  // Escape both brackets: provider regex parsers need not accept JS's literal [.
+  z.object({ kind: z.literal('xlsx'), path, sheets: z.array(z.object({ name: z.string().min(1).max(31).regex(/^[^\\/?*\[\]:]+$/), headers: z.array(z.string().max(200)).min(1).max(32), rows: z.array(z.array(cell).max(32)).max(5000) }).strict()).min(1).max(10) }).strict(),
   z.object({ kind: z.literal('pptx'), path, title: z.string().max(200), slides: z.array(z.object({ title: z.string().max(150), bullets: z.array(z.string().max(300)).max(8), notes: z.string().max(20000).optional() }).strict()).min(1).max(50) }).strict(),
 ]);
 export const officeCreate = officeCreateBase.superRefine(rejectInvalidXmlControls);

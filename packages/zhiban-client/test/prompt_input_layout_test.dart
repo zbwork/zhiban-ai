@@ -16,6 +16,102 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(RichMessageClipboard.clear);
 
+  testWidgets('up/down recalls sent text and returns draft without wrapping',
+      (tester) async {
+    final controller = RichPromptController();
+    final focus = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focus.dispose);
+    await tester.pumpWidget(_host(
+        controller: controller,
+        focusNode: focus,
+        sentTextHistory: ['第一条', '', ' 第二条\n多行内容\n']));
+    focus.requestFocus();
+    await tester.pump();
+    Future<void> key(LogicalKeyboardKey key) async {
+      await tester.sendKeyEvent(key);
+      await tester.pump();
+    }
+
+    await key(LogicalKeyboardKey.arrowUp);
+    expect(controller.text, ' 第二条\n多行内容\n');
+    expect(controller.selection.extentOffset, controller.text.length);
+    await key(LogicalKeyboardKey.arrowUp);
+    expect(controller.text, '第一条');
+    await key(LogicalKeyboardKey.arrowUp);
+    expect(controller.text, '第一条');
+    await key(LogicalKeyboardKey.arrowDown);
+    expect(controller.text, ' 第二条\n多行内容\n');
+    await key(LogicalKeyboardKey.arrowDown);
+    expect(controller.text, isEmpty);
+    await key(LogicalKeyboardKey.arrowDown);
+    expect(controller.text, isEmpty);
+    await tester.enterText(find.byType(TextField), '尚未发送的草稿');
+    expect(controller.text, '尚未发送的草稿');
+    await tester.pump();
+    await key(LogicalKeyboardKey.arrowUp);
+    expect(controller.text, '尚未发送的草稿');
+    controller.clearRich();
+    await key(LogicalKeyboardKey.arrowUp);
+    await tester.enterText(find.byType(TextField), '编辑恢复内容');
+    await tester.pump();
+    await key(LogicalKeyboardKey.arrowDown);
+    expect(controller.text, '编辑恢复内容');
+  });
+
+  testWidgets(
+      'history respects composing, modifiers, attachments and conversation changes',
+      (tester) async {
+    final controller = RichPromptController();
+    final focus = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focus.dispose);
+    await tester.pumpWidget(_host(
+        controller: controller,
+        focusNode: focus,
+        conversationUuid: 'a',
+        sentTextHistory: ['员工 A 的消息']));
+    focus.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    expect(controller.text, isEmpty);
+    controller.value = const TextEditingValue(
+        text: '拼',
+        selection: TextSelection.collapsed(offset: 1),
+        composing: TextRange(start: 0, end: 1));
+    tester.testTextInput.updateEditingValue(controller.value);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(controller.text, '拼');
+    controller.clearRich();
+    controller.insertAttachment(RichPromptAttachment(
+        id: 'history-file',
+        fileName: '本地文件.txt',
+        fileType: ChatFileType.file,
+        status: RichAttachmentStatus.ready,
+        progress: 100,
+        block: const ImMessageBlock(
+            kind: ImMessageBlockKind.file, name: '本地文件.txt')));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(controller.attachments, hasLength(1));
+    expect(controller.textWithoutAttachmentTokens, isEmpty);
+    controller.clearRich();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(controller.text, '员工 A 的消息');
+    controller.clearRich();
+    await tester.pumpWidget(_host(
+        controller: controller,
+        focusNode: focus,
+        conversationUuid: 'b',
+        sentTextHistory: ['员工 B 的消息']));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(controller.text, '员工 B 的消息');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    expect(controller.text, isEmpty);
+  });
+
   testWidgets('PromptInput desktop min height is 1.5x taller', (tester) async {
     final controller = TextEditingController();
     final focusNode = FocusNode();
@@ -503,6 +599,8 @@ Widget _host({
   Future<bool> Function()? onPasteImage,
   bool allowAttachmentOnlySend = false,
   ValueChanged<List<String>>? onSend,
+  List<String> sentTextHistory = const [],
+  String conversationUuid = '',
 }) {
   return ProviderScope(
     child: MaterialApp(
@@ -510,6 +608,8 @@ Widget _host({
         body: SizedBox(
           width: 600,
           child: PromptInput(
+            sentTextHistory: sentTextHistory,
+            conversationUuid: conversationUuid,
             focusNode: focusNode,
             controller: controller,
             onPickAttachment: (_) {},

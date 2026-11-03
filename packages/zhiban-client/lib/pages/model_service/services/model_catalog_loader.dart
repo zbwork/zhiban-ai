@@ -20,6 +20,20 @@ class ModelCatalog {
   List<CatalogModelEntry> modelsFor(String providerId) =>
       modelsByProviderId[providerId] ?? const <CatalogModelEntry>[];
 
+  String? localToolBaseUrlFor(AiProviderConfig provider, AiEndpointType protocol) {
+    if (endpointTypeFor(provider) == protocol) return provider.baseUrl;
+    if (protocol != AiEndpointType.anthropicMessages) return null;
+    final entry = providers.where((p) => p.id == provider.catalogId).firstOrNull;
+    if (entry?.anthropicBasePath == null ||
+        provider.baseUrl.replaceFirst(RegExp(r'/+$'), '') !=
+            entry!.baseUrl.replaceFirst(RegExp(r'/+$'), '')) {
+      return null;
+    }
+    return Uri.parse(provider.baseUrl)
+        .replace(path: entry.anthropicBasePath).toString()
+        .replaceFirst(RegExp(r'/+$'), '');
+  }
+
   /// 协议类型只来自内置目录；自定义 Provider 在协议配置功能恢复前固定使用
   /// OpenAI-compatible。它不是用户配置，也不写入 [AiProviderConfig]。
   AiEndpointType endpointTypeFor(AiProviderConfig provider) {

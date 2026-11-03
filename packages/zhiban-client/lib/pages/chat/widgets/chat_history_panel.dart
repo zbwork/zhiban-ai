@@ -23,11 +23,17 @@ class ChatHistoryPanel extends ConsumerStatefulWidget {
     this.width = 300,
     this.showHeader = true,
     this.showLeftDivider = true,
+    this.localMessages,
+    this.localAgentName,
+    this.onLocalMessageSelected,
   });
 
   /// 由宿主算好的实际宽度。宿主用 LayoutBuilder 在窗口被拖窄时把它收成 280~300
   /// 之间的某个值,避免聊天主体被挤没。
   final double width;
+  final List<ChatMessage>? localMessages;
+  final String? localAgentName;
+  final ValueChanged<String>? onLocalMessageSelected;
   final bool showHeader;
   final bool showLeftDivider;
 
@@ -62,6 +68,7 @@ class _ChatHistoryPanelState extends ConsumerState<ChatHistoryPanel> {
   @override
   void initState() {
     super.initState();
+    if (widget.localMessages != null) return;
     // 面板打开时强制重拉一次当前会话 history。
     // 必要性:SSE 流式推送链路里没有 outputFiles 字段,数字员工本轮产出的附件
     // 只能从 GetMessages REST 接口拿到。如果用户从打开 app 起就停在当前会话、
@@ -84,17 +91,26 @@ class _ChatHistoryPanelState extends ConsumerState<ChatHistoryPanel> {
     // SSE 流结束(isSending: true → false)后再拉一次 history,把刚产出的
     // assistant_output 文件(比如 Excel/HTML)同步进面板。SSE 推送链路不带
     // outputFiles 字段,只有 GetMessages REST 才会返回,所以必须主动重拉。
-    ref.listen<AsyncValue<ChatState>>(chatProvider, (prev, next) {
-      final wasSending = prev?.asData?.value.isSending ?? false;
-      final isSending = next.asData?.value.isSending ?? false;
-      if (wasSending && !isSending) {
-        ref.read(chatProvider.notifier).reloadActiveMessages();
-      }
-    });
-    final messages = ref.watch(chatProvider).asData?.value.messages ?? const [];
-    final agent = ref.watch(selectedAgentOrFallbackProvider);
-    final agentName = (agent?.name.isNotEmpty ?? false) ? agent!.name : '助理';
-    final account = ref.watch(accountInfoProvider).asData?.value;
+    if (widget.localMessages == null) {
+      ref.listen<AsyncValue<ChatState>>(chatProvider, (prev, next) {
+        final wasSending = prev?.asData?.value.isSending ?? false;
+        final isSending = next.asData?.value.isSending ?? false;
+        if (wasSending && !isSending) {
+          ref.read(chatProvider.notifier).reloadActiveMessages();
+        }
+      });
+    }
+    final messages = widget.localMessages ??
+        ref.watch(chatProvider).asData?.value.messages ??
+        const [];
+    final agent = widget.localMessages == null
+        ? ref.watch(selectedAgentOrFallbackProvider)
+        : null;
+    final agentName = widget.localAgentName ??
+        ((agent?.name.isNotEmpty ?? false) ? agent!.name : '助理');
+    final account = widget.localMessages == null
+        ? ref.watch(accountInfoProvider).asData?.value
+        : null;
     // 昵称优先,其次真实姓名;两者都没有再兜底"我"。
     final myName = (() {
       final n = account?.nickname.trim() ?? '';
@@ -274,11 +290,8 @@ class _ChatHistoryPanelState extends ConsumerState<ChatHistoryPanel> {
             _resolveFileTypeFilter(f.fileName) != _fileTypeFilter) {
           continue;
         }
-        list.add(_AttachmentEntry(
-          file: f,
-          message: m,
-          sender: sender,
-          time: t),
+        list.add(
+          _AttachmentEntry(file: f, message: m, sender: sender, time: t),
         );
       }
     }
@@ -416,7 +429,11 @@ class _ChatHistoryPanelState extends ConsumerState<ChatHistoryPanel> {
         : (m.messageId?.isNotEmpty == true ? m.messageId! : '');
     if (targetId.isEmpty) return;
     setState(() => _activeHistoryTargetId = targetId);
-    ref.read(chatProvider.notifier).requestHighlightMessage(targetId);
+    if (widget.localMessages != null) {
+      widget.onLocalMessageSelected?.call(targetId);
+    } else {
+      ref.read(chatProvider.notifier).requestHighlightMessage(targetId);
+    }
     if (PlatformUtils.isMobile) {
       ref.read(chatHistoryPanelOpenProvider.notifier).state = false;
     }
@@ -781,10 +798,7 @@ class _Empty extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Text(
           text,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Color(0xFF9CA3AF)
-          ),
+          style: const TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
         ),
       ),
     );
@@ -924,9 +938,8 @@ class _FilterChipState<T> extends State<_FilterChip<T>>
       duration: const Duration(milliseconds: 160),
       vsync: this,
     );
-    _turns = Tween<double>(begin: 0, end: 0.5).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut)
-    );
+    _turns = Tween<double>(begin: 0, end: 0.5)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override

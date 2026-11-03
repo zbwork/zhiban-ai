@@ -33,6 +33,67 @@ void main() {
   });
 
   group('ChatMessageList hybrid stream follow', () {
+    testWidgets('local send aligns question at top once, including first turn',
+        (tester) async {
+      final question = ChatMessage(messageId: 'first-question',
+          role: ChatRole.question, content: '第一轮发出的问题');
+      final answer = ChatMessage(messageId: 'first-answer',
+          role: ChatRole.answer, content: '正在回复', status: BubbleStatus.loading);
+      await tester.pumpWidget(_wrap([question, answer], autoScroll: false));
+      await tester.pumpAndSettle();
+      final viewportTop = tester.getTopLeft(find.byType(CustomScrollView)).dy;
+      expect(tester.getTopLeft(find.text(question.content)).dy - viewportTop,
+          inInclusiveRange(0, 45));
+      final next = ChatMessage(messageId: 'next-question',
+          role: ChatRole.question, content: '新一轮发出的问题');
+      final messages = [question, answer.copyWith(
+          content: List.filled(25, '已完成内容').join('\n'),
+          status: BubbleStatus.success), next,
+        ChatMessage(messageId: 'next-answer', role: ChatRole.answer,
+            content: '正在回复', status: BubbleStatus.loading)];
+      await tester.pumpWidget(_wrap(messages, autoScroll: false));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.text(next.content)).dy - viewportTop,
+          inInclusiveRange(0, 45));
+      final position = _scrollPosition(tester);
+      final offset = position.pixels;
+      await tester.pumpWidget(_wrap([
+        ...messages.take(messages.length - 1),
+        messages.last.copyWith(content: List.filled(40, '继续回复').join('\n'))
+      ], autoScroll: false));
+      await tester.pumpAndSettle();
+      expect(position.pixels, closeTo(offset, 0.5));
+    });
+
+    testWidgets('local replies preserve position through growth and completion',
+        (tester) async {
+      final initial = _conversation();
+      await tester.pumpWidget(_wrap(initial, autoScroll: false));
+      await tester.pumpAndSettle();
+      final position = _scrollPosition(tester);
+      final originalOffset = position.pixels;
+      final grown = [
+        ...initial.take(initial.length - 1),
+        initial.last.copyWith(content: List.generate(35, (i) => '新增回复第 $i 行').join('\n')),
+      ];
+      await tester.pumpWidget(_wrap(grown, autoScroll: false));
+      await tester.pumpAndSettle();
+      expect(position.maxScrollExtent, greaterThan(originalOffset));
+      expect(position.pixels, closeTo(originalOffset, 0.5));
+      final completed = [
+        ...grown.take(grown.length - 1),
+        grown.last.copyWith(status: BubbleStatus.success),
+        ChatMessage(messageId: 'extra-answer', role: ChatRole.answer,
+            content: List.filled(15, '后续回复').join('\n')),
+      ];
+      await tester.pumpWidget(_wrap(completed, autoScroll: false));
+      await tester.pumpAndSettle();
+      expect(position.pixels, closeTo(originalOffset, 0.5));
+      tester.state<ChatMessageListState>(find.byType(ChatMessageList)).scrollToBottom();
+      await tester.pumpAndSettle();
+      expect(position.pixels, closeTo(position.maxScrollExtent, 0.5));
+    });
+
     testWidgets('follows smoothly while the answer is still short',
         (tester) async {
       final initialMessages = _conversation();
@@ -147,13 +208,14 @@ void main() {
   });
 }
 
-Widget _wrap(List<ChatMessage> messages) {
+Widget _wrap(List<ChatMessage> messages, {bool autoScroll = true}) {
   return MaterialApp(
     home: Scaffold(
       body: SizedBox(
         width: 720,
         height: 320,
         child: ChatMessageList(
+          autoScrollOnMessageUpdate: autoScroll,
           activeConversationId: 'stream-follow-conversation',
           messages: messages,
           hasMoreHistory: false,

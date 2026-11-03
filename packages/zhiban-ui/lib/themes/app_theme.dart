@@ -550,12 +550,15 @@ class AppTheme {
         ),
       ),
       tooltipTheme: TooltipThemeData(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: scheme.inverseSurface,
           borderRadius: BorderRadius.circular(8),
         ),
         textStyle: textTheme.bodySmall?.copyWith(
           color: scheme.onInverseSurface,
+          height: 1.4,
+          leadingDistribution: TextLeadingDistribution.even,
         ),
       ),
       datePickerTheme: DatePickerThemeData(

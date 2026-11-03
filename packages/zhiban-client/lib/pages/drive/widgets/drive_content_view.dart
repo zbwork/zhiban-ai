@@ -134,19 +134,21 @@ class DriveContentView extends ConsumerWidget {
     this.selection,
     this.space,
     this.showUnavailableState = false,
+    this.unavailableMessage,
   });
 
   final bool compactHeader;
   final DriveSelection? selection;
   final String? space;
   final bool showUnavailableState;
+  final String? unavailableMessage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (showUnavailableState) {
       return _EmptyState(
-        message: '云盘暂时无法连接服务器，请检查网络后重试',
-        onRetry: () => UserRefresh.run(
+        message: unavailableMessage ?? '云盘暂时无法连接服务器，请检查网络后重试',
+        onRetry: unavailableMessage != null ? null : () => UserRefresh.run(
             () => ref.refresh(driveTreeProvider.future)).ignore(),
       );
     }

@@ -25,6 +25,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 const double _dialogHorizontalPadding = 24;
 const _cloudCreationUnavailable = '云端创建暂未开放，请在电脑端创建本地数字员工。';
 
+/// Local persistence/capabilities without initializing any session services.
+class LocalAgentEditorOptions {
+  const LocalAgentEditorOptions(
+      {required this.skills, required this.saveAvatar});
+  final List<Skill> skills;
+  final Future<String> Function(String path) saveAvatar;
+}
+
 /// 移动端全屏编辑页通过 GoRouter extra 传递的参数对象。
 class CreateAgentPageArgs {
   const CreateAgentPageArgs({
@@ -50,9 +58,11 @@ class CreateAgentDialog extends StatelessWidget {
     this.submitLabel = '创建数字员工',
     this.enableDeleteAction = false,
     this.agentId,
+    this.localOptions,
   });
 
   final CreateAgentDraft? initialDraft;
+  final LocalAgentEditorOptions? localOptions;
   final String title;
   final String submitLabel;
   final bool enableDeleteAction;
@@ -66,6 +76,7 @@ class CreateAgentDialog extends StatelessWidget {
     return UiContentDialog(
       child: CreateAgentEditor(
         initialDraft: initialDraft,
+        localOptions: localOptions,
         title: title,
         submitLabel: submitLabel,
         enableDeleteAction: enableDeleteAction,
@@ -85,10 +96,12 @@ class CreateAgentEditor extends ConsumerStatefulWidget {
     this.submitLabel = '创建数字员工',
     this.enableDeleteAction = false,
     this.agentId,
+    this.localOptions,
     required this.compact,
   });
 
   final CreateAgentDraft? initialDraft;
+  final LocalAgentEditorOptions? localOptions;
   final String title;
   final String submitLabel;
   final bool enableDeleteAction;
@@ -188,7 +201,15 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
     _selectedKnowledgeBaseLabels =
         Map<String, String>.from(initial?.knowledgeBaseLabels ?? {});
     // Runtime selection does not change the member model catalogue.
-    _loadRuntimeEnvironments();
+    if (widget.localOptions == null) {
+      _loadRuntimeEnvironments();
+    } else {
+      _loadingRuntimeEnvironments = false;
+      _executionLocus = 'local';
+      if (_avatarUrl.startsWith('file:')) {
+        _avatarLocalPath = Uri.parse(_avatarUrl).toFilePath();
+      }
+    }
   }
 
   @override
@@ -350,10 +371,19 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
       _errorText = null;
     });
     try {
-      final uploaded = await ref.read(chatServiceProvider).uploadAgentAvatar(
-            filePath: file.path,
-            fileName: file.name
-          );
+      if (widget.localOptions != null) {
+        final uri = await widget.localOptions!.saveAvatar(file.path);
+        if (!mounted) return;
+        setState(() {
+          _avatarUrl = uri;
+          _avatarDisplayUrl = uri;
+          _uploadingAvatar = false;
+        });
+        return;
+      }
+      final uploaded = await ref
+          .read(chatServiceProvider)
+          .uploadAgentAvatar(filePath: file.path, fileName: file.name);
       if (!mounted) return;
       setState(() {
         _avatarUrl = uploaded.storageUri;
@@ -381,6 +411,19 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
   }
 
   Future<void> _pickSkills() async {
+    if (widget.localOptions != null) {
+      final picked = await showDialog<Map<String, String>>(
+        context: context,
+        builder: (_) => SkillPickerDialog(
+          initialSelected: _selectedSkillLabels,
+          localSkills: widget.localOptions!.skills,
+        ),
+      );
+      if (picked != null && mounted) {
+        setState(() => _selectedSkillLabels = picked);
+      }
+      return;
+    }
     // picker 和 CreateAgentDialog 在同一个 Navigator 上叠了两层，
     // 切回 chat 时需要把这两层都 pop 掉再触发上层导航。
     final navigator = Navigator.of(context);
@@ -411,10 +454,8 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
             onAddCustomSkill: addCustomSkill,
           ),
           transitionsBuilder: (_, animation, __, child) => SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 1),
-              end: Offset.zero
-            ).animate(
+            position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+                .animate(
               CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
             ),
             child: child,
@@ -441,6 +482,10 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
   }
 
   Future<void> _pickApps() async {
+    if (widget.localOptions != null) {
+      BotToast.showText(text: '应用需要登录后使用');
+      return;
+    }
     final picked = await _showCapabilityPicker(
       title: '选择应用',
       subtitle: '选择需要装配到数字员工的客户端应用',
@@ -453,6 +498,10 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
   }
 
   Future<void> _pickKnowledgeBases() async {
+    if (widget.localOptions != null) {
+      BotToast.showText(text: '知识库需要登录后使用');
+      return;
+    }
     final picked = await _showCapabilityPicker(
       title: '选择知识库',
       subtitle: '选择数字员工回答时可参考的知识库',
@@ -496,10 +545,7 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
           _CapabilityOption(
             id: uuid,
             label: app.name.isNotEmpty ? app.name : uuid,
-            subtitle: _joinNonEmpty([
-              category.categoryName,
-              app.description
-            ]),
+            subtitle: _joinNonEmpty([category.categoryName, app.description]),
             iconUrl: app.icon,
             fallbackIcon: Icons.apps_rounded,
           ),
@@ -872,7 +918,9 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
           if (PlatformUtils.isDesktop || _executionLocus == 'local')
             _ExecutionChoice(
               label: '这台电脑',
-              subtitle: '处理本机文件、办公和编程',
+              subtitle: widget.localOptions == null
+                  ? '处理本机文件、办公和编程'
+                  : '使用已配置模型在本机保存对话',
               badge: '默认',
               icon: CupertinoIcons.desktopcomputer,
               selected: _executionLocus == 'local',
@@ -889,7 +937,8 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
             badge: AppConfig.cloudAgentCreationEnabled ? null : '暂未开放',
             icon: CupertinoIcons.cloud,
             selected: _executionLocus == 'cloud',
-            onTap: AppConfig.cloudAgentCreationEnabled
+            onTap: widget.localOptions == null &&
+                    AppConfig.cloudAgentCreationEnabled
                 ? () => setState(() {
                       _executionLocus = 'cloud';
                       _errorText = null;
@@ -928,7 +977,8 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
         UiSelect<String>(
           key: const ValueKey('local-engine-select'),
           value: _localEngine,
-          enabled: widget.initialDraft?.executionLocus != 'local' &&
+          enabled: (widget.localOptions != null ||
+                  widget.initialDraft?.executionLocus != 'local') &&
               PlatformUtils.isDesktop,
           options: [
             const UiSelectOption(value: 'dsh', label: 'DeepSeek Harness'),
@@ -943,9 +993,11 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
         ),
         const SizedBox(height: 6),
         Text(
-            widget.initialDraft?.executionLocus == 'local'
-                ? '创建后引擎固定，如需更换请创建新的数字员工。'
-                : '由这台电脑运行，模型和工作目录在对话中选择。',
+            widget.localOptions != null
+                ? '使用自己的 API Key 在本机执行，模型在对话中选择。文件修改和命令执行沿用本机权限审批。'
+                : widget.initialDraft?.executionLocus == 'local'
+                    ? '创建后引擎固定，如需更换请创建新的数字员工。'
+                    : '由这台电脑运行，模型和工作目录在对话中选择。',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ],
@@ -961,10 +1013,7 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
               : null,
           builder: (field) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildCloudRuntime(),
-              UiFormError(field.errorText)
-            ],
+            children: [_buildCloudRuntime(), UiFormError(field.errorText)],
           ),
         ),
       ],
@@ -1098,9 +1147,7 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
           ),
         ),
         if (_errorText != null) ...[
-          _buildErrorBanner(
-            horizontalPadding: _dialogHorizontalPadding
-          ),
+          _buildErrorBanner(horizontalPadding: _dialogHorizontalPadding),
           const SizedBox(height: 12),
         ],
         Flexible(
@@ -1153,10 +1200,7 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
                   const Expanded(
                     child: Text(
                       '* 为必填项',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF667085)
-                      ),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF667085)),
                     ),
                   ),
                   SizedBox(
@@ -1356,10 +1400,7 @@ class _AvatarProfileCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _UploadAvatarButton(
-                uploading: uploading,
-                onTap: onTap
-              ),
+              _UploadAvatarButton(uploading: uploading, onTap: onTap),
               const SizedBox(height: 8),
               _UseDefaultAvatarButton(onTap: onUseDefault),
             ],
@@ -1371,10 +1412,7 @@ class _AvatarProfileCard extends StatelessWidget {
 }
 
 class _UploadAvatarButton extends StatelessWidget {
-  const _UploadAvatarButton({
-    required this.uploading,
-    required this.onTap
-  });
+  const _UploadAvatarButton({required this.uploading, required this.onTap});
 
   final bool uploading;
   final VoidCallback onTap;
@@ -1580,10 +1618,7 @@ class _SkillChip extends StatelessWidget {
 
 /// 主操作按钮：满宽蓝色渐变（#4080FF → #165DFF），白字加粗。
 class _PrimaryGradientButton extends StatefulWidget {
-  const _PrimaryGradientButton({
-    required this.label,
-    required this.onPressed
-  });
+  const _PrimaryGradientButton({required this.label, required this.onPressed});
 
   final String label;
   final VoidCallback onPressed;
@@ -1641,10 +1676,7 @@ class _PrimaryGradientButtonState extends State<_PrimaryGradientButton> {
 }
 
 class _SecondaryOutlineButton extends StatelessWidget {
-  const _SecondaryOutlineButton({
-    required this.label,
-    required this.onPressed
-  });
+  const _SecondaryOutlineButton({required this.label, required this.onPressed});
 
   final String label;
   final VoidCallback onPressed;
@@ -2071,11 +2103,7 @@ class _CapabilityOptionIcon extends StatelessWidget {
                 color: const Color(0xFF1769FF),
               ),
             )
-          : Icon(
-              option.fallbackIcon,
-              size: 24,
-              color: const Color(0xFF1769FF)
-            ),
+          : Icon(option.fallbackIcon, size: 24, color: const Color(0xFF1769FF)),
     );
   }
 }
@@ -2236,19 +2264,14 @@ class _AvatarUploadPanelState extends State<_AvatarUploadPanel> {
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
-                    colors: [
-                      Color(0x33165DFF),
-                      Color(0x00165DFF)
-                    ],
+                    colors: [Color(0x33165DFF), Color(0x00165DFF)],
                     stops: [0.4, 1],
                   ),
                 ),
               ),
               CustomPaint(
                 size: const Size(86, 86),
-                painter: _DashedCirclePainter(
-                  color: const Color(0xFFB7CCFF)
-                ),
+                painter: _DashedCirclePainter(color: const Color(0xFFB7CCFF)),
               ),
               Container(
                 width: 72,
@@ -2272,11 +2295,7 @@ class _AvatarUploadPanelState extends State<_AvatarUploadPanel> {
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.add,
-                    size: 11,
-                    color: Colors.white
-                  ),
+                  child: const Icon(Icons.add, size: 11, color: Colors.white),
                 ),
               ),
               if (widget.uploading)
@@ -2389,95 +2408,97 @@ class _ExecutionChoice extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final enabled = onTap != null;
     return Semantics(
-        selected: selected,
-        enabled: enabled,
-        button: true,
-        child: Material(
-          color: !enabled
-              ? UiFieldStyle.disabledFillColor(scheme)
-              : selected
-                  ? scheme.primaryContainer.withValues(alpha: .22)
-                  : scheme.surface,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(
-                  color: !enabled
-                      ? UiFieldStyle.disabledBorderColor(scheme)
-                      : selected
-                          ? scheme.primary
-                          : UiFieldStyle.enabledBorderColor(scheme))),
-          child: InkWell(
-            onTap: onTap,
-            canRequestFocus: enabled,
+      selected: selected,
+      enabled: enabled,
+      button: true,
+      child: Material(
+        color: !enabled
+            ? UiFieldStyle.disabledFillColor(scheme)
+            : selected
+                ? scheme.primaryContainer.withValues(alpha: .22)
+                : scheme.surface,
+        shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(children: [
-                  Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                          color: selected && enabled
-                              ? scheme.primary.withValues(alpha: .06)
-                              : null,
-                          shape: BoxShape.circle),
-                      child: Icon(icon,
-                          size: 28,
-                          color: enabled
-                              ? scheme.primary
-                              : scheme.onSurfaceVariant)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                        Wrap(
-                            spacing: 6,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              Text(label,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: onTap == null
-                                          ? scheme.onSurfaceVariant
-                                          : scheme.onSurface)),
-                              if (badge != null)
-                                Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 5, vertical: 1),
-                                    decoration: BoxDecoration(
-                                        color: enabled
-                                            ? scheme.primaryContainer
-                                            : UiFieldStyle.disabledFillColor(
-                                                scheme),
-                                        borderRadius: BorderRadius.circular(4)),
-                                    child: Text(badge!,
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            color: enabled
-                                                ? scheme.onPrimaryContainer
-                                                : scheme.onSurfaceVariant))),
-                            ]),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 5),
-                          Text(subtitle!,
-                              style: TextStyle(
-                                  fontSize: 12, color: scheme.onSurfaceVariant))
-                        ],
-                      ])),
-                  ...[
-                    const SizedBox(width: 8),
-                    Icon(
-                        selected
-                            ? CupertinoIcons.largecircle_fill_circle
-                            : CupertinoIcons.circle,
-                        size: 18,
+            side: BorderSide(
+                color: !enabled
+                    ? UiFieldStyle.disabledBorderColor(scheme)
+                    : selected
+                        ? scheme.primary
+                        : UiFieldStyle.enabledBorderColor(scheme))),
+        child: InkWell(
+          onTap: onTap,
+          canRequestFocus: enabled,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
                         color: selected && enabled
+                            ? scheme.primary.withValues(alpha: .06)
+                            : null,
+                        shape: BoxShape.circle),
+                    child: Icon(icon,
+                        size: 28,
+                        color: enabled
                             ? scheme.primary
-                            : scheme.outlineVariant)
-                  ],
-                ],),
+                            : scheme.onSurfaceVariant)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                      Wrap(
+                          spacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(label,
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: onTap == null
+                                        ? scheme.onSurfaceVariant
+                                        : scheme.onSurface)),
+                            if (badge != null)
+                              Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                      color: enabled
+                                          ? scheme.primaryContainer
+                                          : UiFieldStyle.disabledFillColor(
+                                              scheme),
+                                      borderRadius: BorderRadius.circular(4)),
+                                  child: Text(badge!,
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          color: enabled
+                                              ? scheme.onPrimaryContainer
+                                              : scheme.onSurfaceVariant))),
+                          ]),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 5),
+                        Text(subtitle!,
+                            style: TextStyle(
+                                fontSize: 12, color: scheme.onSurfaceVariant))
+                      ],
+                    ])),
+                ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                      selected
+                          ? CupertinoIcons.largecircle_fill_circle
+                          : CupertinoIcons.circle,
+                      size: 18,
+                      color: selected && enabled
+                          ? scheme.primary
+                          : scheme.outlineVariant)
+                ],
+              ],
+            ),
           ),
         ),
       ),

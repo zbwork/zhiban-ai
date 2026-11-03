@@ -1,3 +1,4 @@
+import '../../../config/app_config.dart';
 import 'package:zhiban_client/services/session_service.dart';
 import 'dart:convert';
 import 'package:bot_toast/bot_toast.dart';
@@ -10,6 +11,8 @@ import '../models/ai_model_config.dart';
 import '../models/ai_provider_config.dart';
 import '../models/catalog_entry.dart';
 import '../services/model_catalog_loader.dart';
+import '../services/model_modality_classifier.dart';
+import '../services/provider_model_fetcher.dart';
 import '../services/model_service_store.dart';
 
 const _uuid = Uuid();
@@ -17,6 +20,9 @@ const _uuid = Uuid();
 final modelServiceStoreProvider = Provider<ModelServiceStore>((ref) {
   return const ModelServiceStore();
 });
+final providerModelFetcherProvider = Provider<ProviderModelFetcher>(
+  (ref) => const ProviderModelFetcher(),
+);
 
 /// 内置模型目录（厂商/模型数据 + Logo），只读一次加载，见
 /// assets/model_catalog/SOURCE.md 了解数据来源。
@@ -108,7 +114,7 @@ class ModelProvidersNotifier extends AsyncNotifier<List<AiProviderConfig>> {
   Future<void> _publishConfiguration(
       List<AiProviderConfig> changes, String? token) async {
     try {
-      if (token == null || !ref.mounted) return;
+      if (AppConfig.communityEdition || token == null || !ref.mounted) return;
       await ConversationModelSources().sync(
           publishLocalConfiguration: true,
           changes: changes,
@@ -222,9 +228,7 @@ class ModelProvidersNotifier extends AsyncNotifier<List<AiProviderConfig>> {
 
   Future<void> updateProvider(AiProviderConfig updated) async {
     final current = state.value ?? const <AiProviderConfig>[];
-    await _persist([
-      for (final p in current) p.id == updated.id ? updated : p
-    ]);
+    await _persist([for (final p in current) p.id == updated.id ? updated : p]);
   }
 
   /// 未启用->启用这一跳变会把它挪到列表最前面（[ProviderOrderNotifier.
@@ -300,8 +304,8 @@ class ModelProvidersNotifier extends AsyncNotifier<List<AiProviderConfig>> {
     await _persist([
       for (final p in current)
         if (p.id == providerId)
-          p.copyWith(models: [
-            for (final m in p.models) m.id == model.id ? model : m],
+          p.copyWith(
+            models: [for (final m in p.models) m.id == model.id ? model : m],
           )
         else
           p,
@@ -313,9 +317,7 @@ class ModelProvidersNotifier extends AsyncNotifier<List<AiProviderConfig>> {
     await _persist([
       for (final p in current)
         if (p.id == providerId)
-          p.copyWith(
-            models: p.models.where((m) => m.id != modelId).toList()
-          )
+          p.copyWith(models: p.models.where((m) => m.id != modelId).toList())
         else
           p,
     ]);
@@ -324,6 +326,66 @@ class ModelProvidersNotifier extends AsyncNotifier<List<AiProviderConfig>> {
   Future<void> setApiKey(String providerId, String apiKey) async {
     final token = await const SessionService().getToken();
     await _store.setApiKey(providerId, apiKey);
+    if (AppConfig.communityEdition && apiKey.trim().isNotEmpty) {
+      final providers = state.value ?? const <AiProviderConfig>[];
+      final catalog = await ref.read(modelCatalogProvider.future);
+      for (final provider in providers.where((p) => p.id == providerId)) {
+        var models = [...provider.models];
+        bool isText(AiModelConfig m) =>
+            classifyModelId(m.modelId) == ModelModality.text;
+        final defaults = catalog
+            .modelsFor(provider.catalogId ?? '')
+            .where((m) => classifyModelId(m.modelId) == ModelModality.text);
+        if (!models.any(isText) && defaults.isNotEmpty) {
+          models.add(AiModelConfig(
+              id: _uuid.v4(),
+              modelId: defaults.first.modelId,
+              displayName: defaults.first.displayName));
+        }
+        final firstText = models.where(isText).firstOrNull;
+        if (firstText != null && !models.any((m) => isText(m) && m.enabled)) {
+          models = [
+            for (final m in models)
+              m.id == firstText.id ? m.copyWith(enabled: true) : m
+          ];
+        }
+        // Saving a key enables the provider immediately. Optional discovery
+        // must not turn a successful credential write into a save failure.
+        await updateProvider(provider.copyWith(enabled: true, models: models));
+        if (!models.any(isText)) {
+          ProviderModelFetchResult discovered;
+          try {
+            discovered = await ref.read(providerModelFetcherProvider).fetch(
+                endpointType: catalog.endpointTypeFor(provider),
+                baseUrl: provider.baseUrl,
+                apiKey: apiKey,
+                customHeaders: provider.customHeaders,
+                catalogId: provider.catalogId);
+          } catch (_) {
+            discovered = const ProviderModelFetchResult.fail('获取模型列表失败');
+          }
+          if (!ref.mounted) return;
+          final textModels = discovered.models
+              .where((m) => classifyModelId(m.modelId) == ModelModality.text);
+          if (textModels.isNotEmpty) {
+            final model = textModels.first;
+            final current = (state.value ?? const <AiProviderConfig>[])
+                .where((p) => p.id == providerId)
+                .firstOrNull;
+            if (current == null || current.baseUrl != provider.baseUrl) return;
+            await updateProvider(current.copyWith(models: [
+              ...current.models,
+              AiModelConfig(
+                  id: _uuid.v4(),
+                  modelId: model.modelId,
+                  displayName: model.displayName),
+            ]));
+            continue;
+          }
+          BotToast.showText(text: '密钥已保存，服务商已启用；未发现聊天模型，请获取模型列表或手动添加');
+        }
+      }
+    }
     await _publishConfiguration(
         (state.value ?? const <AiProviderConfig>[])
             .where((p) => p.id == providerId)

@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:zhiban_client/config/app_config.dart';
 
 import 'package:zhiban_client/pages/local_coding_tools/models/local_coding_models.dart';
 
@@ -365,6 +366,7 @@ class MacOSLocalCodingBridgeSignatureVerifier
     implements LocalCodingBridgeSignatureVerifier {
   const MacOSLocalCodingBridgeSignatureVerifier({
     this.timeout = const Duration(seconds: 5),
+    this.requireDistribution = false,
   });
 
   static const bool _allowUnsignedDebug = bool.fromEnvironment(
@@ -374,14 +376,24 @@ class MacOSLocalCodingBridgeSignatureVerifier
 
   final Duration timeout;
 
+  /// May only strengthen verification; Release always requires distribution.
+  final bool requireDistribution;
+
   @override
   Future<void> verify(String executablePath) async {
     if (!kReleaseMode && _allowUnsignedDebug) return;
-    const requirement = '=anchor apple generic and '
+    const distributionRequirement = '=anchor apple generic and '
         'certificate 1[field.1.2.840.113635.100.6.2.6] exists and '
         'certificate leaf[field.1.2.840.113635.100.6.1.13] exists and '
         'certificate leaf[subject.OU] = "$_developerTeamId" and '
         'identifier "$_helperIdentifier"';
+    // Community development embeds an ad-hoc signed helper. Check its sealed
+    // contents and fixed identity instead of requiring a commercial certificate.
+    // Release builds continue to require the distribution trust chain.
+    final requirement =
+        !kReleaseMode && AppConfig.communityEdition && !requireDistribution
+            ? '=identifier "$_helperIdentifier"'
+            : distributionRequirement;
     final helperBundlePath = _helperBundlePath(executablePath);
     await _runCodesign(
       ['--verify', '--strict', helperBundlePath]

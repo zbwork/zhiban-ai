@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -35,7 +36,18 @@ Future<void> showSkillInstallAgentDialog(
 }
 
 class SkillInstallAgentDialog extends ConsumerStatefulWidget {
-  const SkillInstallAgentDialog({super.key, required this.skill});
+  const SkillInstallAgentDialog(
+      {super.key,
+      required this.skill,
+      this.localAgents,
+      this.onLocalAdd,
+      this.localPackageHealthy = true,
+      this.onLocalUse});
+  final bool localPackageHealthy;
+
+  final List<AgentItem>? localAgents;
+  final Future<void> Function(AgentItem)? onLocalAdd;
+  final Future<void> Function(AgentItem)? onLocalUse;
 
   final Skill skill;
 
@@ -54,13 +66,16 @@ class _SkillInstallAgentDialogState
 
   bool _isInstalled(AgentItem agent) {
     if (_installedAgentIds.contains(agent.agentId)) return true;
+    if (widget.localAgents != null && !widget.localPackageHealthy) return false;
     return agent.skills
         .any((s) => s.slug == widget.skill.slug && s.isInstalled);
   }
 
   @override
   Widget build(BuildContext context) {
-    final agentsAsync = ref.watch(agentsProvider);
+    final agentsAsync = widget.localAgents == null
+        ? ref.watch(agentsProvider)
+        : AsyncData(widget.localAgents!);
 
     return UiPickerDialog(
       size: UiDialogSize.standard,
@@ -98,6 +113,8 @@ class _SkillInstallAgentDialogState
                       agent: agent,
                       installed: _isInstalled(agent),
                       busy: _busyAgentIds.contains(agent.agentId),
+                      repair: widget.localAgents != null &&
+                          !widget.localPackageHealthy,
                       onAdd: () => _addToAgent(agent),
                       onUse: () => _useWithAgent(agent),
                     );
@@ -153,7 +170,11 @@ class _SkillInstallAgentDialogState
     try {
       final slugs = installedSkillSlugs(agent);
       if (!slugs.contains(skill.slug)) slugs.add(skill.slug);
-      await replaceAgentSkillsAndSync(ref, agent: agent, slugs: slugs);
+      if (widget.localAgents != null) {
+        await widget.onLocalAdd!(agent);
+      } else {
+        await replaceAgentSkillsAndSync(ref, agent: agent, slugs: slugs);
+      }
       if (!mounted) return;
       setState(() {
         _busyAgentIds.remove(agent.agentId);
@@ -169,6 +190,12 @@ class _SkillInstallAgentDialogState
 
   Future<void> _useWithAgent(AgentItem agent) async {
     if (_busyAgentIds.contains(agent.agentId)) return;
+    if (widget.localAgents != null) {
+      Navigator.of(context, rootNavigator: true)
+          .popUntil((route) => route.isFirst);
+      await widget.onLocalUse!(agent);
+      return;
+    }
     setState(() => _busyAgentIds.add(agent.agentId));
     try {
       await openAgentDirectConversation(ref, agent: agent);
@@ -203,11 +230,7 @@ class _InstallTargetEmpty extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              CupertinoIcons.person_2,
-              size: 34,
-              color: Color(0xFFB8BDC6)
-            ),
+            Icon(CupertinoIcons.person_2, size: 34, color: Color(0xFFB8BDC6)),
             SizedBox(height: 12),
             Text(
               '暂无可添加技能的数字员工',
@@ -241,10 +264,12 @@ class _InstallTargetTile extends StatelessWidget {
     required this.busy,
     required this.onAdd,
     required this.onUse,
+    this.repair = false,
   });
 
   final AgentItem agent;
   final bool installed;
+  final bool repair;
   final bool busy;
   final VoidCallback onAdd;
   final VoidCallback onUse;
@@ -339,7 +364,7 @@ class _InstallTargetTile extends StatelessWidget {
                 ),
               ),
               onPressed: onAdd,
-              child: const Text('添加'),
+              child: Text(repair ? '重新安装' : '添加'),
             ),
         ],
       ),
@@ -369,6 +394,17 @@ class _AgentAvatar extends StatelessWidget {
           size: 20,
           color: Color(0xFF3D6AD6),
         ),
+      );
+    }
+    if (avatarUrl.startsWith('file:')) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(size / 2),
+        child: Image.file(File.fromUri(Uri.parse(avatarUrl)),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                const Icon(CupertinoIcons.person_fill, size: size)),
       );
     }
     return ClipRRect(

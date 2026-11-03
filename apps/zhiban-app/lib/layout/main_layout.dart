@@ -9,27 +9,35 @@ import 'package:zhiban_client/layout/session_layout.dart';
 import 'widgets/desktop_sidebar.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
-  const MainLayout({super.key, required this.child});
+  const MainLayout(
+      {super.key, required this.child, this.localWorkspace = false});
   final Widget child;
+  final bool localWorkspace;
   @override
   ConsumerState<MainLayout> createState() => _MainLayoutState();
 }
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
   @override
-  Widget build(BuildContext context) =>
-      SessionLayout(builder: (context, unreadCount) {
-        _syncChatRouteActive(context);
-        return Scaffold(
-            body: Row(children: [
-          DesktopSidebar(
-              navItems: mainNavItems
-                  .where((item) => item.path != RoutePaths.settings)
-                  .toList(),
-              chatUnreadCount: unreadCount),
-          Expanded(child: widget.child),
-        ]));
-      });
+  Widget build(BuildContext context) {
+    if (widget.localWorkspace) return _shell(0);
+    return SessionLayout(builder: (context, unreadCount) {
+      _syncChatRouteActive(context);
+      return _shell(unreadCount);
+    });
+  }
+
+  Widget _shell(int unreadCount) => Scaffold(
+          body: Row(children: [
+        DesktopSidebar(
+          localWorkspace: widget.localWorkspace,
+          navItems: mainNavItems
+              .where((item) => item.path != RoutePaths.settings)
+              .toList(),
+          chatUnreadCount: unreadCount,
+        ),
+        Expanded(child: widget.child),
+      ]));
 
   /// 按当前路由是否落在 /chat 子树上，同步 [isChatRouteActiveProvider]。
   /// 不能直接在 build() 里写 provider（Riverpod 不允许 build 期间改状态），

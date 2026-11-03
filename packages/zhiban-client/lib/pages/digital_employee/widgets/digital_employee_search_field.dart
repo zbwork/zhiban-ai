@@ -12,11 +12,13 @@ class DigitalEmployeeSearchField extends ConsumerStatefulWidget {
     this.controller,
     this.focusNode,
     this.mobile = false,
+    this.onLocalChanged,
   });
 
   final TextEditingController? controller;
   final FocusNode? focusNode;
   final bool mobile;
+  final ValueChanged<String>? onLocalChanged;
 
   @override
   ConsumerState<DigitalEmployeeSearchField> createState() =>
@@ -48,7 +50,11 @@ class _DigitalEmployeeSearchFieldState
         _debounce?.cancel();
         _debounce = Timer(const Duration(milliseconds: 300), () {
           if (!mounted) return;
-          ref.read(digitalEmployeeSearchProvider.notifier).setKeyword(value);
+          if (widget.onLocalChanged != null) {
+            widget.onLocalChanged!(value);
+          } else {
+            ref.read(digitalEmployeeSearchProvider.notifier).setKeyword(value);
+          }
         });
       },
     );

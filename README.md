@@ -10,6 +10,14 @@
 
 [快速开始](docs/INSTALL.md) · [反馈问题](https://github.com/zbwork/zhiban-ai/issues) · [参与贡献](CONTRIBUTING.md) · [官网](https://www.zbwork.cn/)
 
+## 社区版桌面：免登录本地使用
+
+启动客户端即可进入本地工作区，无需账号或部署后端。在「模型服务」按现有服务商顺序选择服务商，填写自己的 API Key，内置目录会自动启用一个文本模型；自定义服务商需填写地址和模型。随后新建数字员工，配置角色和技能即可聊天。
+
+员工、会话、消息和技能目录保存在本机 SQLite，API Key 以明文保存在本机私有配置文件。技能广场随客户端包含 149 项：原平台 144 项目录介绍，以及可直接使用的 5 项文本技能（写作、总结、翻译、代码审查与计划）。只有目录、尚无执行包的项目标记“需技能包”，暂不能添加。模型推理仍需连接你选择的服务商。按产品要求，未登录时自动任务不可使用。具体边界见[本地工作区契约](docs/requirements/local-workspace.md)。
+
+以下服务端部署及协作能力说明供集成开发参考，不是本地桌面的启动前提。
+
 ## 为什么做知办AI
 
 和 AI 聊天只是开始。团队还需要知道：谁可以使用哪个数字员工、对话与文件放在哪里，以及如何把自己的 Agent 接进来。知办AI 将这些协作要素放在一起，帮助开发者和团队搭建自己的 AI 工作空间。
@@ -23,7 +31,7 @@
 
 ### Codex 与 Claude Code 一键安装
 
-在「本地开发工具」中安装、检测和配置 Codex、Claude。点击各工具的「API 设置」，填写自己的 API 地址、模型名称和 API Key，再应用配置并检测连接。API Key 仅保存在本机安全凭据库。Codex 需使用支持 OpenAI Responses 的服务，Claude 需使用支持 Anthropic Messages 的服务。
+在「本地开发工具」中安装、检测和配置 Codex、Claude。点击各工具的「API 设置」，填写自己的 API 地址、模型名称和 API Key，再应用配置并检测连接。API Key 以明文保存在本机私有配置文件。Codex 需使用支持 OpenAI Responses 的服务，Claude 需使用支持 Anthropic Messages 的服务。
 
 ![本地开发工具：Codex 安装状态与工具入口](docs/images/screenshots/local-dev-tools.png)
 

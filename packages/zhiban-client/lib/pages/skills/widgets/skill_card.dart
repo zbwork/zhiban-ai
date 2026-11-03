@@ -14,6 +14,7 @@ class SkillCard extends StatefulWidget {
     required this.skill,
     required this.onTap,
     this.onAdd,
+    this.addLabel = '添加',
     this.categoryName,
     super.key,
   });
@@ -23,6 +24,7 @@ class SkillCard extends StatefulWidget {
 
   /// 非空时底行右侧展示「添加」直达按钮（F03 §1.5.4 技能广场闭环）。
   final VoidCallback? onAdd;
+  final String addLabel;
 
   /// 技能所属分类名（由列表侧按 categoryId 解析传入），空则不展示分类标签。
   final String? categoryName;
@@ -37,8 +39,7 @@ class _SkillCardState extends State<SkillCard> {
   @override
   Widget build(BuildContext context) {
     final skill = widget.skill;
-    final description =
-        skill.description.isEmpty ? '暂无描述' : skill.description;
+    final description = skill.description.isEmpty ? '暂无描述' : skill.description;
     final example = _exampleOneliner(skill.usageExample);
 
     return MouseRegion(
@@ -110,8 +111,7 @@ class _SkillCardState extends State<SkillCard> {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                if ((widget.categoryName ?? '')
-                                    .isNotEmpty) ...[
+                                if ((widget.categoryName ?? '').isNotEmpty) ...[
                                   _SkillTagPill(label: widget.categoryName!),
                                   const SizedBox(width: 6),
                                 ],
@@ -164,6 +164,7 @@ class _SkillCardState extends State<SkillCard> {
                         _SkillAddButton(
                           // 付费技能用实心主按钮突出（点击仍走付费确认 + 添加，
                           // EasyO 无按技能买断，不用「购买」文案）。
+                          label: widget.addLabel,
                           filled: skill.isPaid,
                           onPressed: widget.onAdd!,
                         ),
@@ -252,10 +253,12 @@ class _SkillTagPill extends StatelessWidget {
 }
 
 class _SkillAddButton extends StatelessWidget {
-  const _SkillAddButton({required this.onPressed, this.filled = false});
+  const _SkillAddButton(
+      {required this.onPressed, this.filled = false, this.label = '添加'});
 
   final VoidCallback onPressed;
   final bool filled;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -276,7 +279,7 @@ class _SkillAddButton extends StatelessWidget {
           textStyle: textStyle,
         ),
         onPressed: onPressed,
-        child: const Text('添加'),
+        child: Text(label),
       );
     }
     return OutlinedButton(
@@ -291,7 +294,7 @@ class _SkillAddButton extends StatelessWidget {
         textStyle: textStyle,
       ),
       onPressed: onPressed,
-      child: const Text('添加'),
+      child: Text(label),
     );
   }
 }

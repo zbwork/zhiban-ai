@@ -1,3 +1,4 @@
+import 'package:zhiban_core/chat/chat_models.dart';
 import 'package:zhiban_client/pages/chat/providers/chat_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -14,9 +15,11 @@ class ChatDetailHeader extends ConsumerWidget {
     required this.title,
     this.agentDeleted = false,
     this.trailing,
+    this.localAgent,
   });
 
   final String title;
+  final AgentItem? localAgent;
   final bool agentDeleted;
 
   /// 顶栏右侧挂载点,由调用方决定放什么(如"加人"按钮);组件本身不感知具体业务。
@@ -24,7 +27,7 @@ class ChatDetailHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final agent = ref.watch(selectedAgentOrFallbackProvider);
+    final agent = localAgent ?? ref.watch(selectedAgentOrFallbackProvider);
     final agentName = agent?.name.isNotEmpty == true ? agent!.name : title;
     // 产品要求: 客户端去掉「在线」绿点; 副标题展示「部门 · 职位」, 两者按需出现。
     final dept = agent?.departmentName.trim() ?? '';

@@ -20,7 +20,7 @@ const messages: Record<string, string> = {
   'billing.model_access_recovering': '积分已到账，正在恢复模型使用权限，请稍后重试',
   'billing.insufficient_credits': '积分不足，请先购买积分包或升级套餐后再试',
 };
-export interface ModelFailure { code: string; message: string }
+export interface ModelFailure { code: string; message: string; transientRequestRejection?: true }
 export function modelFailure(code: string, status = 0): ModelFailure {
   const safeCode = Object.hasOwn(messages, code) ? code : 'model.upstream_failure';
   const suffix = Number.isInteger(status) && status >= 400 && status <= 599 && safeCode.startsWith('model.') ? `（HTTP ${status}）` : '';
@@ -28,7 +28,7 @@ export function modelFailure(code: string, status = 0): ModelFailure {
 }
 
 /** Read only a bounded Bus error envelope; discard all detail except the stable code. */
-export async function readModelFailure(response: Response, signal: AbortSignal): Promise<ModelFailure> {
+export async function readModelFailure(response: Response, signal: AbortSignal, source: 'bus' | 'provider' = 'bus'): Promise<ModelFailure> {
   const reader = response.body?.getReader();
   let raw = '';
   if (reader) {
@@ -48,13 +48,31 @@ export async function readModelFailure(response: Response, signal: AbortSignal):
     finally { clearTimeout(timer); signal.removeEventListener('abort', cancel); await reader.cancel().catch(() => {}); reader.releaseLock(); }
   }
   let code = 'model.upstream_failure';
+  let transientRequestRejection = false;
+  if (source === 'provider') {
+    code = ({ 400: 'model.request_invalid', 401: 'model.authentication_failed', 403: 'model.authentication_failed', 404: 'model.unavailable', 408: 'model.timeout', 422: 'model.request_invalid', 429: 'model.rate_limited', 504: 'model.timeout' } as Record<number, string>)[response.status] ?? code;
+  }
   try {
     const data: unknown = JSON.parse(raw);
-    if (data && typeof data === 'object' && 'message' in data && typeof data.message === 'string') {
+    if (source === 'provider' && data && typeof data === 'object' && 'error' in data && data.error && typeof data.error === 'object') {
+      const error = data.error as Record<string, unknown>;
+      transientRequestRejection = response.status === 400 && error['code'] === 'bad_response_status_code' &&
+        ['Request body format invalid', 'WorkBuddy AI: invalid function call parameters'].includes(String(error['message']));
+      // Only classify known fields in memory; never propagate provider text.
+      const detail = ['code', 'type', 'param', 'message'].map(key => typeof error[key] === 'string' ? error[key] : '').join(' ').toLowerCase();
+      if ([400, 422].includes(response.status)) {
+        if (/context_length|context window|maximum context/.test(detail)) code = 'model.context_limit';
+        else if (/function call parameters|tools|tool_choice|function.parameters/.test(detail)) code = 'model.tools_invalid';
+        else if (/max_tokens|max_completion_tokens/.test(detail)) code = 'model.token_limit';
+        else if (/temperature/.test(detail)) code = 'model.temperature_invalid';
+      }
+      if ([402, 429].includes(response.status) && /insufficient_quota|insufficient_balance|credit balance|quota exceeded/.test(detail)) code = 'model.upstream_quota';
+    } else if (source === 'bus' && data && typeof data === 'object' && 'message' in data && typeof data.message === 'string') {
       const candidate = data.message.split(':', 1)[0]!.trim();
       if (Object.hasOwn(messages, candidate)) code = candidate;
     }
   } catch { /* Non-JSON errors are not user-facing. */ }
-  const status = response.headers.get('x-local-model-upstream-status') ?? '';
-  return modelFailure(code, /^[45][0-9]{2}$/.test(status) ? Number(status) : 0);
+  const status = source === 'provider' ? String(response.status) : response.headers.get('x-local-model-upstream-status') ?? '';
+  return { ...modelFailure(code, /^[45][0-9]{2}$/.test(status) ? Number(status) : 0),
+    ...(transientRequestRejection ? { transientRequestRejection: true as const } : {}) };
 }

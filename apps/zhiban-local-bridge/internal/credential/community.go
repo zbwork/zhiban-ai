@@ -8,6 +8,8 @@ import (
 	"errors"
 	"net"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"unicode"
 )
@@ -34,11 +36,11 @@ type BYOKInfo struct {
 type CommunityManager struct{ backend secureItemBackend }
 
 func NewCommunityManager() (*CommunityManager, error) {
-	store, ok := NewSystemCredentialStore().(*keychainStore)
-	if !ok {
-		return nil, ErrKeychainUnavailable
+	root, err := os.UserConfigDir()
+	if err != nil {
+		return nil, err
 	}
-	return &CommunityManager{backend: store.backend}, nil
+	return &CommunityManager{backend: &communityFileBackend{root: filepath.Join(root, "cn.qkfintech.zhiban", "community-credentials", "tools")}}, nil
 }
 func byokTarget(target string) (string, error) {
 	target = ScopeTarget(target)
@@ -105,6 +107,9 @@ func (m *CommunityManager) Settings(ctx context.Context, v BYOKSettings) (BYOKIn
 		if v.APIKey == "" {
 			old, e := m.load(ctx, target)
 			if e == nil {
+				if v.BaseURL != old.BaseURL {
+					return BYOKInfo{}, ErrInvalidData
+				}
 				v.APIKey = old.APIKey
 			} else if !errors.Is(e, ErrNotFound) {
 				return BYOKInfo{}, ErrKeychainUnavailable

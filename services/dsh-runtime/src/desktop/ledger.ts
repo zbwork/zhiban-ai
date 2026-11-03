@@ -55,7 +55,7 @@ export function assertTask(task: LocalTask): void {
     if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw new LocalError('local.invalid_identity');
   }
   if (!['desktop', 'mobile'].includes(task.source) || !Number.isSafeInteger(task.fence) || task.fence <= 0 || !Number.isSafeInteger(task.expiresAt)) throw new LocalError('local.invalid_task');
-  if (!task.model || task.model.length > 1024 || !task.message || task.message.length > 100_000) throw new LocalError('local.invalid_task');
+  if (!task.model || task.model.length > 1024 || !task.message || task.message.length > 150_000) throw new LocalError('local.invalid_task');
   if (task.engine !== undefined && !['dsh', 'codex_app_server'].includes(task.engine)) throw new LocalError('local.invalid_task');
 }
 

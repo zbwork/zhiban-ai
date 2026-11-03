@@ -44,6 +44,7 @@ class ChatMessageList extends StatefulWidget {
     this.onHighlightConsumed,
     this.respondHandler,
     this.skillIconUrls = const {},
+    this.autoScrollOnMessageUpdate = true,
   });
 
   final String? activeConversationId;
@@ -98,6 +99,7 @@ class ChatMessageList extends StatefulWidget {
   /// 由 [ChatSessionView] 透传自 chat_conversation_content (ref.read(chatProvider.notifier))。
   final EmpBlocksRespondHandler? respondHandler;
   final Map<String, String> skillIconUrls;
+  final bool autoScrollOnMessageUpdate;
 
   @override
   ChatMessageListState createState() => ChatMessageListState();
@@ -197,7 +199,11 @@ class ChatMessageListState extends State<ChatMessageList>
       // 有目标就 suppress 掉默认的 jumpToBottom、交给 _scheduleHighlight 主导；
       // 没目标再走 jumpToBottom 维持原语义。
       if (!_maybeScheduleHighlight()) {
-        _scheduleJumpToBottom();
+        if (!widget.autoScrollOnMessageUpdate && widget.isSending) {
+          _alignLatestQuestion();
+        } else {
+          _scheduleJumpToBottom();
+        }
       }
     });
   }
@@ -288,7 +294,8 @@ class ChatMessageListState extends State<ChatMessageList>
         oldWidget.messages.isNotEmpty &&
         widget.messages.isNotEmpty &&
         oldWidget.messages.last.content != widget.messages.last.content) {
-      final shouldFollow = _isInStreamFollowPhase(widget.messages.last) &&
+      final shouldFollow = widget.autoScrollOnMessageUpdate &&
+          _isInStreamFollowPhase(widget.messages.last) &&
           _streamAutoFollow &&
           (_streamFollowTicker.isActive || _isAtBottomNow());
       if (!shouldFollow) _stopStreamFollow();
@@ -323,6 +330,31 @@ class ChatMessageListState extends State<ChatMessageList>
     // _syncAfterMessageUpdate 在 oldCount==0 时也会跳底。_maybeScheduleHighlight
     // 里压 suppress=true 让它们让路。
     _maybeScheduleHighlight();
+    if (!widget.autoScrollOnMessageUpdate &&
+        widget.isSending &&
+        oldWidget.activeConversationId == widget.activeConversationId) {
+      final previous = oldWidget.messages
+          .where((m) => m.role == ChatRole.question).lastOrNull;
+      final current = widget.messages
+          .where((m) => m.role == ChatRole.question).lastOrNull;
+      if (current != null &&
+          (current.messageId ?? current.localId) !=
+              (previous?.messageId ?? previous?.localId)) {
+        _alignLatestQuestion();
+      }
+    }
+  }
+
+  void _alignLatestQuestion() {
+    final question = widget.messages
+        .where((m) => m.role == ChatRole.question).lastOrNull;
+    if (question == null) return;
+    _bottomScrollGeneration++;
+    _lastMessageMinHeight = null;
+    if (!_isListVisible) setState(() => _isListVisible = true);
+    _pendingAnchorUuid = 'local:${question.localId}';
+    _pendingAnchorAlignment = 0;
+    _applyPendingAnchor();
   }
 
   void _scheduleHighlight(String uuid) {
@@ -692,7 +724,8 @@ class ChatMessageListState extends State<ChatMessageList>
   }
 
   void _startStreamFollow() {
-    if (!_streamAutoFollow ||
+    if (!widget.autoScrollOnMessageUpdate ||
+        !_streamAutoFollow ||
         _suppressNextJumpToBottom ||
         _programmaticScrollInProgress) {
       return;
@@ -718,6 +751,7 @@ class ChatMessageListState extends State<ChatMessageList>
 
   void _onStreamFollowFrame(Duration _) {
     if (!mounted ||
+        !widget.autoScrollOnMessageUpdate ||
         !_streamAutoFollow ||
         _suppressNextJumpToBottom ||
         _programmaticScrollInProgress ||
@@ -754,6 +788,7 @@ class ChatMessageListState extends State<ChatMessageList>
   }
 
   void _smartScrollToBottom() {
+    if (!widget.autoScrollOnMessageUpdate) return;
     if (_suppressNextJumpToBottom || _olderRequest != null) return;
     if (!_showScrollToBottomButton) {
       final generation = _bottomScrollGeneration;
@@ -771,7 +806,8 @@ class ChatMessageListState extends State<ChatMessageList>
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
-    final followBottom = isNearBottom && _olderRequest == null;
+    final followBottom = widget.autoScrollOnMessageUpdate &&
+        isNearBottom && _olderRequest == null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (followBottom) scrollToBottom();
@@ -894,6 +930,7 @@ class ChatMessageListState extends State<ChatMessageList>
       add(item.userMessage?.messageId);
       add(item.assistantMessage?.uuid);
       add(item.assistantMessage?.messageId);
+      if (item.userMessage != null) add('local:${item.userMessage!.localId}');
     } else if (item is ChatSystemConversationItem) {
       add(item.messageId);
     }

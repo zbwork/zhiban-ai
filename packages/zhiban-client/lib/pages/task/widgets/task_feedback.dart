@@ -6,10 +6,16 @@ class TaskLoadError extends StatelessWidget {
   const TaskLoadError({
     required this.message,
     required this.onRetry,
+    this.title = '任务页面暂时不可用',
+    this.actionLabel = '重新加载',
+    this.icon = CupertinoIcons.exclamationmark_triangle_fill,
     super.key,
   });
 
   final String message;
+  final String title;
+  final String actionLabel;
+  final IconData icon;
   final VoidCallback onRetry;
 
   @override
@@ -22,14 +28,14 @@ class TaskLoadError extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                CupertinoIcons.exclamationmark_triangle_fill,
+              Icon(
+                icon,
                 size: 38,
                 color: Color(0xFFD92D20),
               ),
               const SizedBox(height: 14),
-              const Text(
-                '任务页面暂时不可用',
+              Text(
+                title,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -54,7 +60,7 @@ class TaskLoadError extends StatelessWidget {
                   ),
                 ),
                 onPressed: onRetry,
-                child: const Text('重新加载'),
+                child: Text(actionLabel),
               ),
             ],
           ),

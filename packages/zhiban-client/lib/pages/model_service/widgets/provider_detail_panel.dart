@@ -220,7 +220,16 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
       return;
     }
     setState(() => _loadingKey = true);
-    final key = await ref.read(modelProvidersProvider.notifier).readApiKey(id);
+    String? key;
+    try {
+      key = await ref.read(modelProvidersProvider.notifier).readApiKey(id);
+    } catch (_) {
+      if (mounted && revision == _keyLoadRevision) {
+        setState(() => _loadingKey = false);
+        BotToast.showText(text: '无法读取本地密钥，请检查应用目录权限后重试');
+      }
+      return;
+    }
     if (!mounted ||
         revision != _keyLoadRevision ||
         _localId != id ||
@@ -264,7 +273,12 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
     if (next == _lastSavedApiKey) return;
     final id = await _ensureLocalId();
     if (!mounted || revision != _keyLoadRevision) return;
-    await ref.read(modelProvidersProvider.notifier).setApiKey(id, next);
+    try {
+      await ref.read(modelProvidersProvider.notifier).setApiKey(id, next);
+    } catch (_) {
+      if (mounted) BotToast.showText(text: '密钥保存失败，请检查应用目录权限后重试');
+      return;
+    }
     if (!mounted || revision != _keyLoadRevision) return;
     _lastSavedApiKey = next;
     if (showConfirmation) BotToast.showText(text: 'API 密钥已保存');
@@ -532,9 +546,8 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
           hintText: '搜索模型...',
           enabled: hasModels,
-          onChanged: (value) => setState(
-            () => _modelQuery = value.trim().toLowerCase()
-          ),
+          onChanged: (value) =>
+              setState(() => _modelQuery = value.trim().toLowerCase()),
           onClear: () => setState(() => _modelSearchOpen = false),
         ),
       );
@@ -568,10 +581,7 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
     );
   }
 
-  Widget _buildModelFilterTabs(
-    ColorScheme scheme,
-    List<AiModelConfig> models
-  ) {
+  Widget _buildModelFilterTabs(ColorScheme scheme, List<AiModelConfig> models) {
     final counts = <ModelModality, int>{};
     for (final model in models) {
       final modality = classifyModelId(model.modelId);

@@ -1,3 +1,4 @@
+import 'package:zhiban_client/pages/skills/widgets/skills_tab_switcher.dart';
 import 'dart:async';
 
 import 'package:zhiban_client/config/color_config.dart';
@@ -14,10 +15,8 @@ import 'package:zhiban_client/pages/skills/widgets/skill_detail_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nexwork/widgets/page_header.dart';
-import 'package:zhiban_ui/zhiban_ui.dart';
 
 /// 技能广场页顶层视图：广场浏览 / 我的技能（F03 §1.5.4 闭环）。
-enum _SkillsTab { market, mine }
 
 class SkillsPage extends StatelessWidget {
   const SkillsPage({super.key});
@@ -53,7 +52,7 @@ class _SkillsPageBodyState extends ConsumerState<SkillsPageBody> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
-  _SkillsTab _tab = _SkillsTab.market;
+  SkillsTab _tab = SkillsTab.market;
 
   @override
   void initState() {
@@ -82,11 +81,11 @@ class _SkillsPageBodyState extends ConsumerState<SkillsPageBody> {
     });
   }
 
-  void _switchTab(_SkillsTab tab) {
+  void _switchTab(SkillsTab tab) {
     if (_tab == tab) return;
     setState(() => _tab = tab);
     widget.onSectionChanged?.call(
-      tab == _SkillsTab.mine ? '我的技能' : '技能广场',
+      tab == SkillsTab.mine ? '我的技能' : '技能广场',
     );
   }
 
@@ -95,17 +94,17 @@ class _SkillsPageBodyState extends ConsumerState<SkillsPageBody> {
     final asyncState = ref.watch(skillsProvider);
     final notifier = ref.read(skillsProvider.notifier);
     final compact = widget.compact;
-    final tabSwitcher = _SkillsTabSwitcher(
+    final tabSwitcher = SkillsTabSwitcher(
       tab: _tab,
       compact: compact,
       onChanged: _switchTab,
     );
 
-    return _tab == _SkillsTab.mine
+    return _tab == SkillsTab.mine
         ? _MySkillsTabBody(
             compact: compact,
             tabSwitcher: tabSwitcher,
-            onGoMarket: () => _switchTab(_SkillsTab.market),
+            onGoMarket: () => _switchTab(SkillsTab.market),
           )
         : asyncState.when(
             data: (state) => _SkillsPageBody(
@@ -268,38 +267,6 @@ class _SkillsPageBody extends StatelessWidget {
             onLoadMore: onLoadMore,
           ),
         ),
-      ],
-    );
-  }
-}
-
-/// 「技能广场 / 我的技能」分段切换（shadcn segmented 风格）。
-class _SkillsTabSwitcher extends StatelessWidget {
-  const _SkillsTabSwitcher({
-    required this.tab,
-    required this.compact,
-    required this.onChanged,
-  });
-
-  final _SkillsTab tab;
-  final bool compact;
-  final ValueChanged<_SkillsTab> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return UiSegmentedTabs<_SkillsTab>(
-      expand: compact,
-      trackColor: const Color(0xFFF2F4F7),
-      trackRadius: 10,
-      fontSize: 13,
-      activeColor: const Color(0xFF1D2129),
-      inactiveColor: const Color(0xFF667085),
-      segmentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      current: tab,
-      onChanged: onChanged,
-      tabs: const [
-        UiSegmentedTab(value: _SkillsTab.market, label: '技能广场'),
-        UiSegmentedTab(value: _SkillsTab.mine, label: '我的技能'),
       ],
     );
   }

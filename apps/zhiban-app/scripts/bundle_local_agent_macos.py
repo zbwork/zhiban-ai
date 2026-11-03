@@ -84,11 +84,11 @@ def bundle_arch(arch, destination, package=PACKAGE):
     env = {**os.environ, "PATH": str(node.parent) + ":/usr/bin:/bin:/usr/sbin:/sbin"}
     lock = digest(package / "package-lock.json")
     dependencies = cache / ("dependencies-" + lock[:20])
-    if not (dependencies / ".complete").exists():
+    if not (dependencies / ".complete").exists() or not (dependencies / "node_modules/typescript/bin/tsc").is_file():
         dependencies.mkdir(exist_ok=True)
         for name in ["package.json", "package-lock.json"]:
             shutil.copy2(package / name, dependencies / name)
-        run([node, npm, "ci", "--ignore-scripts", "--no-audit", "--no-fund"], cwd=dependencies, env=env)
+        run([node, npm, "ci", "--include=dev", "--ignore-scripts", "--no-audit", "--no-fund"], cwd=dependencies, env=env)
         (dependencies / ".complete").write_text(lock)
     # Compile in an isolated directory: incremental Xcode builds do not mutate a developer's node_modules/dist.
     with tempfile.TemporaryDirectory(prefix="assembly-", dir=cache) as work:
