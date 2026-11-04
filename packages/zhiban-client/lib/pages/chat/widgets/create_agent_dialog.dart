@@ -843,35 +843,37 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
           },
         ),
       ),
-      const SizedBox(height: 14),
-      _FieldBlock(
-        label: '应用',
-        child: _CapabilityAssemblyRow(
-          buttonLabel: '选择应用',
-          selectedLabels: _selectedAppLabels,
-          onTap: _pickApps,
-          onRemove: (id) {
-            setState(() {
-              _selectedAppLabels = Map.of(_selectedAppLabels)..remove(id);
-            });
-          },
+      if (widget.localOptions == null) ...[
+        const SizedBox(height: 14),
+        _FieldBlock(
+          label: '应用',
+          child: _CapabilityAssemblyRow(
+            buttonLabel: '选择应用',
+            selectedLabels: _selectedAppLabels,
+            onTap: _pickApps,
+            onRemove: (id) {
+              setState(() {
+                _selectedAppLabels = Map.of(_selectedAppLabels)..remove(id);
+              });
+            },
+          ),
         ),
-      ),
-      const SizedBox(height: 14),
-      _FieldBlock(
-        label: '知识库',
-        child: _CapabilityAssemblyRow(
-          buttonLabel: '选择知识库',
-          selectedLabels: _selectedKnowledgeBaseLabels,
-          onTap: _pickKnowledgeBases,
-          onRemove: (id) {
-            setState(() {
-              _selectedKnowledgeBaseLabels =
-                  Map.of(_selectedKnowledgeBaseLabels)..remove(id);
-            });
-          },
+        const SizedBox(height: 14),
+        _FieldBlock(
+          label: '知识库',
+          child: _CapabilityAssemblyRow(
+            buttonLabel: '选择知识库',
+            selectedLabels: _selectedKnowledgeBaseLabels,
+            onTap: _pickKnowledgeBases,
+            onRemove: (id) {
+              setState(() {
+                _selectedKnowledgeBaseLabels =
+                    Map.of(_selectedKnowledgeBaseLabels)..remove(id);
+              });
+            },
+          ),
         ),
-      ),
+      ],
     ];
     final welcomeFields = <Widget>[
       _FieldBlock(
@@ -931,20 +933,21 @@ class _CreateAgentEditorState extends ConsumerState<CreateAgentEditor> {
                       })
                   : null,
             ),
-          _ExecutionChoice(
-            label: '云端',
-            subtitle: '在云端持续运行',
-            badge: AppConfig.cloudAgentCreationEnabled ? null : '暂未开放',
-            icon: CupertinoIcons.cloud,
-            selected: _executionLocus == 'cloud',
-            onTap: widget.localOptions == null &&
-                    AppConfig.cloudAgentCreationEnabled
-                ? () => setState(() {
-                      _executionLocus = 'cloud';
-                      _errorText = null;
-                    })
-                : null,
-          ),
+          if (widget.localOptions == null)
+            _ExecutionChoice(
+              label: '云端',
+              subtitle: '在云端持续运行',
+              badge: AppConfig.cloudAgentCreationEnabled ? null : '暂未开放',
+              icon: CupertinoIcons.cloud,
+              selected: _executionLocus == 'cloud',
+              onTap: widget.localOptions == null &&
+                      AppConfig.cloudAgentCreationEnabled
+                  ? () => setState(() {
+                        _executionLocus = 'cloud';
+                        _errorText = null;
+                      })
+                  : null,
+            ),
         ];
         if (constraints.maxWidth < 400 ||
             MediaQuery.textScalerOf(context).scale(14) > 21) {

@@ -32,7 +32,14 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         DesktopSidebar(
           localWorkspace: widget.localWorkspace,
           navItems: mainNavItems
-              .where((item) => item.path != RoutePaths.settings)
+              .where((item) =>
+                  item.path != RoutePaths.settings &&
+                  (!widget.localWorkspace ||
+                      [
+                        RoutePaths.chat,
+                        RoutePaths.digitalEmployee,
+                        RoutePaths.inspire
+                      ].contains(item.path)))
               .toList(),
           chatUnreadCount: unreadCount,
         ),

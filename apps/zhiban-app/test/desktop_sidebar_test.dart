@@ -48,7 +48,7 @@ void main() {
   });
 
   testWidgets(
-      'collapse preserves workspace, navigation, badges and billing state',
+      'collapse preserves workspace, navigation and badges without community billing',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(900, 620));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -124,7 +124,7 @@ void main() {
     await tester.pump();
     expect(toggleFill(), idleFill);
     await mouse.removePointer();
-    final billingState = tester.state(find.byType(SidebarBillingSection));
+    expect(find.byType(SidebarBillingSection), findsNothing);
     final workspaceElement = tester.element(find.byType(TextField));
     await tester.enterText(find.byType(TextField), '未发送的内容');
     await tester.tap(find.byTooltip('收起菜单'));
@@ -140,9 +140,8 @@ void main() {
     expect(find.byTooltip('对话'), findsOneWidget);
     expect(find.text('99+'), findsOneWidget);
     expect(find.byTooltip('我的企业'), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.star_fill), findsOneWidget);
-    expect(
-        tester.state(find.byType(SidebarBillingSection)), same(billingState));
+    expect(find.byIcon(CupertinoIcons.star_fill), findsNothing);
+    expect(find.byType(SidebarBillingSection), findsNothing);
     expect(tester.element(find.byType(TextField)), same(workspaceElement));
     expect(controller.text, '未发送的内容');
     expect(tester.takeException(), isNull);

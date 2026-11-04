@@ -52,7 +52,9 @@ const Color _cardHeadDividerColor = Color(0xFFE3E8F1);
 const Color _cardRowDividerColor = Color(0xFFEEF2F7);
 
 class LocalCodingToolsPage extends ConsumerStatefulWidget {
-  const LocalCodingToolsPage({super.key});
+  const LocalCodingToolsPage({super.key, this.apiSettingsSessionFactory});
+
+  final LocalCodingBridgeSessionFactory? apiSettingsSessionFactory;
 
   @override
   ConsumerState<LocalCodingToolsPage> createState() =>
@@ -83,6 +85,7 @@ class _LocalCodingToolsPageState extends ConsumerState<LocalCodingToolsPage> {
     } else if (!state.hasValue) {
       // 首次进入还没有数据:卡片骨架 + 检测进度,不再整页转圈(2026-09-15)。
       body = _ToolsContent(
+        apiSettingsSessionFactory: widget.apiSettingsSessionFactory,
         data: null,
         progress: progress ?? LocalCodingInspectProgress.starting(),
       );
@@ -90,7 +93,8 @@ class _LocalCodingToolsPageState extends ConsumerState<LocalCodingToolsPage> {
       // 授权等其它整页操作仍用整页转圈。
       body = const Center(child: CupertinoActivityIndicator());
     } else {
-      body = _ToolsContent(data: state.value!, progress: progress);
+      body = _ToolsContent(data: state.value!, progress: progress,
+          apiSettingsSessionFactory: widget.apiSettingsSessionFactory);
     }
     return Scaffold(
       backgroundColor: ColorConfig.pageBackground,
@@ -122,7 +126,9 @@ class _LocalCodingToolsPageState extends ConsumerState<LocalCodingToolsPage> {
 }
 
 class _ToolsContent extends ConsumerWidget {
-  const _ToolsContent({required this.data, this.progress});
+  const _ToolsContent({required this.data, this.progress, this.apiSettingsSessionFactory});
+
+  final LocalCodingBridgeSessionFactory? apiSettingsSessionFactory;
 
   /// 首次进入、检测还没结束时为 null(卡片显示骨架)。
   final LocalCodingToolsPageData? data;
@@ -147,7 +153,8 @@ class _ToolsContent extends ConsumerWidget {
               // 2026-09-15 · 不再有页面顶部的持续横幅:「环境未开放」写在卡片上灰掉的
               // 切换按钮旁;「服务端撤销待重试」是自动完成的后台事,不打扰用户。
               for (final vendor in LocalCodingVendor.values) ...[
-                _VendorCard(vendor: vendor, data: data, progress: progress),
+                _VendorCard(vendor: vendor, data: data, progress: progress,
+                    apiSettingsSessionFactory: apiSettingsSessionFactory),
                 const SizedBox(height: 16),
               ],
             ],
@@ -276,7 +283,10 @@ class _RowView {
 }
 
 class _VendorCard extends ConsumerWidget {
-  const _VendorCard({required this.vendor, required this.data, this.progress});
+  const _VendorCard({required this.vendor, required this.data, this.progress,
+    this.apiSettingsSessionFactory});
+
+  final LocalCodingBridgeSessionFactory? apiSettingsSessionFactory;
 
   final LocalCodingVendor vendor;
   final LocalCodingToolsPageData? data;
@@ -365,6 +375,7 @@ class _VendorCard extends ConsumerWidget {
                           final saved = await showLocalCodingApiSettings(
                             context,
                             vendor,
+                            sessionFactory: apiSettingsSessionFactory,
                           );
                           if (saved == true && context.mounted) {
                             ref

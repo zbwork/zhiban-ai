@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
@@ -10,8 +11,151 @@ import 'package:zhiban_client/pages/local_coding_tools/models/local_coding_model
 import 'package:zhiban_client/pages/local_coding_tools/providers/local_coding_tools_provider.dart';
 import 'package:zhiban_client/pages/local_coding_tools/services/local_coding_bridge_client.dart';
 import 'package:zhiban_client/pages/local_coding_tools/services/local_coding_tools_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zhiban_client/pages/model_service/services/model_service_store.dart';
+import 'package:zhiban_client/pages/model_service/models/ai_provider_config.dart';
+import 'package:zhiban_client/pages/model_service/models/ai_model_config.dart';
+import 'package:zhiban_client/pages/chat/widgets/model_picker_content.dart';
+import 'package:zhiban_ui/widgets/ui_search_field.dart';
+import 'local_coding_api_settings_test.dart' show FakeFactory;
 
 void main() {
+  for (final vendor in LocalCodingVendor.values) {
+    testWidgets('${vendor.name}: 从卡片配置自有模型并执行 CLI/桌面配置和验证', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      rootBundle.clear();
+      ModelServiceStore.clearApiKeyMemoryCache();
+      final root = Directory.systemTemp.createTempSync('community-tool-flow-');
+      const channel = MethodChannel('plugins.flutter.io/path_provider');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (_) async => root.path);
+      addTearDown(() {
+        ModelServiceStore.clearApiKeyMemoryCache();
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+        root.deleteSync(recursive: true);
+      });
+      const store = ModelServiceStore();
+      final claude = vendor == LocalCodingVendor.claude;
+      final url =
+          claude ? 'https://api.airick.cn/v1' : 'https://model.example/v1';
+      await store.saveProviders([
+        AiProviderConfig(
+          id: 'flow-provider',
+          catalogId: claude ? 'beebridge' : null,
+          name: '回归模型服务',
+          enabled: true,
+          baseUrl: url,
+          models: [
+            AiModelConfig(
+                id: 'flow-model', modelId: 'gpt-demo', displayName: '回归模型')
+          ],
+        )
+      ]);
+      await store.setApiKey('flow-provider', 'fixture-key');
+      final factory = FakeFactory();
+      final configured = <LocalCodingTarget>{};
+      LocalCodingToolsSnapshot current() {
+        final base = _snapshot(
+            authorized: false,
+            currentService: LocalCodingCurrentService.zhiban,
+            globalVerificationLevel: 'l3',
+            desktopGlobalVerificationLevel: 'l2',
+            supportedMethods: const {'verify.execute'});
+        final initial = _snapshot(
+            authorized: false, supportedMethods: const {'verify.execute'});
+        return LocalCodingToolsSnapshot(
+            deviceId: base.deviceId,
+            environment: base.environment,
+            credentialStatus: base.credentialStatus,
+            tools: base.tools,
+            configurations: {
+              for (final t in LocalCodingTarget.values)
+                t: (configured.contains(t) ? base : initial).configurationFor(t)
+            },
+            expectedProfileVersions: base.expectedProfileVersions,
+            registrationAvailable: true,
+            supportedMethods: base.supportedMethods);
+      }
+
+      final service = _FakeOperations(
+          inspect: () async => current(),
+          switchToZhiban: (target) async {
+            expect(factory.session.saved, isNotNull, reason: '先保存模型服务凭据再配置工具');
+            configured.add(target);
+            return current();
+          });
+      service.startVerifyResponse = _operation(
+          kind: LocalCodingOperationKind.verify,
+          state: LocalCodingOperationState.running,
+          stage: 'l1');
+      service.pollResponse = _operation(
+          kind: LocalCodingOperationKind.verify,
+          state: LocalCodingOperationState.succeeded,
+          stage: 'l3');
+      await _pumpPage(tester, service, apiSettingsSessionFactory: factory);
+      await tester.pumpAndSettle();
+      final index = vendor == LocalCodingVendor.codex ? 0 : 1;
+      await tester.runAsync(() async {
+        await tester.tap(find.text('API 设置').at(index));
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      for (var i = 0;
+          i < 20 &&
+              find
+                  .byKey(const ValueKey('api-settings-model-button'))
+                  .evaluate()
+                  .isEmpty;
+          i++) {
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)));
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('api-settings-model-button')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ModelPickerEntry), findsOneWidget);
+      await tester.enterText(
+          find.descendant(
+              of: find.byType(UiSearchField), matching: find.byType(TextField)),
+          'gpt-demo');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('回归模型'));
+      await tester.pumpAndSettle();
+      expect(find.text('fixture-key'), findsNothing);
+      await tester.runAsync(() async {
+        await tester.tap(find.text('保存'));
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pump();
+      for (var i = 0; i < 20 && factory.session.saved == null; i++) {
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)));
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(factory.session.saved, {
+        'url': claude ? 'https://api.airick.cn' : url,
+        'model': 'gpt-demo',
+        'key': 'fixture-key',
+      });
+      await tester.tap(find.widgetWithText(FilledButton, '一键配置工具').at(index));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('开始接入'));
+      for (var i = 0; i < 12 && service.startVerifyCalls < 2; i++) {
+        await tester.pump(const Duration(milliseconds: 600));
+      }
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+      expect(service.switchedTargets, vendor.targets);
+      expect(service.verifiedTargets, vendor.targets);
+      expect(service.registerCalls, 0);
+      expect(service.enableCalls, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+  }
   testWidgets('桌面安装授权前置：等待时无百分比，取消不显示安装冲突', (tester) async {
     final service = _FakeOperations(
       inspect: () async => _snapshot(
@@ -58,10 +202,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-
-  testWidgets(
-      '首次进入先显示卡片骨架与检测进度,检测完每个厂商一张卡(CLI + 桌面端 汇总)',
-      (tester) async {
+  testWidgets('首次进入先显示卡片骨架与检测进度,检测完每个厂商一张卡(CLI + 桌面端 汇总)', (tester) async {
     final completer = Completer<LocalCodingToolsSnapshot>();
     final service = _FakeOperations(inspect: () => completer.future);
     await _pumpPage(tester, service);
@@ -96,14 +237,15 @@ void main() {
     expect(find.text('打开'), findsNWidgets(2));
     expect(find.text('打开 CLI'), findsNothing);
     expect(find.text('打开桌面端'), findsNothing);
-    expect(find.text('一键接入知办'), findsNWidgets(2));
+    expect(find.text('一键配置工具'), findsNWidgets(2));
     expect(find.text('重新检测'), findsNWidgets(2));
     // 卡头 ⓘ 解释一起装了什么。
     expect(find.byType(Tooltip), findsNWidgets(2));
   });
 
   testWidgets('检测过程可视化 · 重新检测时卡片保留,已读完的卡填新结果,正在查的卡行尾显示检测中', (tester) async {
-    final service = _FakeOperations(inspect: () async => _snapshot(authorized: true));
+    final service =
+        _FakeOperations(inspect: () async => _snapshot(authorized: true));
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
     final container = ProviderScope.containerOf(
@@ -166,7 +308,7 @@ void main() {
     );
     await tester.pump();
     // 检测中不给操作:底部按钮换成检测步骤,行尾链接隐藏。
-    expect(find.text('一键接入知办'), findsNothing);
+    expect(find.text('一键配置工具'), findsNothing);
     expect(find.text('重新检测'), findsNothing);
 
     container.read(localCodingInspectProgressProvider.notifier).state = null;
@@ -175,7 +317,7 @@ void main() {
     expect(find.text('检测完成'), findsOneWidget);
     expect(find.text('安装、检测并配置本机 AI 编程工具'), findsOneWidget);
     expect(find.text('检测中'), findsNothing);
-    expect(find.text('一键接入知办'), findsNWidgets(2));
+    expect(find.text('一键配置工具'), findsNWidgets(2));
     expect(find.text('重新检测'), findsNWidgets(2));
 
     // 全部完成 3 秒后淡出。
@@ -184,7 +326,7 @@ void main() {
     expect(find.text('检测完成'), findsNothing);
   });
 
-  testWidgets('missing profiles disables 一键接入知办 but keeps 打开', (tester) async {
+  testWidgets('missing profiles disables 一键配置工具 but keeps 打开', (tester) async {
     final service = _FakeOperations(
       inspect: () async =>
           _snapshot(authorized: false, registrationAvailable: false),
@@ -193,9 +335,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // 2026-09-15 · 不再是页面顶部横幅:两张卡灰掉的切换按钮旁各有一句说明。
-    expect(find.text('当前环境暂未开放知办模型 API，可先安装并使用官方服务'), findsNWidgets(2));
+    expect(find.text('当前环境暂未开放自定义模型 API，可先安装并使用官方服务'), findsNWidgets(2));
     final switchButton = tester.widget<FilledButton>(find.ancestor(
-      of: find.text('一键接入知办').first,
+      of: find.text('一键配置工具').first,
       matching: find.byType(FilledButton),
     ));
     expect(switchButton.onPressed, isNull);
@@ -247,13 +389,12 @@ void main() {
       expect(find.text('自定义配置'), findsNothing);
       expect(find.textContaining('配置目录权限或链接不满足安全要求'), findsOneWidget);
       expect(
-        find.text(missingDesktop
-            ? '已安装（命令行）· 桌面端未安装'
-            : '已安装（命令行 + 桌面端）'),
+        find.text(missingDesktop ? '已安装（命令行）· 桌面端未安装' : '已安装（命令行 + 桌面端）'),
         missingDesktop ? findsOneWidget : findsNWidgets(2),
       );
-      expect(find.text('安装桌面端'), missingDesktop ? findsOneWidget : findsNothing);
-      expect(find.text('一键接入知办'), findsOneWidget);
+      expect(
+          find.text('安装桌面端'), missingDesktop ? findsOneWidget : findsNothing);
+      expect(find.text('一键配置工具'), findsOneWidget);
       expect(find.text('修复并重试'), findsNothing);
       expect(service.switchCalls, 0);
       expect(service.enableCalls, 0);
@@ -280,8 +421,7 @@ void main() {
     expect(service.inspectCalls, 1);
   });
 
-  testWidgets('整页检测失败显示本地连接组件给出的原因,不再统一成"检测失败，请重试"',
-      (tester) async {
+  testWidgets('整页检测失败显示本地连接组件给出的原因,不再统一成"检测失败，请重试"', (tester) async {
     final service = _FakeOperations(
       inspect: () async => throw const LocalCodingBridgeException(
         'rpc_timeout',
@@ -296,8 +436,7 @@ void main() {
     expect(find.text('重新检测'), findsOneWidget);
   });
 
-  testWidgets('契约 §2.7 · 某个形态的检测结果读不懂:只有这张卡显示检测异常,另一张卡照常',
-      (tester) async {
+  testWidgets('契约 §2.7 · 某个形态的检测结果读不懂:只有这张卡显示检测异常,另一张卡照常', (tester) async {
     final base = _snapshot(authorized: false);
     final snapshot = LocalCodingToolsSnapshot(
       deviceId: base.deviceId,
@@ -366,7 +505,7 @@ void main() {
     expect(service.launchCalls, 0);
   });
 
-  testWidgets('一键接入知办(已装 · 官方服务): 一次确认 → CLI 与桌面端依次写配置 + 验证 → 卡角标运行正常',
+  testWidgets('一键配置工具(已装 · 官方服务): 一次确认 → CLI 与桌面端依次写配置 + 验证 → 卡角标运行正常',
       (tester) async {
     // 共用配置:切了命令行之后桌面端仍按官方报告(没有它自己的切换记录),链会
     // 再为桌面端写一次;两个都切了才是完整的知办态。
@@ -409,14 +548,14 @@ void main() {
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
 
-    expect(find.text('接入知办模型 API 后无需官方账号即可使用'), findsNWidgets(2));
-    await tester.tap(find.text('一键接入知办').first);
+    expect(find.text('接入自定义模型 API 后使用你填写的模型服务'), findsNWidgets(2));
+    await tester.tap(find.text('一键配置工具').first);
     await tester.pumpAndSettle();
 
     // F31 §3.2.1 · 一次确认:程序不用动,只列备份 / 写入 / 检测三步与本次涉及的两个形态。
     expect(find.text('先把程序准备好：'), findsNothing);
     expect(find.text('备份原有官方配置'), findsOneWidget);
-    expect(find.text('写入知办模型 API 配置'), findsOneWidget);
+    expect(find.text('写入自定义模型 API 配置'), findsOneWidget);
     expect(find.text('检测服务连接是否正常'), findsOneWidget);
     expect(find.text('本次接入：Codex CLI、Codex 桌面端'), findsOneWidget);
     expect(find.text('之后可随时恢复官方配置'), findsOneWidget);
@@ -448,25 +587,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('正在接入 Codex'), findsNothing);
-    expect(find.text('接入完成，Codex 已可以使用知办模型 API'), findsOneWidget);
+    expect(find.text('接入完成，Codex 已可以使用自定义模型 API'), findsOneWidget);
     // 配置只在进程启动时读:提示第二行说清已打开的会话要重开(2026-09-17)。
     expect(find.text('已打开的终端和桌面端要重新打开才生效'), findsOneWidget);
     // 2026-09-15 · 完成提示是顶部浮动通知:成功 3 秒后自动淡出并从页面状态清掉。
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
-    expect(find.text('接入完成，Codex 已可以使用知办模型 API'), findsNothing);
-    // CLI L3 + 桌面端 L2 → 卡角标「运行正常」,当前服务「知办模型 API」。
+    expect(find.text('接入完成，Codex 已可以使用自定义模型 API'), findsNothing);
+    // CLI L3 + 桌面端 L2 → 卡角标「运行正常」,当前服务「自定义模型 API」。
     expect(find.text('运行正常'), findsNWidgets(2));
-    expect(find.text('知办模型 API'), findsNWidgets(2));
+    expect(find.text('自定义模型 API'), findsNWidgets(2));
     expect(find.text('恢复官方配置'), findsNWidgets(2));
     // 2026-09-14 卡片改版:恢复官方配置是「当前服务」行尾的文字链接,不再是按钮。
     expect(find.widgetWithText(TextButton, '恢复官方配置'), findsNWidgets(2));
-    expect(find.text('一键接入知办'), findsNothing);
+    expect(find.text('一键配置工具'), findsNothing);
     expect(service.startVerifyCalls, 2);
   });
 
-  testWidgets('已切换卡片可卡级恢复官方配置(两形态一起),进度弹框按形态显示后自动关闭',
-      (tester) async {
+  testWidgets('已切换卡片可卡级恢复官方配置(两形态一起),进度弹框按形态显示后自动关闭', (tester) async {
     var restored = false;
     // 第一个形态的恢复卡在这里,好观察进度弹框;放行后两个形态依次完成。
     final gate = Completer<void>();
@@ -519,8 +657,7 @@ void main() {
     expect(find.text('官方服务'), findsNWidgets(2));
   });
 
-  testWidgets(
-      '12900 真机 · 命令行验证失败后恢复官方配置:遗留的失败记录不再让卡片「需要处理」,主按钮不得是「修复并重试」',
+  testWidgets('12900 真机 · 命令行验证失败后恢复官方配置:遗留的失败记录不再让卡片「需要处理」,主按钮不得是「修复并重试」',
       (tester) async {
     // Codex 命令行 L3 真实请求失败、桌面端 L2 通过。当时「恢复官方配置」只作用在
     // 桌面端上,共用配置还原后命令行那条失败记录没人清;现在需要处理的命令行也一起恢复。
@@ -584,8 +721,7 @@ void main() {
     expect(service.switchCalls, 0);
   });
 
-  testWidgets('陷阱 §41 · 配置在别处回到官方后,遗留的验证失败记录不再算「需要处理」',
-      (tester) async {
+  testWidgets('陷阱 §41 · 配置在别处回到官方后,遗留的验证失败记录不再算「需要处理」', (tester) async {
     // 用户在知办之外把配置改回官方(或另一形态的恢复把共用配置带回官方):
     // 没有任何恢复批处理来清这条失败记录,状态判定必须自己看配置还指不指向知办。
     var official = false;
@@ -640,8 +776,7 @@ void main() {
     expect(find.text('修复并重试'), findsNothing);
   });
 
-  testWidgets(
-      '2026-09-18 · 需要处理的形态也能恢复官方配置:Claude 命令行连不上知办,恢复时与桌面端一起还原',
+  testWidgets('2026-09-18 · 需要处理的形态也能恢复官方配置:Claude 命令行连不上知办,恢复时与桌面端一起还原',
       (tester) async {
     // Claude 两形态的配置是分开的:只恢复状态正常的桌面端,命令行会一直指向知办。
     var restored = false;
@@ -722,7 +857,7 @@ void main() {
 
     expect(find.text('已配置'), findsNWidgets(2));
     expect(find.text('运行正常'), findsNothing);
-    expect(find.text('已配置知办模型 API'), findsNWidgets(2));
+    expect(find.text('已配置自定义模型 API'), findsNWidgets(2));
     expect(find.text('已安装（桌面端）· 命令行未安装'), findsNWidgets(2));
     expect(find.text('未安装'), findsNothing);
     // 只装了一种形态 → 「打开」不下拉,直接写明形态。
@@ -736,7 +871,8 @@ void main() {
     expect(find.text('查看系统要求'), findsNWidgets(2));
   });
 
-  testWidgets('未安装卡:「一键接入知办」一次确认后依次装命令行 + 桌面端,再写配置、检测;进度弹框按形态分块', (tester) async {
+  testWidgets('未安装卡:「一键配置工具」一次确认后依次装命令行 + 桌面端,再写配置、检测;进度弹框按形态分块',
+      (tester) async {
     var installed = false;
     // 每个形态切过才按知办报告(共用配置也要各自的切换记录)。
     final switchedTargets = <LocalCodingTarget>{};
@@ -802,12 +938,12 @@ void main() {
     expect(find.text('未安装'), findsNWidgets(4));
     expect(find.text('下载安装'), findsNothing);
     expect(find.text('查看系统要求'), findsNWidgets(2));
-    expect(find.textContaining('安装后自动接入知办模型 API，无需官方账号即可使用 Codex'),
+    expect(find.textContaining('安装后自动接入自定义模型 API，使用你填写的模型服务 Codex'),
         findsOneWidget);
     expect(find.textContaining('命令行版与桌面版会一起安装'), findsNWidgets(2));
 
-    // 卡级「一键接入知办」→ 一次确认框列出要装的两个形态,再开始;先装 CLI。
-    await tester.tap(find.widgetWithText(FilledButton, '一键接入知办').first);
+    // 卡级「一键配置工具」→ 一次确认框列出要装的两个形态,再开始;先装 CLI。
+    await tester.tap(find.widgetWithText(FilledButton, '一键配置工具').first);
     await tester.pumpAndSettle();
     expect(find.byType(Checkbox), findsNothing);
     expect(find.text('· 安装 Codex CLI'), findsOneWidget);
@@ -846,10 +982,10 @@ void main() {
         [LocalCodingTarget.codexCli, LocalCodingTarget.codexDesktop]);
     expect(service.startVerifyCalls, 2);
     expect(find.text('正在接入 Codex'), findsNothing);
-    expect(find.text('接入完成，Codex 已可以使用知办模型 API'), findsOneWidget);
+    expect(find.text('接入完成，Codex 已可以使用自定义模型 API'), findsOneWidget);
     expect(find.text('已安装（命令行 + 桌面端）'), findsNWidgets(2));
     expect(find.text('运行正常'), findsNWidgets(2));
-    expect(find.text('一键接入知办'), findsNothing);
+    expect(find.text('一键配置工具'), findsNothing);
     expect(find.text('需要处理'), findsNothing);
   });
 
@@ -892,14 +1028,13 @@ void main() {
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, '一键接入知办').first);
+    await tester.tap(find.widgetWithText(FilledButton, '一键配置工具').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('开始接入'));
     await tester.pump();
     await tester.pump();
     expect(find.text('正在接入 Codex'), findsOneWidget);
-    expect(find.text('关闭此窗口不会中断接入，可随时在卡片上点「查看进度」'),
-        findsOneWidget);
+    expect(find.text('关闭此窗口不会中断接入，可随时在卡片上点「查看进度」'), findsOneWidget);
 
     // 右上角 × 关闭:弹框消失,安装没被取消,卡片进入进行中并给「查看进度」。
     await tester.tap(find.byKey(const ValueKey('batch-progress-close')));
@@ -953,8 +1088,7 @@ void main() {
     expect(find.text('打开'), findsNWidgets(2));
   });
 
-  testWidgets(
-      '契约 §2.7.2 · global_drifted 卡显示需要处理并提供修复并重试;2026-09-18 起也能恢复官方配置',
+  testWidgets('契约 §2.7.2 · global_drifted 卡显示需要处理并提供修复并重试;2026-09-18 起也能恢复官方配置',
       (tester) async {
     var restored = false;
     final service = _FakeOperations(
@@ -979,7 +1113,8 @@ void main() {
 
     expect(find.text('需要处理'), findsNWidgets(2));
     expect(find.text('配置已改动'), findsNWidgets(2));
-    expect(find.textContaining('知办模型 API 配置被修改，点「修复并重试」重写知办线路'), findsNWidgets(2));
+    expect(find.textContaining('自定义模型 API 配置被修改，点「修复并重试」重写知办线路'),
+        findsNWidgets(2));
     expect(find.text('修复并重试'), findsNWidgets(2));
     expect(find.text('运行正常'), findsNothing);
 
@@ -996,7 +1131,7 @@ void main() {
     expect(find.text('已恢复 Codex 官方配置'), findsOneWidget);
   });
 
-  testWidgets('已切换但本机设备授权没了(退出过知办 / 切过环境 / 重装):需要处理,修复并重试重新接入', (tester) async {
+  testWidgets('社区 BYOK 不依赖知办设备授权，已验证配置继续可用', (tester) async {
     final service = _FakeOperations(
       inspect: () async => _snapshot(
         authorized: false,
@@ -1009,12 +1144,13 @@ void main() {
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
 
-    expect(find.text('运行正常'), findsNothing);
-    expect(find.text('需要处理'), findsNWidgets(2));
-    expect(find.text('授权已失效'), findsNWidgets(2));
-    expect(find.textContaining('设备授权已失效（可能退出过知办、切换过环境或重装过），点「修复并重试」重新接入'),
-        findsNWidgets(2));
-    expect(find.widgetWithText(FilledButton, '修复并重试'), findsNWidgets(2));
+    expect(find.text('运行正常'), findsNWidgets(2));
+    expect(find.text('需要处理'), findsNothing);
+    expect(find.text('授权已失效'), findsNothing);
+    expect(find.text('修复并重试'), findsNothing);
+    expect(find.text('API 设置'), findsNWidgets(2));
+    expect(service.registerCalls, 0);
+    expect(service.switchCalls, 0);
   });
 
   testWidgets('契约 §2.7 B3 · 知办配置缺少本机切换记录:需要处理,说明原因,修复并重试走重新切换', (tester) async {
@@ -1089,9 +1225,9 @@ void main() {
     await tester.tap(find.text('知道了'));
     await tester.pumpAndSettle();
 
-    expect(find.text('一键接入知办'), findsNWidgets(2));
+    expect(find.text('一键配置工具'), findsNWidgets(2));
     expect(find.text('修复并重试'), findsNothing);
-    await tester.tap(find.text('一键接入知办').last);
+    await tester.tap(find.text('一键配置工具').last);
     await tester.pumpAndSettle();
     expect(find.text('本次接入：Claude 桌面端'), findsOneWidget);
   });
@@ -1110,16 +1246,16 @@ void main() {
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
 
-    expect(find.text('已切换为知办模型 API，尚未检测服务连接'), findsNWidgets(2));
+    expect(find.text('已切换为自定义模型 API，尚未检测服务连接'), findsNWidgets(2));
     expect(find.widgetWithText(FilledButton, '重新检测'), findsNWidgets(2));
     expect(find.text('查看原因'), findsNWidgets(2));
     expect(find.widgetWithText(FilledButton, '查看原因'), findsNothing);
   });
 
-  testWidgets('2026-09-17 · 进页面只检测:已装未接入的形态不自动切换,主按钮「一键接入知办」', (tester) async {
+  testWidgets('2026-09-17 · 进页面只检测:已装未接入的形态不自动切换,主按钮「一键配置工具」', (tester) async {
     final service = _FakeOperations(
-      inspect: () async =>
-          _snapshot(authorized: true, supportedMethods: const {'verify.execute'}),
+      inspect: () async => _snapshot(
+          authorized: true, supportedMethods: const {'verify.execute'}),
     );
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
@@ -1130,7 +1266,7 @@ void main() {
 
     expect(service.switchCalls, 0);
     expect(find.text('官方服务'), findsNWidgets(2));
-    expect(find.widgetWithText(FilledButton, '一键接入知办'), findsNWidgets(2));
+    expect(find.widgetWithText(FilledButton, '一键配置工具'), findsNWidgets(2));
     expect(find.text('开始接入'), findsNothing);
     expect(find.text('正在接入 Codex'), findsNothing);
     expect(find.text('版本管理'), findsNothing);
@@ -1228,7 +1364,7 @@ void main() {
     );
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '一键接入知办').first);
+    await tester.tap(find.widgetWithText(FilledButton, '一键配置工具').first);
     await tester.pumpAndSettle();
     expect(find.textContaining('会被它拦截'), findsNothing);
     expect(find.textContaining('代理例外'), findsNothing);
@@ -1342,9 +1478,7 @@ void main() {
     expect(find.widgetWithText(FilledButton, '重新检测'), findsOneWidget);
   });
 
-  testWidgets(
-      '2026-09-20 · 积分用完:卡片直说积分用完和去哪充值,不报授权失效,不给修复并重试',
-      (tester) async {
+  testWidgets('2026-09-20 · 积分用完:卡片直说积分用完和去哪充值,不报授权失效,不给修复并重试', (tester) async {
     final service = _FakeOperations(
       inspect: () async => _snapshot(
         authorized: true,
@@ -1390,8 +1524,7 @@ void main() {
     expect(find.widgetWithText(FilledButton, '重新检测'), findsOneWidget);
   });
 
-  testWidgets(
-      '2026-09-20 · 备用模型通过:卡片仍是运行正常,提示当前配置的模型线路不可用、可换模型',
+  testWidgets('2026-09-20 · 备用模型通过:卡片仍是运行正常,提示当前配置的模型线路不可用、可换模型',
       (tester) async {
     final service = _FakeOperations(
       inspect: () async => _snapshot(
@@ -1488,7 +1621,7 @@ void main() {
     }
     await tester.pumpAndSettle();
 
-    expect(find.text('Codex：知办中转站暂时不可用（HTTP 503），不是本机问题，稍后再检测'),
+    expect(find.text('Codex：你配置的模型服务暂时不可用（HTTP 503），不是本机问题，稍后再检测'),
         findsOneWidget);
     expect(find.text('中转站暂时不可用'), findsWidgets);
     expect(find.textContaining('中转站原话见「诊断详情」'), findsWidgets);
@@ -1536,7 +1669,8 @@ void main() {
     expect(find.text('· 刚刚检测'), findsNothing);
   });
 
-  testWidgets('2026-09-15 · Codex 命令行低于最低版本且没有接管路径:Codex 卡不给接入,说明怎么升级,仍可打开', (tester) async {
+  testWidgets('2026-09-15 · Codex 命令行低于最低版本且没有接管路径:Codex 卡不给接入,说明怎么升级,仍可打开',
+      (tester) async {
     final service = _FakeOperations(
       inspect: () async => _snapshot(authorized: true, codexCliTooOld: true),
     );
@@ -1544,27 +1678,30 @@ void main() {
     await tester.pumpAndSettle();
 
     // Codex 卡:命令行过旧、目录也接管不了,共用配置的桌面端也接不了;Claude 卡照常可接入。
-    expect(find.text('一键接入知办'), findsOneWidget);
+    expect(find.text('一键配置工具'), findsOneWidget);
     expect(
-        find.textContaining('版本（0.130.0）过旧，升级到 0.137.0 或更高版本后才能切换为知办模型 API'),
+        find.textContaining('版本（0.130.0）过旧，升级到 0.137.0 或更高版本后才能切换为自定义模型 API'),
         findsOneWidget);
-    expect(find.textContaining('npm i -g @openai/codex@latest'), findsOneWidget);
+    expect(
+        find.textContaining('npm i -g @openai/codex@latest'), findsOneWidget);
     expect(find.text('打开'), findsNWidgets(2));
   });
 
-  testWidgets('2026-09-15 · Claude 桌面端太老不支持第三方模型配置且目录没给新版:说明需更新,接入只作用命令行', (tester) async {
+  testWidgets('2026-09-15 · Claude 桌面端太老不支持第三方模型配置且目录没给新版:说明需更新,接入只作用命令行',
+      (tester) async {
     final service = _FakeOperations(
       inspect: () async => _snapshot(
         authorized: true,
-        claudeDesktopErrorCode: 'LCT-CLAUDE_DESKTOP-DETECT-THIRD_PARTY_UNSUPPORTED',
+        claudeDesktopErrorCode:
+            'LCT-CLAUDE_DESKTOP-DETECT-THIRD_PARTY_UNSUPPORTED',
       ),
     );
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('版本（1.46388.4）过旧，还不支持第三方模型配置'), findsOneWidget);
-    expect(find.text('一键接入知办'), findsNWidgets(2));
-    await tester.tap(find.text('一键接入知办').last);
+    expect(find.text('一键配置工具'), findsNWidgets(2));
+    await tester.tap(find.text('一键配置工具').last);
     await tester.pumpAndSettle();
     expect(find.text('本次接入：Claude Code'), findsOneWidget);
   });
@@ -1580,11 +1717,11 @@ void main() {
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('桌面端 暂不支持知办模型 API'), findsNWidgets(2));
+    expect(find.textContaining('桌面端 暂不支持自定义模型 API'), findsNWidgets(2));
     expect(find.text('打开'), findsNWidgets(2));
     expect(find.text('已安装'), findsNWidgets(2));
 
-    await tester.tap(find.text('一键接入知办').first);
+    await tester.tap(find.text('一键配置工具').first);
     await tester.pumpAndSettle();
     expect(find.text('本次接入：Codex CLI'), findsOneWidget);
   });
@@ -1628,7 +1765,7 @@ void main() {
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('一键接入知办').first);
+    await tester.tap(find.text('一键配置工具').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('开始接入'));
     await tester.pump();
@@ -1643,7 +1780,7 @@ void main() {
     expect(find.text('写入配置未完成'), findsOneWidget);
     expect(
         find.text('错误码 LCT-CODEX_DESKTOP-CONFIG-WRITE_FAILED'), findsOneWidget);
-    expect(find.text('接入完成，Codex 已可以使用知办模型 API'), findsNothing);
+    expect(find.text('接入完成，Codex 已可以使用自定义模型 API'), findsNothing);
     expect(service.switchedTargets,
         [LocalCodingTarget.codexCli, LocalCodingTarget.codexDesktop]);
     expect(service.startVerifyCalls, 1);
@@ -1652,10 +1789,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('正在接入 Codex'), findsNothing);
 
-    // CLI 已切且 L3、桌面端仍官方 → 当前服务「知办模型 API（部分）」,
+    // CLI 已切且 L3、桌面端仍官方 → 当前服务「自定义模型 API（部分）」,
     // 可再接入桌面端,也可恢复 CLI。
-    expect(find.text('知办模型 API（部分）'), findsNWidgets(2));
-    expect(find.text('一键接入知办'), findsNWidgets(2));
+    expect(find.text('自定义模型 API（部分）'), findsNWidgets(2));
+    expect(find.text('一键配置工具'), findsNWidgets(2));
     expect(find.text('恢复官方配置'), findsNWidgets(2));
     expect(find.text('打开'), findsNWidgets(2));
   });
@@ -1697,7 +1834,7 @@ void main() {
     expect(find.text('新版本 0.154.0'), findsOneWidget);
     expect(find.text('升级到 0.154.0'), findsOneWidget);
     expect(find.text('更多'), findsNothing);
-    // 页脚不再有单独的升级按钮:主按钮是一键接入知办,旁注说明会先升级。
+    // 页脚不再有单独的升级按钮:主按钮是一键配置工具,旁注说明会先升级。
     expect(find.widgetWithText(FilledButton, '升级到 0.154.0'), findsNothing);
     expect(find.textContaining('接入时会先把命令行升级到 0.154.0'), findsOneWidget);
 
@@ -1705,7 +1842,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('升级 Codex'), findsOneWidget);
     expect(find.textContaining('Codex CLI 0.153.4 → 0.154.0'), findsOneWidget);
-    expect(find.textContaining('会直接修改本机现有的这份安装（包括你自己用官方安装器装的）'), findsOneWidget);
+    expect(
+        find.textContaining('会直接修改本机现有的这份安装（包括你自己用官方安装器装的）'), findsOneWidget);
     expect(find.textContaining('发行方自带的自动更新之后可能会再次改变版本'), findsOneWidget);
     await tester.tap(find.text('升级'));
     await tester.pump();
@@ -1725,7 +1863,8 @@ void main() {
     expect(find.text('升级完成，Codex CLI 0.154.0 已可以使用'), findsOneWidget);
   });
 
-  testWidgets('2026-09-16 · npm 装的旧版本:「一键接入知办」先由知办接管到目录版本,再写配置、检测', (tester) async {
+  testWidgets('2026-09-16 · npm 装的旧版本:「一键配置工具」先由知办接管到目录版本,再写配置、检测',
+      (tester) async {
     // 升级只作用于发行方标准位置,npm 装的那份既升不了也装不了,以前这类用户
     // 卡在旧版本上没有任何可点的东西(测试用户 Codex 0.130.0)。
     var adopted = false;
@@ -1748,7 +1887,9 @@ void main() {
                     ? LocalCodingCurrentService.zhiban
                     : LocalCodingCurrentService.official,
             globalVerificationLevel:
-                switchedTargets.contains(LocalCodingTarget.codexCli) ? 'l3' : '',
+                switchedTargets.contains(LocalCodingTarget.codexCli)
+                    ? 'l3'
+                    : '',
             desktopGlobalVerificationLevel:
                 switchedTargets.contains(LocalCodingTarget.codexDesktop)
                     ? 'l2'
@@ -1786,12 +1927,12 @@ void main() {
     await _pumpPage(tester, service);
     await tester.pumpAndSettle();
 
-    // 没有单独的升级 / 接管按钮:主按钮就是一键接入知办,旁注说明会先升级。
+    // 没有单独的升级 / 接管按钮:主按钮就是一键配置工具,旁注说明会先升级。
     expect(find.text('升级到 0.154.0'), findsNothing);
     expect(find.text('交给知办管理'), findsNothing);
     expect(find.text('版本管理'), findsNothing);
     expect(find.textContaining('接入时会先把命令行升级到 0.154.0'), findsOneWidget);
-    await tester.tap(find.text('一键接入知办').first);
+    await tester.tap(find.text('一键配置工具').first);
     await tester.pumpAndSettle();
     // 话术只讲用户关心的:升到哪、原来的留着、以后自动更新;不提 PATH 与安装位置。
     expect(find.textContaining('Codex CLI 0.130.0 → 0.154.0（由知办接管，你原来的版本会保留）'),
@@ -1817,7 +1958,7 @@ void main() {
     expect(service.installModes, [LocalCodingInstallMode.adopt]);
     expect(service.switchedTargets,
         [LocalCodingTarget.codexCli, LocalCodingTarget.codexDesktop]);
-    expect(find.text('接入完成，Codex 已可以使用知办模型 API'), findsOneWidget);
+    expect(find.text('接入完成，Codex 已可以使用自定义模型 API'), findsOneWidget);
   });
 
   testWidgets('2026-09-16 · 升级失败:弹框除了错误码还要给一句能照做的下一步', (tester) async {
@@ -1858,10 +1999,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('升级失败'), findsOneWidget);
+    expect(find.text('错误码 LCT-CODEX_DESKTOP-INSTALL-TARGET_IN_USE'),
+        findsOneWidget);
     expect(
-        find.text('错误码 LCT-CODEX_DESKTOP-INSTALL-TARGET_IN_USE'), findsOneWidget);
-    expect(find.text('请先完全退出 Codex 桌面端再升级（新版应用名是 ChatGPT，退出后再点一次）'),
-        findsWidgets);
+        find.text('请先完全退出 Codex 桌面端再升级（新版应用名是 ChatGPT，退出后再点一次）'), findsWidgets);
   });
 
   testWidgets('2026-09-15 · 只做升级不做回退:目录给了可回退版本,卡片也不出现回退', (tester) async {
@@ -1884,13 +2025,13 @@ void main() {
     expect(find.textContaining('回退'), findsNothing);
     expect(find.text('更多'), findsNothing);
   });
-
 }
 
 Future<void> _pumpPage(
   WidgetTester tester,
-  LocalCodingToolsOperations service,
-) async {
+  LocalCodingToolsOperations service, {
+  LocalCodingBridgeSessionFactory? apiSettingsSessionFactory,
+}) async {
   // 两张卡各两行比原型高;放大测试视口,让所有按钮都在可点击范围内。
   tester.view.physicalSize = const Size(1280, 2000);
   tester.view.devicePixelRatio = 1.0;
@@ -1904,7 +2045,8 @@ Future<void> _pumpPage(
       child: MaterialApp(
         builder: BotToastInit(),
         navigatorObservers: [BotToastNavigatorObserver()],
-        home: const LocalCodingToolsPage(),
+        home: LocalCodingToolsPage(
+            apiSettingsSessionFactory: apiSettingsSessionFactory),
       ),
     ),
   );
@@ -2246,7 +2388,6 @@ class _FakeOperations implements LocalCodingToolsOperations {
     LocalCodingTarget target,
   ) async =>
       throw UnimplementedError();
-
 
   @override
   Future<LocalCodingDiagnostics> diagnostics(LocalCodingTarget target) async =>

@@ -283,10 +283,9 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
 
   /// F31 · 本地开发工具入口(2026-09-10 从"设置 → 支持与服务"挪到弹框一级,
   /// 设置页入口已移除)。显隐:桌面端 macOS / Windows + 构建开关。
-  bool get _showLocalCodingTools =>
-      (widget.localCodingToolsAvailable ??
-          ((PlatformUtils.isMacOS || PlatformUtils.isWindows) &&
-              AppConfig.localCodingToolsEnabled));
+  bool get _showLocalCodingTools => (widget.localCodingToolsAvailable ??
+      ((PlatformUtils.isMacOS || PlatformUtils.isWindows) &&
+          AppConfig.localCodingToolsEnabled));
 
   void _openLocalCodingTools() {
     final host = widget.hostContext;
@@ -358,18 +357,19 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
             onTap: _openProfileCard,
           ),
           const _PopoverDivider(),
-          _ActionRow(
-            icon: CupertinoIcons.question_circle,
-            label: '帮助与客服',
-            onTap: _openHelp,
-          ),
+          if (!widget.localWorkspace)
+            _ActionRow(
+              icon: CupertinoIcons.question_circle,
+              label: '帮助与客服',
+              onTap: _openHelp,
+            ),
           if (_showLocalCodingTools)
             _ActionRow(
               icon: CupertinoIcons.chevron_left_slash_chevron_right,
               label: '本地开发工具',
               onTap: _openLocalCodingTools,
             ),
-          if (PlatformUtils.isDesktop)
+          if (PlatformUtils.isDesktop && !widget.localWorkspace)
             _ActionRow(
               icon: CupertinoIcons.arrow_clockwise,
               label: '检查更新',

@@ -280,7 +280,7 @@ void main() {
       expect(find.text('部门'), findsOneWidget);
       expect(find.text('企业'), findsOneWidget);
       expect(find.text('我'), findsOneWidget); // isSelf 标签
-      expect(find.text('发消息'), findsOneWidget); // 按钮存在 (对自己禁用)
+      expect(find.text('发消息'), findsNothing); // 自己名片无消息/通话操作。
       // 对齐企业微信: 名片叠加展示, 头像弹框不关闭。
       expect(find.text('设置'), findsOneWidget);
       expect(find.text('退出登录'), findsOneWidget);

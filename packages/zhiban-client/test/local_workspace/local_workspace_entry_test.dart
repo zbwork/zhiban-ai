@@ -355,8 +355,6 @@ void main() {
         '主要职责',
         '人设（系统提示词）',
         '核心技能',
-        '应用',
-        '知识库',
         '欢迎语',
         '标签',
         '运行位置',
@@ -364,6 +362,9 @@ void main() {
         '备注（可选）'
       ]) {
         expect(find.textContaining(label, findRichText: true), findsWidgets);
+      }
+      for (final label in ['应用', '知识库', '选择应用', '选择知识库', '云端']) {
+        expect(find.text(label), findsNothing);
       }
       await tester.tap(find.text('创建数字员工').last);
       await tester.pumpAndSettle();
@@ -548,7 +549,8 @@ void main() {
       expect(find.text('通讯录需要登录后使用'), findsWidgets);
       router.go('/settings');
       await tester.pumpAndSettle();
-      expect(find.text('账号与安全'), findsOneWidget);
+      expect(find.text('账号与安全'), findsNothing);
+      expect(find.text('支持与服务'), findsNothing);
       expect(find.text('AI 与模型'), findsOneWidget);
       await tester.tap(find.text('模型服务'));
       await tester.pumpAndSettle();

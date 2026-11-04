@@ -686,21 +686,23 @@ class _ProfileBody extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        loadingHero
-            ? const _ProfileHeroSkeleton()
-            : _ProfileHeroCard(
-                info: info,
-                onEditProfile: localWorkspace ? needsLogin : onEditProfile,
-                onChangeAvatar: localWorkspace ? needsLogin : onChangeAvatar,
-                uploadingAvatar: uploadingAvatar,
-              ),
-        const SizedBox(height: 16),
-        _ActionGroupCard(
-          title: '账号与安全',
-          icon: CupertinoIcons.hexagon_fill,
-          iconColor: const Color(0xFF165DFF),
-          items: accountItems,
-        ),
+        if (!localWorkspace) ...[
+          loadingHero
+              ? const _ProfileHeroSkeleton()
+              : _ProfileHeroCard(
+                  info: info,
+                  onEditProfile: localWorkspace ? needsLogin : onEditProfile,
+                  onChangeAvatar: localWorkspace ? needsLogin : onChangeAvatar,
+                  uploadingAvatar: uploadingAvatar,
+                ),
+          const SizedBox(height: 16),
+          _ActionGroupCard(
+            title: '账号与安全',
+            icon: CupertinoIcons.hexagon_fill,
+            iconColor: const Color(0xFF165DFF),
+            items: accountItems,
+          ),
+        ],
         if (toolItems.isNotEmpty) ...[
           const SizedBox(height: 16),
           _ActionGroupCard(
@@ -719,13 +721,15 @@ class _ProfileBody extends ConsumerWidget {
             items: chatItems,
           ),
         ],
-        const SizedBox(height: 16),
-        _ActionGroupCard(
-          title: '支持与服务',
-          icon: CupertinoIcons.headphones,
-          iconColor: const Color(0xFF165DFF),
-          items: supportItems,
-        ),
+        if (!localWorkspace) ...[
+          const SizedBox(height: 16),
+          _ActionGroupCard(
+            title: '支持与服务',
+            icon: CupertinoIcons.headphones,
+            iconColor: const Color(0xFF165DFF),
+            items: supportItems,
+          ),
+        ],
       ],
     );
   }

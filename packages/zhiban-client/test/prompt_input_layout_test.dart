@@ -16,6 +16,36 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(RichMessageClipboard.clear);
 
+  testWidgets('local toolbar hides server tools and retains local tools',
+      (tester) async {
+    final controller = RichPromptController();
+    final focus = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focus.dispose);
+    await tester.pumpWidget(_host(
+        controller: controller, focusNode: focus, showServerTools: false));
+    for (final icon in [
+      CupertinoIcons.doc_text,
+      CupertinoIcons.square_grid_2x2,
+      CupertinoIcons.phone,
+      CupertinoIcons.video_camera
+    ]) {
+      expect(find.byIcon(icon), findsNothing);
+    }
+    for (final label in ['文件', '表情']) {
+      expect(find.byTooltip(label), findsOneWidget);
+    }
+    await tester.pumpWidget(_host(controller: controller, focusNode: focus));
+    for (final icon in [
+      CupertinoIcons.doc_text,
+      CupertinoIcons.square_grid_2x2,
+      CupertinoIcons.phone,
+      CupertinoIcons.video_camera
+    ]) {
+      expect(find.byIcon(icon), findsOneWidget);
+    }
+  });
+
   testWidgets('up/down recalls sent text and returns draft without wrapping',
       (tester) async {
     final controller = RichPromptController();
@@ -601,6 +631,7 @@ Widget _host({
   ValueChanged<List<String>>? onSend,
   List<String> sentTextHistory = const [],
   String conversationUuid = '',
+  bool showServerTools = true,
 }) {
   return ProviderScope(
     child: MaterialApp(
@@ -608,6 +639,7 @@ Widget _host({
         body: SizedBox(
           width: 600,
           child: PromptInput(
+            showServerTools: showServerTools,
             sentTextHistory: sentTextHistory,
             conversationUuid: conversationUuid,
             focusNode: focusNode,

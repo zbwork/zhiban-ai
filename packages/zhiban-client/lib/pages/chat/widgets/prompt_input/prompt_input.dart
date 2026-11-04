@@ -65,10 +65,12 @@ class PromptInput extends StatefulWidget {
     this.runtimeControls,
     this.sendReady = true,
     this.onOpenApps,
+    this.showServerTools = true,
     this.sentTextHistory = const [],
   });
 
   final FocusNode focusNode;
+  final bool showServerTools;
   final TextEditingController controller;
   final ValueChanged<ChatAttachmentPickKind> onPickAttachment;
   // 从云盘选择已有文件作为附件,不重新上传。
@@ -634,6 +636,8 @@ class PromptInputState extends State<PromptInput> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           _ComposerToolBar(
+                                            showServerTools:
+                                                widget.showServerTools,
                                             onPickEmoji: _pickEmoji,
                                             onUpload: () =>
                                                 widget.onPickAttachment(
@@ -922,6 +926,7 @@ class IconButtonSized extends StatelessWidget {
 
 class _ComposerToolBar extends StatelessWidget {
   const _ComposerToolBar({
+    required this.showServerTools,
     required this.onPickEmoji,
     required this.onUpload,
     required this.onPickFromDrive,
@@ -936,6 +941,7 @@ class _ComposerToolBar extends StatelessWidget {
   });
 
   final VoidCallback onPickEmoji;
+  final bool showServerTools;
   final VoidCallback onUpload;
   final VoidCallback onPickFromDrive;
   final VoidCallback onOpenAppPlaza;
@@ -962,40 +968,44 @@ class _ComposerToolBar extends StatelessWidget {
         tooltip: '文件',
         onTap: onUpload,
       ),
-      _ComposerToolButton(
-        icon: CupertinoIcons.doc_text,
-        label: '云盘',
-        tooltip: '云盘',
-        onTap: onPickFromDrive,
-      ),
-      _ComposerToolButton(
-        icon: CupertinoIcons.square_grid_2x2,
-        label: '应用',
-        tooltip: '应用',
-        onTap: onOpenAppPlaza,
-      ),
-      _ComposerToolButton(
-        icon: CupertinoIcons.phone,
-        label: '通话',
-        tooltip: voiceCallActive ? '挂断语音' : '语音通话',
-        enabled: voiceCallEnabled && onVoiceCall != null,
-        active: voiceCallActive,
-        onTap: (voiceCallEnabled && onVoiceCall != null)
-            ? onVoiceCall!
-            : onComingSoon,
-      ),
+      if (showServerTools)
+        _ComposerToolButton(
+          icon: CupertinoIcons.doc_text,
+          label: '云盘',
+          tooltip: '云盘',
+          onTap: onPickFromDrive,
+        ),
+      if (showServerTools)
+        _ComposerToolButton(
+          icon: CupertinoIcons.square_grid_2x2,
+          label: '应用',
+          tooltip: '应用',
+          onTap: onOpenAppPlaza,
+        ),
+      if (showServerTools)
+        _ComposerToolButton(
+          icon: CupertinoIcons.phone,
+          label: '通话',
+          tooltip: voiceCallActive ? '挂断语音' : '语音通话',
+          enabled: voiceCallEnabled && onVoiceCall != null,
+          active: voiceCallActive,
+          onTap: (voiceCallEnabled && onVoiceCall != null)
+              ? onVoiceCall!
+              : onComingSoon,
+        ),
       // Phase B：人↔人 1v1 视频通话入口。有 onVideoCall 回调 → 启用「视频」；
       // 否则保持「会议」置灰预留（敬请期待）。
-      _ComposerToolButton(
-        icon: CupertinoIcons.video_camera,
-        label: onVideoCall != null ? '视频' : '会议',
-        tooltip: videoCallActive ? '挂断视频' : '视频通话',
-        enabled: videoCallEnabled && onVideoCall != null,
-        active: videoCallActive,
-        onTap: (videoCallEnabled && onVideoCall != null)
-            ? onVideoCall!
-            : onComingSoon,
-      ),
+      if (showServerTools)
+        _ComposerToolButton(
+          icon: CupertinoIcons.video_camera,
+          label: onVideoCall != null ? '视频' : '会议',
+          tooltip: videoCallActive ? '挂断视频' : '视频通话',
+          enabled: videoCallEnabled && onVideoCall != null,
+          active: videoCallActive,
+          onTap: (videoCallEnabled && onVideoCall != null)
+              ? onVideoCall!
+              : onComingSoon,
+        ),
       // 聊天历史: 原在右侧顶栏, 移到工具栏末尾 (会议之后), 切换聊天历史面板。
       const _HistoryToolButton(),
     ];

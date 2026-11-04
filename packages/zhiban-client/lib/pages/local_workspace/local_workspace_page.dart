@@ -562,8 +562,7 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                       child: Column(children: [
                         ConversationListHeader(
                             controller: _search,
-                            onCreateGroup: () =>
-                                BotToast.showText(text: '群聊需要登录后使用'),
+                            onCreateGroup: null,
                             onSearchChanged: (v) =>
                                 setState(() => _keyword = v),
                             onClearSearch: () => setState(() {
@@ -754,8 +753,7 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                                               setState(() => _highlight = null);
                                             }
                                           },
-                                          onOpenApps: () => BotToast.showText(
-                                              text: '应用需要登录后使用'),
+                                          showServerTools: false,
                                           key: ValueKey(id),
                                           state: ChatWorkspaceState(
                                               activeConversationId: id,

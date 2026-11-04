@@ -66,11 +66,13 @@ class ChatSessionView extends StatefulWidget {
     this.runtimeApprovals,
     this.sendReady = true,
     this.onOpenApps,
+    this.showServerTools = true,
     this.sentTextHistory = const [],
     this.autoScrollOnMessageUpdate = true,
   });
 
   final ChatState state;
+  final bool showServerTools;
   final List<String> sentTextHistory;
   final bool autoScrollOnMessageUpdate;
   final RichPromptController? controller;
@@ -576,6 +578,7 @@ class _ChatSessionViewState extends State<ChatSessionView> {
                                       )
                                     else
                                       PromptInput(
+                                        showServerTools: widget.showServerTools,
                                         sentTextHistory: widget.sentTextHistory,
                                         onOpenApps: widget.onOpenApps,
                                         runtimeControls: widget.runtimeControls,

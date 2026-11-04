@@ -1,5 +1,9 @@
 # 本地工作区验证注意事项
 
+## 社区工具流程测试不能沿用商业版授权断言
+
+社区开发工具使用 API 设置和“一键配置工具”，按模型服务保存 BYOK；知办设备登录授权缺失不是社区配置失败。测试应保留安装、验证、恢复和错误边界，适配真实文案与能力判断，而非仅替换按钮文本或跳过失败。串联测试注入模拟 Bridge 工厂，模型凭据使用临时目录；真实文件 IO 在 tester.runAsync 内推进并有界等待，避免 fake async 阻止读写造成假失败。组件交互通过不代表真实服务商联调通过。
+
 ## 模型服务局部主题的中性色覆盖
 
 ModelServicePageTheme 将 colorScheme.primary 覆盖为 onSurfaceVariant，不能用它表达品牌蓝链接。获取密钥入口沿用 UiSwitch 的 Theme.primaryColor；不修改整个页面主题。颜色回归必须包裹真实 ModelServicePageTheme，单独在 AppTheme 下检查不能复现此问题。
