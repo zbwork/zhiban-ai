@@ -1,5 +1,9 @@
 # 本地工作区验证注意事项
 
+## 模型服务局部主题的中性色覆盖
+
+ModelServicePageTheme 将 colorScheme.primary 覆盖为 onSurfaceVariant，不能用它表达品牌蓝链接。获取密钥入口沿用 UiSwitch 的 Theme.primaryColor；不修改整个页面主题。颜色回归必须包裹真实 ModelServicePageTheme，单独在 AppTheme 下检查不能复现此问题。
+
 ## 凭据存储与原生验证
 
 社区版按用户选择使用本地私有明文文件，不使用钥匙串。Widget替身不能验证原生签名与文件权限，需独立验证目录0700、文件0600和重启读取。历史钥匙串调试过程见验证记录，不作为当前实现要求。

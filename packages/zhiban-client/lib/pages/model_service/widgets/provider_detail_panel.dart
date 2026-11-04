@@ -654,6 +654,8 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
     }
     final docsUrl = _catalogDocsUrlFor(provider);
     final websiteUrl = _resolveCatalogEntry(provider)?.websiteUrl;
+    // The page neutralizes colorScheme.primary; keep the brand accent for links.
+    final linkColor = Theme.of(context).primaryColor;
     final scheme = Theme.of(context).colorScheme;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
@@ -699,13 +701,25 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
                 TextButton(
                   onPressed: () => _openExternalUrl(websiteUrl),
                   style: TextButton.styleFrom(
-                    foregroundColor: scheme.primary,
+                    foregroundColor: linkColor,
                     textStyle: const TextStyle(fontSize: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    minimumSize: const Size(0, 24),
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    elevation: 0,
+                    side: BorderSide.none,
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ).copyWith(
+                    overlayColor: WidgetStateProperty.resolveWith((states) =>
+                        states.contains(WidgetState.focused)
+                            ? linkColor.withValues(alpha: 0.12)
+                            : Colors.transparent),
                   ),
-                  child: const Text('获取密钥'),
+                  child: Text(
+                    '获取密钥',
+                    style: TextStyle(color: linkColor, fontSize: 12),
+                  ),
                 ),
               ],
             ],
