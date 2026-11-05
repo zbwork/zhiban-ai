@@ -1,5 +1,7 @@
 # 社区版本地工具集成
 
+- 社区 helper 按轮启动，LocalAgentService.online 描述的是服务端常驻通道。共享顶栏若直接读取后者，会将社区空闲态误报为“本机运行组件未连接”。调用方显式指定按需启动提示，不能用假 online 状态绕过问题，也不能据提示宣称组件健康。
+
 - HTTP 400 不一定是固定 schema 错误。2026-11-03 实测 BeeBridge deepseek-flash 在首轮和工具成功后的续轮均可能返回 `bad_response_status_code` / `Request body format invalid`；同一请求体原样再发 HTTP 200。不能据错误分类认定 PDF 不可读，也不能把改工具后的偶然成功当作因果证据。社区代理仅对该目的端已确认拒绝做一次原样重试，不重放工具或成功流；仍失败则显示原错误。现有 ledger 不保留原始上游错误，历史截图的具体原文不可追溯。
 
 - 工具文字备份不能只写裸名 read_file：真实联调显示模型会照抄裸名，DSH 只注册 mcp__local__read_file，仍报 unknown tool。备份目录必须给完整调用名；用最终产物实测 list_files→read_file 两次均成功，不能只凭提示词变更或 mock 判定修复。

@@ -668,6 +668,7 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                               ChatDetailHeader(
                                   title: e['name'] as String,
                                   localAgent: _agent(c, e),
+                                  localExecutionOnDemand: true,
                                   trailing: IconButton(
                                       tooltip: '编辑数字员工',
                                       onPressed: c.busy(id!)

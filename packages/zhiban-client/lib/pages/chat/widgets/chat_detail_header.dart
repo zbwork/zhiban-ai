@@ -16,10 +16,14 @@ class ChatDetailHeader extends ConsumerWidget {
     this.agentDeleted = false,
     this.trailing,
     this.localAgent,
+    this.localExecutionOnDemand = false,
   });
 
   final String title;
   final AgentItem? localAgent;
+
+  /// 社区 helper 按任务启动，不使用服务端常驻通道的连接状态。
+  final bool localExecutionOnDemand;
   final bool agentDeleted;
 
   /// 顶栏右侧挂载点,由调用方决定放什么(如"加人"按钮);组件本身不感知具体业务。
@@ -77,6 +81,15 @@ class ChatDetailHeader extends ConsumerWidget {
                               .colorScheme
                               .onSurfaceVariant
                               .withValues(alpha: 0.55),
+                        ),
+                      )
+                    else if (localExecutionOnDemand)
+                      Tooltip(
+                        message: '本地执行，发送消息时自动启动',
+                        child: Icon(
+                          CupertinoIcons.desktopcomputer,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       )
                     else
