@@ -131,14 +131,26 @@ class TaskJobCard extends StatelessWidget {
   /// 单次任务状态：图标 + 文案一行展示，紧凑，不占额外一行。
   Widget _runOnceStatusRow() {
     final executed = !job.enabled && (job.state.lastRunAtMs ?? 0) > 0;
-    final color = executed ? const Color(0xFF12B76A) : const Color(0xFF98A2B3);
+    final localStatus =
+        job.localOnceAt == null ? null : job.state.lastRunStatus;
+    final failed = executed && ['error', 'cancelled'].contains(localStatus);
+    final running = executed && job.localOnceAt != null && localStatus == null;
+    final color = failed
+        ? const Color(0xFFB42318)
+        : executed && !running
+            ? const Color(0xFF12B76A)
+            : const Color(0xFF98A2B3);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          executed ? Icons.check_circle : CupertinoIcons.clock,
+          failed
+              ? CupertinoIcons.exclamationmark_circle
+              : executed && !running
+                  ? Icons.check_circle
+                  : CupertinoIcons.clock,
           size: 14,
           color: color,
         ),
@@ -147,7 +159,13 @@ class TaskJobCard extends StatelessWidget {
         // 对齐时视觉上文字会偏低；height:1.0 把行高收紧到贴合字形，两者才是真的
         // 视觉居中。
         Text(
-          executed ? '已执行' : '单次执行',
+          failed
+              ? (localStatus == 'cancelled' ? '已停止' : '执行失败')
+              : running
+                  ? '执行中'
+                  : executed
+                      ? '已执行'
+                      : '单次执行',
           style: TextStyle(fontSize: 12, color: color, height: 1.0),
         ),
       ],
@@ -307,16 +325,21 @@ class TaskJobCard extends StatelessWidget {
                                               MainAxisAlignment.center,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Text(
-                                              _nextRunTimeText(),
-                                              style: const TextStyle(
-                                                fontSize: 26,
-                                                fontWeight: FontWeight.w700,
-                                                color: Color(0xFF1D2939),
-                                                letterSpacing: 0.2,
-                                                height: 1.1,
-                                              ),
-                                            ),
+                                            Flexible(
+                                                child: FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: Text(
+                                                      _nextRunTimeText(),
+                                                      style: const TextStyle(
+                                                        fontSize: 26,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color:
+                                                            Color(0xFF1D2939),
+                                                        letterSpacing: 0.2,
+                                                        height: 1.1,
+                                                      ),
+                                                    ))),
                                             if (lastOk) ...[
                                               const SizedBox(width: 4),
                                               const Icon(
@@ -376,10 +399,7 @@ class TaskJobCard extends StatelessWidget {
 }
 
 class _TaskEnabledSwitch extends StatelessWidget {
-  const _TaskEnabledSwitch({
-    required this.enabled,
-    required this.onChanged
-  });
+  const _TaskEnabledSwitch({required this.enabled, required this.onChanged});
 
   final bool enabled;
   // null 时 Switch 自身置灰且不可交互（busy 中）。
@@ -537,9 +557,7 @@ class _RunNowButton extends StatelessWidget {
               const Color(0xFF3361F0).withValues(alpha: 0.85),
           disabledForegroundColor: Colors.white,
           padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8)
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           textStyle: const TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,

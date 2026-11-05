@@ -25,6 +25,7 @@ class CronJob {
     required this.createdAtMs,
     required this.updatedAtMs,
     this.runOnce = false,
+    this.localOnceAt,
     this.status = '',
     this.adminDisabled = false,
   }) : _enabled = enabled;
@@ -66,14 +67,11 @@ class CronJob {
   /// 落库表达式只能表达"每年这个月这天这个时间点"；后端在任务第一次跑到终态后
   /// 立即自动禁用，防止真的等到下一年重新触发。见 F08 doc「一次性 at-job」范围说明。
   final bool runOnce;
+  final DateTime? localOnceAt;
 
   /// 部分更新副本——主要给前端 toggle / busy 时做乐观刷新用：CupertinoSwitch
   /// 是受控组件，必须父级在 onChanged 触发后立刻喂入新 value 才不会回弹回旧值。
-  CronJob copyWith({
-    bool? enabled,
-    CronState? state,
-    String? status
-  }) {
+  CronJob copyWith({bool? enabled, CronState? state, String? status}) {
     return CronJob(
       id: id,
       name: name,
@@ -91,6 +89,7 @@ class CronJob {
       createdAtMs: createdAtMs,
       updatedAtMs: updatedAtMs,
       runOnce: runOnce,
+      localOnceAt: localOnceAt,
       status: status ?? this.status,
       adminDisabled: adminDisabled,
     );
@@ -114,9 +113,7 @@ class CronJob {
       enabled: json['enabled'] == true,
       status: (json['status'] ?? '').toString(),
       adminDisabled: json['admin_disabled'] == true,
-      schedule: CronSchedule.fromJson(
-        json
-      ),
+      schedule: CronSchedule.fromJson(json),
       timezone: (json['timezone'] ?? '').toString(),
       sessionTarget: (json['sessionTarget'] ?? 'isolated').toString(),
       wakeMode: (json['wakeMode'] ?? 'now').toString(),
@@ -126,16 +123,15 @@ class CronJob {
       createdAtMs: _readMs(json['created_at'] ?? json['createdAtMs']),
       updatedAtMs: _readMs(json['updated_at'] ?? json['updatedAtMs']),
       runOnce: json['run_once'] == true,
+      localOnceAt: json['once_at'] is int
+          ? DateTime.fromMillisecondsSinceEpoch(json['once_at'] as int)
+          : null,
     );
   }
 }
 
 class CronSchedule {
-  const CronSchedule({
-    required this.kind,
-    this.everyMs,
-    this.expr
-  });
+  const CronSchedule({required this.kind, this.everyMs, this.expr});
 
   final String kind;
   final int? everyMs;
@@ -155,11 +151,7 @@ class CronSchedule {
 }
 
 class CronPayload {
-  const CronPayload({
-    required this.kind,
-    this.message,
-    this.text
-  });
+  const CronPayload({required this.kind, this.message, this.text});
 
   final String kind;
   final String? message;
@@ -632,7 +624,8 @@ class CronJobDraft {
         scheduleType: 'once',
         interval: null,
         intervalUnit: 'hour',
-        runOnceAt: _parseOnceFromCron((job.schedule.expr ?? '').trim()),
+        runOnceAt: job.localOnceAt ??
+            _parseOnceFromCron((job.schedule.expr ?? '').trim()),
         schedule: job.schedule.expr ?? '',
         sessionTarget: job.sessionTarget,
         payloadKind: job.payload.kind.isEmpty ? 'agentTurn' : job.payload.kind,

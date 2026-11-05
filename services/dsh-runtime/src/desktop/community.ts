@@ -37,7 +37,7 @@ export interface CommunityModelDiagnostic {
 
 /** Backup of the authoritative registry; never guess aliases by ordinal. */
 export function communityToolGuide(tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>): string {
-  return '本轮可用工具以以下宿主实际注册目录为准。DSH 使用 mcp__local__ 前缀，例如 mcp__local__list_files；Codex 使用 local MCP 对应工具。参数遵守以下 schema。不使用 tool、tool_2 等占位名，不猜编号与工具对应关系。接口只显示占位定义时以此目录真实名称与参数为准，仍不能调用时说明接口异常，停止试探未知工具。只使用此目录与引擎实际提供的工具，不宣称具有未注册的搜索、浏览器或桌面控制能力。DSH 列目录只调用 mcp__local__list_files，path 为空；读取文件只调用 mcp__local__read_file。type=file 的路径不能传给目录工具。目录中每项 name 已是完整可调用名称，DSH 禁止去掉前缀。已获得未截断列表就回答，不为只问列表的任务继续读内容或枚举工具。工具错误按具体反馈修正，不重复试探。生成文件仍须交付声明与发布，写入和命令仍须批准。本轮实际工具目录：' + JSON.stringify(tools.map(({ name, description, inputSchema }) => ({ name: 'mcp__local__' + name, description, parameters: inputSchema })));
+  return '本轮可用工具以以下宿主实际注册目录为准。DSH 使用 mcp__local__ 前缀，例如 mcp__local__list_files；Codex 使用 local MCP 对应工具。参数遵守以下 schema。不使用 tool、tool_2 等占位名，不猜编号与工具对应关系。接口只显示占位定义时以此目录真实名称与参数为准，仍不能调用时说明接口异常，停止试探未知工具。只使用此目录与引擎实际提供的工具，不宣称具有未注册的搜索、浏览器或桌面控制能力。DSH 列目录只调用 mcp__local__list_files，path 为空；读取文件只调用 mcp__local__read_file。type=file 的路径不能传给目录工具。目录中每项 name 已是完整可调用名称，DSH 禁止去掉前缀。已获得未截断列表就回答，不为只问列表的任务继续读内容或枚举工具。工具错误按具体反馈修正，不重复试探。生成文件仍须交付声明与发布，写入和命令遵守当前访问权限，需批准时等待用户决定。本轮实际工具目录：' + JSON.stringify(tools.map(({ name, description, inputSchema }) => ({ name: 'mcp__local__' + name, description, parameters: inputSchema })));
 }
 
 /** The parent chooses the destination; workers cannot redirect credentials. */
@@ -181,11 +181,11 @@ export async function runCommunity(): Promise<void> {
         }
         if (input['type'] === 'stop') { await shutdown(); return; }
         if (input['type'] !== 'submit') throw new LocalError('local.invalid_request');
-        const request = z.object({ type: z.literal('submit'), id: z.string().uuid(), employee: z.string().uuid(), name: z.string().max(200), messageId: z.string().uuid(), engine: z.enum(['dsh', 'codex_app_server']), workspace: z.string().max(4096).optional(), skillsDir: z.string().max(4096).optional(), model: z.string().min(1).max(1024), attachments: z.array(z.object({ name: z.string().min(1).max(255), path: z.string().max(4096), size: z.number().int().min(0).max(10 * 1024 * 1024), sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict()).max(5).default([]), message: z.string().min(1).max(150000), persona: z.string().max(200000), history: z.string().max(500000), route: modelRoute }).strict().parse(input);
+        const request = z.object({ type: z.literal('submit'), id: z.string().uuid(), employee: z.string().uuid(), name: z.string().max(200), messageId: z.string().uuid(), engine: z.enum(['dsh', 'codex_app_server']), workspace: z.string().max(4096).optional(), mode: z.enum(['ask', 'assist', 'full']).default('assist'), confirmation: z.string().uuid().optional(), skillsDir: z.string().max(4096).optional(), model: z.string().min(1).max(1024), attachments: z.array(z.object({ name: z.string().min(1).max(255), path: z.string().max(4096), size: z.number().int().min(0).max(10 * 1024 * 1024), sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict()).max(5).default([]), message: z.string().min(1).max(150000), persona: z.string().max(200000), history: z.string().max(500000), route: modelRoute }).strict().parse(input);
         if (request.engine === 'codex_app_server' && request.route.protocol !== 'openai-compatible') throw new LocalError('local.model_protocol_mismatch');
         const task: LocalTask = { ...identity, run: request.id, employee: request.employee, conversation: request.employee, messageId: request.messageId, engine: request.engine, model: request.model, message: request.message, fence: 1, source: 'desktop', expiresAt: Date.now() + 900000 };
         const { selection } = await workspaces!.defaults(request.employee, request.employee, request.name);
-        if (request.workspace) Object.assign(selection, await workspaces!.select({ ...selection, workspace: request.workspace, mode: 'assist' }));
+        Object.assign(selection, await workspaces!.select({ ...selection, workspace: request.workspace ?? selection.workspace, mode: request.mode }, request.confirmation));
         let skillsDir: string | undefined;
         if (request.skillsDir) {
           const candidate = await realpath(request.skillsDir);

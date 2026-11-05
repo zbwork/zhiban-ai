@@ -540,7 +540,7 @@ void main() {
       expect(find.byType(ChatSessionView), findsOneWidget);
       router.go('/task');
       await tester.pumpAndSettle();
-      expect(find.textContaining('自动任务需要登录后使用'), findsWidgets);
+      expect(find.text('当前入口未配置任务页面'), findsOneWidget);
       router.go('/drive');
       await tester.pumpAndSettle();
       expect(find.text('云盘需要登录后使用'), findsWidgets);

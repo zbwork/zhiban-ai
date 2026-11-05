@@ -18,3 +18,10 @@
 - Artifact 原文件地址与历史快照不是同一个用途；消息保留独立已验证快照，避免用户改写工作文件后历史附件失效。
 - helper 测试清理先等进程退出再删目录，避免 worker 清理写入与 rm 竞争（ENOTEMPTY）。
 - 社区 Debug helper 为 ad-hoc（TeamIdentifier=not set），如果 Dart 仍执行商业 Developer ID requirement，会报“本地连接组件签名校验失败”。开发分支必须仍验证 strict 签名完整性和固定 identifier；Release 不放宽。完成 Flutter 构建后不要修改 App 内资产，否则外层资源 seal 失效；检查最终产物并重新签名调试包后再启动。
+
+
+## 社区权限入口与真实运行策略必须一起接通（2026-11-04）
+
+仅复用目录/模型按钮会漏掉原访问权限入口；community submit 原来在指定目录时写死 assist，增加 UI 不足以修复。复用原菜单行、确认框及 LocalPolicy，模式从员工配置经父进程传到 workspace.select；full 必须带 App-only 确认凭证。普通模式持久化，full 仅保存在客户端控制器内，runtime 持久化仍降级 assist。验收必须同时检查 UI 取消/确认、员工隔离/重启、DSH 与 Codex 真实执行器及无确认拒绝，不用只查菜单文字的测试证明权限生效。
+
+原文件卡片已改成“打开 / 在文件夹中显示”，旧测试仍查“预览 / 下载” tooltip 会报假失败；按当前按钮的类型、可点击性和云盘入口不存在验证，保留深浅主题覆盖，不改产品布局迎合旧断言。

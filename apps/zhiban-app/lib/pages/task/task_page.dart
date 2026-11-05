@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:zhiban_client/network/user_refresh.dart';
 
 import 'package:zhiban_client/pages/task/services/task_navigation.dart';
@@ -21,16 +22,46 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class TaskPage extends ConsumerStatefulWidget {
-  const TaskPage({super.key});
+  const TaskPage(
+      {super.key, this.localAgents, this.onOpenLocalRun, this.localChanges});
+  final List<AgentItem>? localAgents;
+  final Stream<void>? localChanges;
+  final Future<void> Function(CronRunEntry entry)? onOpenLocalRun;
 
   @override
   ConsumerState<TaskPage> createState() => _TaskPageState();
 }
 
 class _TaskPageState extends ConsumerState<TaskPage> {
+  StreamSubscription<void>? _localRefresh;
+  bool _refreshing = false, _refreshAgain = false;
+  Future<void> _refreshLocal() async {
+    if (_refreshing) {
+      _refreshAgain = true;
+      return;
+    }
+    _refreshing = true;
+    try {
+      do {
+        _refreshAgain = false;
+        if (mounted) await ref.read(taskPageProvider.notifier).refresh();
+      } while (mounted && _refreshAgain);
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _localRefresh?.cancel();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _localRefresh =
+        widget.localChanges?.listen((_) => unawaited(_refreshLocal()));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final notifier = ref.read(taskPageProvider.notifier);
@@ -64,6 +95,8 @@ class _TaskPageState extends ConsumerState<TaskPage> {
                 ? const TaskPageSkeleton()
                 : TaskPageBody(
                     state: taskState,
+                    localAgents: widget.localAgents,
+                    onOpenLocalRun: widget.onOpenLocalRun,
                     compact: false,
                     openEditorAsPage: false,
                     openConversationAsPage: false,
@@ -76,6 +109,8 @@ class _TaskPageState extends ConsumerState<TaskPage> {
 class TaskPageBody extends ConsumerWidget {
   const TaskPageBody({
     super.key,
+    this.localAgents,
+    this.onOpenLocalRun,
     required this.state,
     required this.compact,
     required this.openEditorAsPage,
@@ -83,6 +118,8 @@ class TaskPageBody extends ConsumerWidget {
   });
 
   final TaskPageState state;
+  final List<AgentItem>? localAgents;
+  final Future<void> Function(CronRunEntry entry)? onOpenLocalRun;
   final bool compact;
   final bool openEditorAsPage;
   final bool openConversationAsPage;
@@ -92,6 +129,8 @@ class TaskPageBody extends ConsumerWidget {
     final notifier = ref.read(taskPageProvider.notifier);
     return _TaskPageBodyContent(
       state: state,
+      localAgents: localAgents,
+      onOpenLocalRun: onOpenLocalRun,
       notifier: notifier,
       compact: compact,
       openEditorAsPage: openEditorAsPage,
@@ -102,6 +141,8 @@ class TaskPageBody extends ConsumerWidget {
 
 class _TaskPageBodyContent extends ConsumerStatefulWidget {
   const _TaskPageBodyContent({
+    this.localAgents,
+    this.onOpenLocalRun,
     required this.state,
     required this.notifier,
     required this.compact,
@@ -110,6 +151,8 @@ class _TaskPageBodyContent extends ConsumerStatefulWidget {
   });
 
   final TaskPageState state;
+  final List<AgentItem>? localAgents;
+  final Future<void> Function(CronRunEntry entry)? onOpenLocalRun;
   final TaskPageNotifier notifier;
   final bool compact;
   final bool openEditorAsPage;
@@ -139,6 +182,7 @@ class _TaskPageBodyContentState extends ConsumerState<_TaskPageBodyContent> {
   }
 
   Future<void> _openRunInChat(CronRunEntry entry) =>
+      widget.onOpenLocalRun?.call(entry) ??
       openTaskRunInChat(context, ref, entry,
           asPage: widget.openConversationAsPage);
 
@@ -201,13 +245,18 @@ class _TaskPageBodyContentState extends ConsumerState<_TaskPageBodyContent> {
     final hPad = isNarrow ? 16.0 : 24.0;
 
     final managedAgents =
-        ref.watch(agentsProvider).asData?.value ?? const <AgentItem>[];
-    final selectableAgents = ref.watch(taskSelectableAgentsProvider);
+        (widget.localAgents ?? ref.watch(agentsProvider).asData?.value) ??
+            const <AgentItem>[];
+    final selectableAgents = widget.localAgents == null
+        ? ref.watch(taskSelectableAgentsProvider)
+        : AsyncData<List<AgentItem>>(widget.localAgents!);
     // 联系人目录是完整业务候选；只有目录失败时才降级保留“我创建的”列表。
     // value 会在 refresh 期间保留上一份快照，避免下拉闪空。
     final agents = selectableAgents.value ?? managedAgents;
-    final conversations = ref.watch(conversationsProvider).asData?.value ??
-        const <ConversationItem>[];
+    final conversations = widget.localAgents != null
+        ? const <ConversationItem>[]
+        : ref.watch(conversationsProvider).asData?.value ??
+            const <ConversationItem>[];
     final agentNameById = <String, String>{
       for (final a in agents) a.agentId: a.name,
     };
@@ -234,6 +283,7 @@ class _TaskPageBodyContentState extends ConsumerState<_TaskPageBodyContent> {
         draft = await showDialog<CronJobDraft>(
           context: context,
           builder: (context) => TaskEditorDialog(
+            localWorkspace: widget.localAgents != null,
             job: job,
             agents: agents,
             conversations: conversations,
@@ -246,6 +296,13 @@ class _TaskPageBodyContentState extends ConsumerState<_TaskPageBodyContent> {
 
     return Column(
       children: [
+        if (widget.localAgents != null)
+          Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              child: Text('任务在客户端运行期间执行；关闭后暂停，重新打开会补执行一次到期任务。',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant))),
         Container(
           padding: EdgeInsets.fromLTRB(
             hPad,
@@ -288,6 +345,10 @@ class _TaskPageBodyContentState extends ConsumerState<_TaskPageBodyContent> {
                     icon: CupertinoIcons.refresh,
                     label: '刷新',
                     onPressed: () => UserRefresh.run(() async {
+                      if (widget.localAgents != null) {
+                        await notifier.refresh();
+                        return;
+                      }
                       ref.invalidate(taskSelectableAgentsProvider);
                       await Future.wait([
                         ref.read(taskSelectableAgentsProvider.future),

@@ -12,3 +12,9 @@
 - [本地附件处理踩坑](pitfalls/local-workspace.md)
 - [ADR：免登录本地工具](adr/0002-community-local-tools.md)
 - [本地工具集成踩坑](pitfalls/community-local-tools.md)
+
+- [社区版本地定时任务](requirements/local-scheduled-tasks.md)
+
+- [本地定时任务踩坑](pitfalls/local-scheduled-tasks.md)
+
+- [本地定时任务验证](verification/local-scheduled-tasks-2026-11-05.md)

@@ -8,7 +8,14 @@ import 'package:zhiban_core/chat/chat_models.dart';
 import '../../routes/route_paths.dart';
 import '../../services/conversation_models.dart';
 import '../chat/widgets/local_agent_controls.dart'
-    show AgentControlButton, conversationModelIcon, conversationModelPlatform;
+    show
+        AgentControlButton,
+        conversationModelIcon,
+        conversationModelPlatform,
+        permissionLabels,
+        localWarningColor,
+        localPermissionMenuItems,
+        FullLocalAccessDialog;
 import '../chat/widgets/model_picker_content.dart';
 import '../model_service/providers/model_service_providers.dart';
 import '../model_service/services/model_modality_classifier.dart';
@@ -22,9 +29,13 @@ class LocalChatModelControl extends ConsumerWidget {
       required this.employee,
       required this.busy,
       this.onWorkspace,
+      required this.permissionMode,
+      required this.onPermission,
       required this.onSelect});
   final LocalRow employee;
   final bool busy;
+  final String permissionMode;
+  final Future<void> Function(String mode) onPermission;
   final Future<void> Function(String path)? onWorkspace;
   final Future<void> Function(String provider, String model) onSelect;
 
@@ -94,6 +105,62 @@ class LocalChatModelControl extends ConsumerWidget {
                           }
                         }),
             ),
+          Builder(
+              builder: (anchor) => AgentControlButton(
+                    key: const ValueKey('local-chat-permission-button'),
+                    label: permissionLabels[permissionMode]!,
+                    icon: CupertinoIcons.shield,
+                    color: permissionMode == 'full'
+                        ? localWarningColor(context)
+                        : null,
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            final box = anchor.findRenderObject() as RenderBox;
+                            final overlay = Overlay.of(context)
+                                .context
+                                .findRenderObject() as RenderBox;
+                            final point = box.localToGlobal(Offset.zero,
+                                ancestor: overlay);
+                            final y = (point.dy - 310)
+                                .clamp(8.0, overlay.size.height - 80);
+                            final width =
+                                310.0.clamp(0.0, overlay.size.width - 32);
+                            final choice = await showMenu<String>(
+                                context: context,
+                                position: RelativeRect.fromLTRB(
+                                    point.dx,
+                                    y,
+                                    overlay.size.width -
+                                        point.dx -
+                                        box.size.width,
+                                    overlay.size.height - y),
+                                constraints: BoxConstraints(
+                                    minWidth: width, maxWidth: width),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                color: Theme.of(context).colorScheme.surface,
+                                items: localPermissionMenuItems(
+                                    context, permissionMode));
+                            if (choice == null ||
+                                choice == permissionMode ||
+                                !context.mounted) {
+                              return;
+                            }
+                            if (choice == 'full') {
+                              final accepted = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) =>
+                                      const FullLocalAccessDialog());
+                              if (accepted != true || !context.mounted) return;
+                            }
+                            try {
+                              await onPermission(choice);
+                            } catch (_) {
+                              BotToast.showText(text: '访问权限保存失败，请重试');
+                            }
+                          },
+                  )),
           AgentControlButton(
             key: const ValueKey('local-chat-model-button'),
             label: model?.displayName ?? '选择模型',

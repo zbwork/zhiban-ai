@@ -574,7 +574,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets(
-      'local file card exposes preview, reveal and explicit cancellable cloud sync',
+      'local file card exposes original open and reveal actions without cloud upload',
       (tester) async {
     tester.view.physicalSize = const Size(800, 650);
     tester.view.devicePixelRatio = 1;
@@ -600,9 +600,10 @@ void main() {
           dark: dark));
       await tester.pumpAndSettle();
       expect(find.textContaining('本机文件'), findsOneWidget);
-      expect(find.byTooltip('预览'), findsOneWidget);
-      expect(find.byTooltip('下载'), findsOneWidget);
-      expect(find.byTooltip('在文件夹中显示'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, '打开'), findsOneWidget);
+      expect(tester.widget<TextButton>(find.widgetWithText(TextButton, '打开')).onPressed, isNotNull);
+      expect(find.widgetWithText(TextButton, '在文件夹中显示'), findsOneWidget);
+      expect(tester.widget<TextButton>(find.widgetWithText(TextButton, '在文件夹中显示')).onPressed, isNotNull);
 
       expect(find.text('上传到我的云盘'), findsNothing);
       expect(find.text('确认上传'), findsNothing);

@@ -122,7 +122,7 @@ test('model proxy rejects redirects, nonlocal HTTP, model mismatch and protocol 
   } finally { server.closeAllConnections(); server.close(); }
 });
 
-for (const mode of ['allow', 'deny', 'cancel', 'codex']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
+for (const mode of ['allow', 'deny', 'cancel', 'codex', 'ask', 'full', 'full-unconfirmed', 'codex-ask', 'codex-full']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'community-runtime-test-')));
   let calls = 0;
   const run = randomUUID(), employee = randomUUID();
@@ -143,7 +143,7 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex']) test('real engine file/
     const chunks = []; for await (const chunk of req) chunks.push(chunk);
     const body = JSON.parse(Buffer.concat(chunks));
     assert.equal(req.headers.authorization, 'Bearer test-only-key');
-    assert.equal(req.url, mode === 'codex' ? '/v1/responses' : '/v1/chat/completions');
+    assert.equal(req.url, mode.startsWith('codex') ? '/v1/responses' : '/v1/chat/completions');
     assert.equal(body.model, 'test-model');
     if (!importedFile) {
       const serialized = JSON.stringify(body);
@@ -165,7 +165,7 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex']) test('real engine file/
       ['local_shell', { command: 'printf shell-ok > shell-result.txt; printf shell-ok', timeout_ms: 10000 }],
     ];
     const step = steps[calls++];
-    if (mode === 'codex') {
+    if (mode.startsWith('codex')) {
       const namespace = (body.tools ?? []).find(tool => tool.type === 'namespace' && tool.tools?.some(child => child.name === step?.[0]));
       const name = namespace ? step?.[0] : (body.tools ?? []).find(tool => tool.name?.endsWith(step?.[0]))?.name ?? 'mcp__local__' + step?.[0];
       const item = step ? { type: 'function_call', id: 'fc_' + calls, call_id: 'call-' + calls, name, ...(namespace ? { namespace: namespace.name } : {}), arguments: JSON.stringify(step[1]), status: 'completed' } : { type: 'message', id: 'msg_' + calls, role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: '本机验证完成', annotations: [] }] };
@@ -189,25 +189,38 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex']) test('real engine file/
   const done = new Promise((resolve, reject) => {
     child.once('exit', code => reject(new Error('helper exited ' + code)));
     child.stderr.resume();
-    lines.on('line', line => {
+    lines.on('line', async line => {
+      try {
       const event = JSON.parse(line); events.push(event);
       if (event.type === 'ready') {
         broker = event.url; key = event.key;
-        send({ type: 'submit', id: run, employee, name: 'test', messageId: randomUUID(), workspace: customWorkspace, engine: mode === 'codex' ? 'codex_app_server' : 'dsh', model: 'test-model', message: 'Write hello.txt, read it and run a shell command. This is an integration test.' + (mode === 'allow' ? ' '.repeat(120000) : ''), persona: 'Use tools.', skillsDir, attachments: [attachment], history: '[]', route: { baseURL: 'http://127.0.0.1:' + server.address().port, apiKey: 'test-only-key', headers: {}, protocol: 'openai-compatible' } });
+        let confirmation;
+        if (mode === 'full' || mode === 'codex-full') {
+          const proof = await fetch(broker + '/app/workspaces/full-confirmation', { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify({ conversation: employee }) });
+          confirmation = (await proof.json()).id;
+        }
+        send({ type: 'submit', mode: mode.endsWith('ask') ? 'ask' : mode.startsWith('full') || mode === 'codex-full' ? 'full' : 'assist', ...(confirmation ? { confirmation } : {}), id: run, employee, name: 'test', messageId: randomUUID(), workspace: customWorkspace, engine: mode.startsWith('codex') ? 'codex_app_server' : 'dsh', model: 'test-model', message: 'Write hello.txt, read it and run a shell command. This is an integration test.' + (mode === 'allow' ? ' '.repeat(120000) : ''), persona: 'Use tools.', skillsDir, attachments: [attachment], history: '[]', route: { baseURL: 'http://127.0.0.1:' + server.address().port, apiKey: 'test-only-key', headers: {}, protocol: 'openai-compatible' } });
       }
       if (event.type === 'accepted') workspace = event.workspace;
       if (event.type === 'approval') {
         approved = true;
         const path = mode === 'cancel' ? '/app/runs/' + run + '/cancel' : '/app/runs/' + run + '/approvals/' + event.id;
-        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'codex'].includes(mode), scope: 'once' }) }).catch(reject);
+        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'codex', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode), scope: 'once' }) }).catch(reject);
       }
-      if (event.type === 'error') reject(new Error(event.code));
+      if (event.type === 'error') { if (mode === 'full-unconfirmed') resolve(event); else reject(new Error(event.code)); }
       if (event.type === 'result') resolve(event);
+      } catch (error) { reject(error); }
     });
   });
   try {
     send({ type: 'initialize', privateRoot: stateRoot, documentsRoot: join(root, 'documents') });
     const result = await Promise.race([done, new Promise((_, reject) => setTimeout(() => reject(new Error('runtime timeout: ' + JSON.stringify(events.slice(-5)))), 100000).unref())]);
+    if (mode === 'full-unconfirmed') {
+      assert.equal(result.code, 'local.full_confirmation_required');
+      assert.equal(calls, 0);
+      await assert.rejects(readFile(join(customWorkspace, 'hello.txt')));
+      return;
+    }
     assert.equal(result.frame.event, mode === 'cancel' ? 'message.cancelled' : 'message.completed', JSON.stringify(result));
     assert.equal(workspace, customWorkspace);
     const preferences = JSON.parse(await readFile(join(stateRoot, 'workspaces.json'), 'utf8'));
@@ -220,13 +233,16 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex']) test('real engine file/
     assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('original-attachment-bytes')),
       'real engine reads imported original file');
     assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('community-ok')), JSON.stringify(toolResults));
-    if (['allow', 'codex'].includes(mode)) {
+    if (['allow', 'codex', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode)) {
       assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('shell-ok')), JSON.stringify(toolResults));
       assert.equal(await readFile(join(workspace, 'shell-result.txt'), 'utf8'), 'shell-ok');
     } else {
       await assert.rejects(readFile(join(workspace, 'shell-result.txt')));
     }
-    assert.equal(approved, true);
+    assert.equal(approved, !['full', 'codex-full'].includes(mode));
+    const approvals = events.filter(e => e.type === 'approval');
+    assert.equal(approvals.some(e => e.intent.tool === 'write_file'), mode.endsWith('ask'));
+    assert.equal(preferences.choices[0].mode, mode.endsWith('ask') ? 'ask' : 'assist');
     assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('full-package-resource')),
       'real engine reads installed package resources through the scoped skill tool');
     if (mode !== 'cancel') {
@@ -238,4 +254,19 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex']) test('real engine file/
     await Promise.race([new Promise(resolve => child.once('exit', resolve)), new Promise(resolve => setTimeout(() => { child.kill(); resolve(); }, 10000).unref())]);
     server.closeAllConnections(); server.close(); await rm(root, { recursive: true, force: true, maxRetries: 3 });
   }
+});
+
+
+test('full access still requires one-time upload approval', async () => {
+  const { LocalPolicy } = await import(pathToFileURL(join(packageRoot, 'dist/desktop/policy.js')));
+  let pending;
+  const policy = new LocalPolicy(randomUUID(), request => { pending = request; });
+  const confirmation = policy.requestFull(); policy.setMode('full', confirmation.id);
+  let executed = false;
+  const result = policy.execute({ tool: 'upload_file', operation: 'upload', args: { artifact: 'immutable-id' } }, async () => { executed = true; });
+  assert.ok(pending);
+  assert.equal(executed, false);
+  policy.approve(pending.id, pending.revision, false, 'once');
+  await assert.rejects(result, error => error.code === 'local.approval_denied');
+  assert.equal(executed, false);
 });

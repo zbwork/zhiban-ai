@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
+import 'services/local_task_service.dart';
+import 'services/local_employee_execution.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -26,6 +29,7 @@ final localWorkspaceProvider =
   final controller = LocalWorkspaceController(store);
   ref.onDispose(controller.dispose);
   await controller.refresh();
+  controller.startTasks();
   return controller;
 });
 
@@ -51,12 +55,53 @@ class LocalWorkspaceController extends ChangeNotifier {
       : _client = modelClient ?? LocalModelClient(),
         _runtime = modelClient == null ? CommunityRuntime() : null;
   final LocalWorkspaceStore store;
+  LocalTaskService? _tasks;
+  CommunityApproval? taskApproval;
+  LocalTaskService get tasks =>
+      _tasks ??= LocalTaskService(store, isBusy: busy, execution: _execution,
+          execute: (employee, prompt, token) async {
+        final reply = await send(employee, prompt, executionToken: token,
+            approve: (request) async {
+          final approval = taskApproval;
+          return approval == null ? false : await approval(request);
+        });
+        if (reply == null) throw StateError('该员工正在执行');
+        return reply;
+      });
+  void startTasks() => tasks.start();
   late final skillInstaller = CommunitySkillInstaller(store);
   final LocalModelClient _client;
   final CommunityRuntime? _runtime;
+  final Set<String> _fullAccess = {};
+  String permissionMode(LocalRow employee) {
+    if (_fullAccess.contains(employee['id'])) return 'full';
+    final meta = jsonDecode(employee['metadata'] as String? ?? '{}') as Map;
+    return meta['permission_mode'] == 'ask' ? 'ask' : 'assist';
+  }
+
+  /// The caller must show FullLocalAccessDialog before selecting full.
+  Future<void> setPermission(LocalRow employee, String mode) async {
+    if (!['ask', 'assist', 'full'].contains(mode)) {
+      throw ArgumentError.value(mode);
+    }
+    final id = employee['id'] as String;
+    final meta = jsonDecode(employee['metadata'] as String? ?? '{}') as Map;
+    await saveEmployee({
+      ...employee,
+      'metadata': jsonEncode(
+          {...meta, 'permission_mode': mode == 'full' ? 'assist' : mode})
+    });
+    if (mode == 'full') {
+      _fullAccess.add(id);
+    } else {
+      _fullAccess.remove(id);
+    }
+    _notify();
+  }
+
   final Map<String, String> liveText = {};
   final Map<String, List<ChatTimelineEntry>> timelines = {};
-  final Map<String, CancelToken> _requests = {};
+  late final _execution = LocalEmployeeExecution(onChanged: _notify);
   List<LocalRow> employees = [];
   List<LocalRow> skills = [];
   bool _disposed = false;
@@ -158,8 +203,8 @@ class LocalWorkspaceController extends ChangeNotifier {
     }
   }
 
-  bool busy(String employee) => _requests.containsKey(employee);
-  void stop(String employee) => _requests[employee]?.cancel();
+  bool busy(String employee) => _execution.busy(employee);
+  void stop(String employee) => _execution.stop(employee);
   void _notify() {
     if (!_disposed) notifyListeners();
   }
@@ -184,22 +229,29 @@ class LocalWorkspaceController extends ChangeNotifier {
 
   Future<void> deleteEmployee(String id) async {
     if (busy(id)) throw StateError('请先停止该员工的回复再删除');
-    _requests[id] = CancelToken();
+    final token = _execution.acquire(id);
+    if (token == null) throw StateError('请先停止该员工的回复再删除');
     try {
       await LocalAttachmentService().deleteEmployeeFiles(id);
       await store.deleteEmployee(id);
+      _fullAccess.remove(id);
     } finally {
-      _requests.remove(id);
+      _execution.release(id, token);
     }
     await refresh();
   }
 
-  Future<void> send(LocalRow employee, String text,
+  Future<LocalRow?> send(LocalRow employee, String text,
       {List<LocalAttachment> attachments = const [],
       CommunityApproval? approve,
-      void Function()? onAccepted}) async {
+      void Function()? onAccepted,
+      CancelToken? executionToken}) async {
     final id = employee['id'] as String;
-    if ((text.trim().isEmpty && attachments.isEmpty) || busy(id)) return;
+    if (text.trim().isEmpty && attachments.isEmpty) return null;
+    if (executionToken == null && busy(id)) return null;
+    if (executionToken != null && !_execution.owns(id, executionToken)) {
+      throw StateError('员工执行令牌已失效');
+    }
     if (attachments.length > 5 ||
         attachments.fold<int>(0, (n, f) => n + f.text.length) > 120000) {
       throw StateError('每次最多 5 个附件，总文字不能超过 120,000 字符');
@@ -208,12 +260,13 @@ class LocalWorkspaceController extends ChangeNotifier {
         (employee['model_id'] as String).isEmpty) {
       throw const LocalModelException('请先在对话输入框选择聊天模型');
     }
-    final cancel = CancelToken();
-    _requests[id] = cancel;
+    final cancel = executionToken ?? _execution.acquire(id);
+    if (cancel == null) return null;
     _notify();
     String? replyId;
     String? skillsDir;
     try {
+      if (cancel.isCancelled) throw cancel.cancelError!;
       const configStore = ModelServiceStore();
       final providers = await configStore.loadProviders();
       final provider = providers
@@ -312,6 +365,7 @@ class LocalWorkspaceController extends ChangeNotifier {
             messageId: replyId,
             engine: meta['local_engine'] as String? ?? 'dsh',
             workspace: meta['workspace'] as String?,
+            permissionMode: permissionMode(employee),
             skillsDir: skillsDir,
             attachments: saved,
             message: messages.last['content']!,
@@ -383,7 +437,9 @@ class LocalWorkspaceController extends ChangeNotifier {
                     .join('\n'),
             status,
             attachments: jsonEncode(files.map((f) => f.toJson()).toList()));
-        return;
+        return (await store.db
+                .query('messages', where: 'id = ?', whereArgs: [replyId]))
+            .single;
       }
       final reply = await _client.complete(
         provider: provider,
@@ -395,6 +451,9 @@ class LocalWorkspaceController extends ChangeNotifier {
         cancelToken: cancel,
       );
       await store.finishMessage(replyId, reply, 'complete');
+      return (await store.db
+              .query('messages', where: 'id = ?', whereArgs: [replyId]))
+          .single;
     } catch (e) {
       if (replyId != null) {
         await store.finishMessage(
@@ -407,46 +466,52 @@ class LocalWorkspaceController extends ChangeNotifier {
       } else {
         rethrow;
       }
+      return (await store.db
+              .query('messages', where: 'id = ?', whereArgs: [replyId]))
+          .single;
     } finally {
       if (skillsDir != null) {
         try {
           await Directory(skillsDir).delete(recursive: true);
         } catch (_) {}
       }
-      if (replyId != null) {
-        liveText.remove(replyId);
-        final entries = timelines[replyId] ?? [];
-        for (var i = 0; i < entries.length; i++) {
-          if (entries[i].isRunning) {
-            entries[i] = entries[i].copyWith(
-                status: cancel.isCancelled
-                    ? ChatTimelineStatus.stopped
-                    : ChatTimelineStatus.error,
-                endedAt: DateTime.now());
+      try {
+        if (replyId != null) {
+          liveText.remove(replyId);
+          final entries = timelines[replyId] ?? [];
+          for (var i = 0; i < entries.length; i++) {
+            if (entries[i].isRunning) {
+              entries[i] = entries[i].copyWith(
+                  status: cancel.isCancelled
+                      ? ChatTimelineStatus.stopped
+                      : ChatTimelineStatus.error,
+                  endedAt: DateTime.now());
+            }
           }
+          await store.db.update(
+              'messages',
+              {
+                'timeline': jsonEncode([
+                  for (final t in entries)
+                    {
+                      'key': t.key,
+                      'title': t.title,
+                      'start': t.startedAt.millisecondsSinceEpoch,
+                      'end': t.endedAt?.millisecondsSinceEpoch,
+                      'status': t.status.name,
+                      'name': t.toolName,
+                      'args': t.toolArgs,
+                      'result': t.toolResult
+                    }
+                ])
+              },
+              where: 'id = ?',
+              whereArgs: [replyId]);
+          timelines.remove(replyId);
         }
-        await store.db.update(
-            'messages',
-            {
-              'timeline': jsonEncode([
-                for (final t in entries)
-                  {
-                    'key': t.key,
-                    'title': t.title,
-                    'start': t.startedAt.millisecondsSinceEpoch,
-                    'end': t.endedAt?.millisecondsSinceEpoch,
-                    'status': t.status.name,
-                    'name': t.toolName,
-                    'args': t.toolArgs,
-                    'result': t.toolResult
-                  }
-              ])
-            },
-            where: 'id = ?',
-            whereArgs: [replyId]);
-        timelines.remove(replyId);
+      } finally {
+        if (executionToken == null) _execution.release(id, cancel);
       }
-      _requests.remove(id);
       await refresh();
     }
   }
@@ -454,9 +519,9 @@ class LocalWorkspaceController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    for (final request in _requests.values) {
-      request.cancel();
-    }
+    _tasks?.dispose();
+    taskApproval = null;
+    _execution.dispose();
     // Let in-flight requests finish their durable interrupted status first.
     super.dispose();
   }

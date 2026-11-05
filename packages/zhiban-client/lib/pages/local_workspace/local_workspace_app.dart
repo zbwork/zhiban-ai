@@ -14,20 +14,26 @@ import 'local_workspace_page.dart';
 /// fetches its anonymous public catalog only when opened.
 Future<void> startLocalWorkspace(
     {Widget Function(Widget child)? shellBuilder,
-    WidgetBuilder? localCodingToolsBuilder}) async {
+    WidgetBuilder? localCodingToolsBuilder,
+    LocalTaskPageBuilder? localTaskBuilder}) async {
   WidgetsFlutterBinding.ensureInitialized();
   await WindowController.instance.init(hasToken: true);
   runApp(ProviderScope(
       child: LocalWorkspaceApp(
           shellBuilder: shellBuilder,
-          localCodingToolsBuilder: localCodingToolsBuilder)));
+          localCodingToolsBuilder: localCodingToolsBuilder,
+          localTaskBuilder: localTaskBuilder)));
 }
 
 class LocalWorkspaceApp extends StatefulWidget {
   const LocalWorkspaceApp(
-      {super.key, this.shellBuilder, this.localCodingToolsBuilder});
+      {super.key,
+      this.shellBuilder,
+      this.localCodingToolsBuilder,
+      this.localTaskBuilder});
   final Widget Function(Widget child)? shellBuilder;
   final WidgetBuilder? localCodingToolsBuilder;
+  final LocalTaskPageBuilder? localTaskBuilder;
   @override
   State<LocalWorkspaceApp> createState() => _LocalWorkspaceAppState();
 }
@@ -39,6 +45,7 @@ class _LocalWorkspaceAppState extends State<LocalWorkspaceApp> {
           final content = Material(
               child: LocalWorkspacePage(
             section: state.uri.path,
+            localTaskBuilder: widget.localTaskBuilder,
             child: [RoutePaths.modelService, RoutePaths.localCodingTools]
                     .contains(state.uri.path)
                 ? child

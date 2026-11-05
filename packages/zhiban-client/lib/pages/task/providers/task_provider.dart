@@ -9,9 +9,7 @@ import 'package:zhiban_client/pages/task/services/task_service.dart';
 import 'package:zhiban_client/pages/task/utils/task_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final taskServiceProvider = Provider<BusTaskService>(
-  (ref) => BusTaskService()
-);
+final taskServiceProvider = Provider<BusTaskService>((ref) => BusTaskService());
 
 /// 自动任务需要的是“当前用户可对话的数字员工”，不是仅供管理场景使用的
 /// `/agents?mine=1`。这里直接读取空关键词联系人快照，避免继承数字员工页面
@@ -38,6 +36,7 @@ List<AgentItem> taskSelectableAgentsFromSnapshot(
 
 final taskPageProvider = NotifierProvider<TaskPageNotifier, TaskPageState>(
   TaskPageNotifier.new,
+  dependencies: [taskServiceProvider],
 );
 
 class TaskPageState {
@@ -156,6 +155,7 @@ class TaskPageNotifier extends Notifier<TaskPageState> {
       // jobs 与 recent runs 互相独立，并行拉取（此前串行等待）；
       // runs 的 jobName 回填依赖 jobs，放在两者都返回后做。
       final (jobs, rawRuns) = await _loadJobsAndRecentRuns(service);
+      if (!ref.mounted) return;
       final recentRuns = _withJobNames(rawRuns, jobs);
       // 历史 tab 下拉直接从已拉取的 jobs 派生（Bus F08 暂无 distinct endpoint，
       // 之前调 listJobsDistinct 会把同一份 /cron/jobs 再打一次）。
@@ -170,6 +170,7 @@ class TaskPageNotifier extends Notifier<TaskPageState> {
         clearError: true,
       );
     } catch (e) {
+      if (!ref.mounted) return;
       state = state.copyWith(
         isLoading: false,
         hasLoadedOnce: true,
@@ -184,13 +185,15 @@ class TaskPageNotifier extends Notifier<TaskPageState> {
     final service = ref.read(taskServiceProvider);
     try {
       final (jobs, rawRuns) = await _loadJobsAndRecentRuns(service);
+      if (!ref.mounted) return;
       final recentRuns = _withJobNames(rawRuns, jobs);
       final historyJobs =
           jobs.map(CronJobDistinctEntry.fromJob).toList(growable: false);
       final nextRunsByJob = <String, List<CronRunEntry>>{};
-      for (final jobId in state.expandedJobIds) {
+      for (final jobId in {...state.expandedJobIds, ...state.runsByJob.keys}) {
         nextRunsByJob[jobId] = await service.listJobRuns(jobId, limit: 10);
       }
+      if (!ref.mounted) return;
       state = state.copyWith(
         jobs: jobs,
         recentRuns: recentRuns,
@@ -201,6 +204,7 @@ class TaskPageNotifier extends Notifier<TaskPageState> {
         clearError: true,
       );
     } catch (e) {
+      if (!ref.mounted) return;
       state = state.copyWith(
         isRefreshing: false,
         errorMessage: isTransientNetworkError(e) ? null : taskUserMessage(e),
@@ -351,10 +355,7 @@ class TaskPageNotifier extends Notifier<TaskPageState> {
       service.listJobs(),
       service.listRecentRuns(limit: 100),
     ]);
-    return (
-      results[0]! as List<CronJob>,
-      results[1]! as List<CronRunEntry>
-    );
+    return (results[0]! as List<CronJob>, results[1]! as List<CronRunEntry>);
   }
 
   List<CronRunEntry> _withJobNames(

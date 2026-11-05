@@ -28,9 +28,10 @@ class LocalWorkspaceStore {
         '${(await getApplicationSupportDirectory()).path}/community_workspace_v1.db';
     final database = await (factory ?? databaseFactory).openDatabase(location,
         options: OpenDatabaseOptions(
-          version: 6,
+          version: 7,
           onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
           onUpgrade: (db, oldVersion, newVersion) async {
+            if (oldVersion < 7) await _createTaskTables(db);
             if (oldVersion < 6) {
               await db.execute(
                   "ALTER TABLE messages ADD COLUMN timeline TEXT NOT NULL DEFAULT '[]'");
@@ -59,6 +60,7 @@ class LocalWorkspaceStore {
             }
           },
           onCreate: (db, version) async {
+            await _createTaskTables(db);
             await db.execute(
                 'CREATE TABLE employees (id TEXT PRIMARY KEY, name TEXT NOT NULL, prompt TEXT NOT NULL, provider_id TEXT NOT NULL, model_id TEXT NOT NULL, skills TEXT NOT NULL, created INTEGER NOT NULL)');
             await db.execute(
@@ -90,10 +92,46 @@ class LocalWorkspaceStore {
         await txn.insert('skills', Map<String, Object?>.from(skill as Map),
             conflictAlgorithm: ConflictAlgorithm.ignore);
       }
+      final interrupted = await txn.query('local_task_runs',
+          where: 'status = ?', whereArgs: ['running']);
+      for (final run in interrupted) {
+        final jobs = await txn
+            .query('local_tasks', where: 'id = ?', whereArgs: [run['job_id']]);
+        if (jobs.isNotEmpty) {
+          final body = Map<String, dynamic>.from(
+              jsonDecode(jobs.single['body'] as String) as Map);
+          await txn.update(
+              'local_tasks',
+              {
+                'body': jsonEncode({
+                  ...body,
+                  'last_run_status': 'cancelled',
+                  'last_run_summary': '客户端退出，本次执行已中断'
+                })
+              },
+              where: 'id = ?',
+              whereArgs: [run['job_id']]);
+        }
+      }
+      await txn.update('local_task_runs',
+          {'status': 'interrupted', 'error': '客户端退出，本次执行已中断'},
+          where: 'status = ?', whereArgs: ['running']);
       await txn.update('messages', {'status': 'interrupted'},
           where: 'status = ?', whereArgs: ['pending']);
     });
     return store;
+  }
+
+  static Future<void> _createTaskTables(Database db) async {
+    await db.execute(
+        'CREATE TABLE local_tasks (id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, body TEXT NOT NULL, next_run INTEGER, enabled INTEGER NOT NULL, updated INTEGER NOT NULL)');
+    await db.execute(
+        'CREATE INDEX local_tasks_due ON local_tasks(enabled, next_run)');
+    // Snapshots intentionally survive deleting a task or employee.
+    await db.execute(
+        "CREATE TABLE local_task_runs (id TEXT PRIMARY KEY, job_id TEXT NOT NULL, employee_id TEXT NOT NULL, job_name TEXT NOT NULL, started INTEGER NOT NULL, status TEXT NOT NULL, body TEXT NOT NULL, summary TEXT NOT NULL DEFAULT '', error TEXT, message_id TEXT, duration INTEGER NOT NULL DEFAULT 0)");
+    await db.execute(
+        'CREATE INDEX local_task_runs_job ON local_task_runs(job_id, started)');
   }
 
   static Future<void> _addSkillPresentationColumns(Database db) async {
@@ -182,7 +220,11 @@ class LocalWorkspaceStore {
   }
 
   Future<void> deleteEmployee(String id) async {
-    await db.delete('employees', where: 'id = ?', whereArgs: [id]);
+    await db.transaction((txn) async {
+      await txn
+          .delete('local_tasks', where: 'employee_id = ?', whereArgs: [id]);
+      await txn.delete('employees', where: 'id = ?', whereArgs: [id]);
+    });
   }
 
   Future<String> addMessage(String employee, String role, String content,

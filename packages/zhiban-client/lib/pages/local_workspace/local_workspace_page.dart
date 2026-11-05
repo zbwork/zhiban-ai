@@ -27,7 +27,9 @@ import '../chat/widgets/chat_history_panel.dart';
 import '../chat/providers/chat_providers.dart'
     show chatHistoryPanelOpenProvider;
 import '../settings/settings_page.dart';
-import '../task/widgets/task_feedback.dart';
+import '../task/models/task_models.dart';
+import '../task/providers/task_provider.dart';
+import 'services/community_runtime.dart';
 import '../drive/widgets/drive_content_view.dart';
 import '../contacts/contacts_panes.dart' as contacts;
 import '../chat/widgets/chat_session_view.dart';
@@ -51,6 +53,9 @@ import 'local_workspace_controller.dart';
 import 'services/local_model_client.dart';
 import 'services/local_workspace_store.dart';
 
+typedef LocalTaskPageBuilder = Widget Function(List<AgentItem> agents,
+    Future<void> Function(CronRunEntry entry) openRun, Stream<void> changes);
+
 final localAttachmentPickerProvider =
     Provider<Future<List<String>> Function()>((ref) => () async {
           final files = await openFiles();
@@ -60,15 +65,32 @@ final localAttachmentPickerProvider =
 /// Local data adapter for the existing desktop presentation components.
 /// The host App supplies its original MainLayout; this widget owns no navigation.
 class LocalWorkspacePage extends ConsumerStatefulWidget {
-  const LocalWorkspacePage({super.key, required this.section, this.child});
+  const LocalWorkspacePage(
+      {super.key, required this.section, this.child, this.localTaskBuilder});
   final String section;
   final Widget? child;
+  final LocalTaskPageBuilder? localTaskBuilder;
   @override
   ConsumerState<LocalWorkspacePage> createState() => _LocalWorkspacePageState();
 }
 
 class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
   String? _selected;
+  LocalWorkspaceController? _controller;
+  late final CommunityApproval _taskApproval = _approveTask;
+  Future<bool> _approveTask(Map<String, dynamic> approval) async {
+    if (!mounted) return false;
+    final intent = approval['intent'] as Map;
+    return await showUiConfirmDialog(context,
+            title: '允许本机操作？',
+            description:
+                '工具：${intent['tool']}\n操作：${intent['operation']}\n${jsonEncode(intent['args'])}',
+            confirmLabel: '允许本次',
+            danger: ['shell', 'delete', 'overwrite']
+                .contains(intent['operation'])) ==
+        true;
+  }
+
   final _messageLoads =
       <String, ({int revision, Future<List<LocalRow>> future})>{};
   final _messageViews = <String, List<ChatMessage>>{};
@@ -195,6 +217,9 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
 
   @override
   void dispose() {
+    if (identical(_controller?.taskApproval, _taskApproval)) {
+      _controller?.taskApproval = null;
+    }
     WindowController.instance.setOverlayWidth(0);
     _search.dispose();
     _skillsScroll.dispose();
@@ -235,9 +260,14 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
         WindowController.instance.setOverlayWidth(next ? 280 : 0);
       }
     });
+    final workspace = ref.watch(localWorkspaceProvider);
+    final ready = workspace.value;
+    if (ready != null) {
+      _controller = ready;
+      ready.taskApproval = _taskApproval;
+    }
     if (widget.child != null) return widget.child!;
-    if ([RoutePaths.task, RoutePaths.drive, RoutePaths.contacts]
-        .contains(widget.section)) {
+    if ([RoutePaths.drive, RoutePaths.contacts].contains(widget.section)) {
       final title = widget.section == RoutePaths.task
           ? '自动任务'
           : widget.section == RoutePaths.drive
@@ -248,23 +278,14 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
           child: Column(children: [
             _header(title, '$title需要登录后使用'),
             Expanded(
-                child: widget.section == RoutePaths.task
-                    ? TaskLoadError(
-                        title: '自动任务需要登录后使用',
-                        message: '当前为免登录本地工作区，暂不开放自动任务',
-                        icon: CupertinoIcons.lock,
-                        actionLabel: '了解使用条件',
-                        onRetry: () => BotToast.showText(text: '自动任务需要登录后使用'),
-                      )
-                    : widget.section == RoutePaths.drive
-                        ? const DriveContentView(
-                            showUnavailableState: true,
-                            unavailableMessage: '云盘需要登录后使用')
-                        : const contacts.EmptyState(text: '通讯录需要登录后使用')),
+                child: widget.section == RoutePaths.drive
+                    ? const DriveContentView(
+                        showUnavailableState: true,
+                        unavailableMessage: '云盘需要登录后使用')
+                    : const contacts.EmptyState(text: '通讯录需要登录后使用')),
           ]));
     }
     if (widget.section == RoutePaths.settings) return _settings();
-    final workspace = ref.watch(localWorkspaceProvider);
     return ColoredBox(
         color: ColorConfig.pageBackground,
         child: workspace.when(
@@ -279,6 +300,27 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
           data: (c) => ListenableBuilder(
               listenable: c,
               builder: (context, _) {
+                if (widget.section == RoutePaths.task) {
+                  final builder = widget.localTaskBuilder;
+                  if (builder == null) {
+                    return const Center(child: Text('当前入口未配置任务页面'));
+                  }
+                  return ProviderScope(
+                      overrides: [
+                        taskServiceProvider.overrideWithValue(c.tasks)
+                      ],
+                      child:
+                          builder([for (final e in c.employees) _agent(c, e)],
+                              (entry) async {
+                        if (!c.employees
+                            .any((e) => e['id'] == entry.conversationUuid)) {
+                          BotToast.showText(text: '数字员工已删除，执行记录仍保留');
+                          return;
+                        }
+                        setState(() => _selected = entry.conversationUuid);
+                        context.go(RoutePaths.chat);
+                      }, c.tasks.changes));
+                }
                 if (widget.section == RoutePaths.digitalEmployee) {
                   return _employees(c);
                 }
@@ -733,6 +775,9 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                                               LocalChatModelControl(
                                             employee: e,
                                             busy: c.busy(id),
+                                            permissionMode: c.permissionMode(e),
+                                            onPermission: (mode) =>
+                                                c.setPermission(e, mode),
                                             onWorkspace: (path) =>
                                                 c.saveEmployee({
                                               ...e,

@@ -70,3 +70,11 @@ flutter test --no-pub --reporter expanded test/local_workspace_shell_test.dart t
 - 不重跑整仓库测试；本轮围绕社区工作区及相邻桌面组件，无 Windows 实测。
 
 本轮未发现定向社区回归中的新增失败；扩展测试兼容性待清理，真实 GUI 和模型联调未完成，不能称为完整手工验收通过。
+# 本地聊天权限修复补充
+
+- 已验证：复用原权限菜单和完全访问确认框，三档权限、取消/勾选确认、回复期间禁用。普通模式按员工保存，完全访问仅内存保存；覆盖员工隔离、改目录保持、控制器重建降级。
+- 已验证：community submit 不再固定 assist，校验模式并经原 workspace 确认凭证接入 LocalPolicy。无凭证 full 在模型调用前失败；DSH/Codex 的 ask 写入、assist 常规写入、full 命令、拒绝/取消均使用真实执行器验证；full 上传单次批准保留。
+- Flutter：local_workspace、local_agent_design_test、local_agent_menu_navigation_test 共64通过、2个原有条件跳过（商业版云端创建），未新增跳过。旧文件卡片测试按当前打开/显示按钮及回调验证，保留深浅主题覆盖。
+- Runtime：打包 Node 执行 community-runtime.test.mjs 与 community-attachments.test.mjs，16通过、0失败、0跳过；模型为本地 HTTP mock，文件和命令真实执行。
+- 静态分析：本地工作区、原权限组件及相关测试无问题；macOS debug 构建通过，保留既有 Go macOS 链接版本警告。
+- 未运行 Windows 构建、真实付费模型及人工 GUI 点击。本仓库无 scripts/check-repo-hygiene.sh，改用 git diff --check。在线 security 参考返回 Forbidden，未据此声称核验最新版。

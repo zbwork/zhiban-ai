@@ -26,6 +26,7 @@ class CommunityRuntime {
     required String messageId,
     required String engine,
     String? workspace,
+    String permissionMode = 'assist',
     String? skillsDir,
     List<LocalAttachment> attachments = const [],
     required String message,
@@ -162,6 +163,14 @@ class CommunityRuntime {
       });
       await ready.future.timeout(const Duration(seconds: 45));
       if (cancelToken.isCancelled) throw const LocalModelException('已停止生成');
+      String? confirmation;
+      if (permissionMode == 'full') {
+        final proof = await dio.post<Map<String, dynamic>>(
+            '/app/workspaces/full-confirmation',
+            data: {'conversation': employee});
+        confirmation = proof.data!['id'] as String;
+      }
+      if (cancelToken.isCancelled) throw const LocalModelException('已停止生成');
       submitted = true;
       write({
         'type': 'submit',
@@ -170,6 +179,8 @@ class CommunityRuntime {
         'name': name,
         'messageId': messageId,
         'engine': engine,
+        'mode': permissionMode,
+        if (confirmation != null) 'confirmation': confirmation,
         if (workspace != null && workspace.isNotEmpty) 'workspace': workspace,
         if (skillsDir != null) 'skillsDir': skillsDir,
         'attachments': [

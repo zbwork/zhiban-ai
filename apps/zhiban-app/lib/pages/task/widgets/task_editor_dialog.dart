@@ -7,12 +7,14 @@ import 'package:flutter/material.dart';
 class TaskEditorDialog extends StatelessWidget {
   const TaskEditorDialog({
     this.job,
+    this.localWorkspace = false,
     this.agents = const <AgentItem>[],
     this.conversations = const <ConversationItem>[],
     super.key,
   });
 
   final CronJob? job;
+  final bool localWorkspace;
   final List<AgentItem> agents;
   final List<ConversationItem> conversations;
 
@@ -21,6 +23,7 @@ class TaskEditorDialog extends StatelessWidget {
     return UiContentDialog(
       child: TaskEditorContent(
         job: job,
+        localWorkspace: localWorkspace,
         agents: agents,
         conversations: conversations,
         onCancel: () => Navigator.of(context).pop(),

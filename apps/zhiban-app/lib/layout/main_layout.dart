@@ -38,6 +38,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                       [
                         RoutePaths.chat,
                         RoutePaths.digitalEmployee,
+                        RoutePaths.task,
                         RoutePaths.inspire
                       ].contains(item.path)))
               .toList(),

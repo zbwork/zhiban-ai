@@ -71,6 +71,42 @@ const permissionDescriptions = {
   'assist': '自动执行常规操作，风险操作前询问',
   'full': '可访问当前账户有权限的文件与网络',
 };
+PopupMenuEntry<String> permissionMenuRow(
+        BuildContext context, String key, String mode) =>
+    PopupMenuItem<String>(
+        value: key,
+        height: 66,
+        child: AgentMenuRow(
+            title: permissionLabels[key]!,
+            subtitle: permissionDescriptions[key],
+            icon: key == 'full'
+                ? CupertinoIcons.lock_open
+                : key == 'ask'
+                    ? CupertinoIcons.person_badge_plus
+                    : CupertinoIcons.checkmark_shield,
+            selected: key == mode,
+            color: key == 'full' ? localWarningColor(context) : null));
+
+List<PopupMenuEntry<String>> localPermissionMenuItems(
+        BuildContext context, String mode) =>
+    [
+      PopupMenuItem<String>(
+          enabled: false, height: 34,
+          child: Text('访问权限', style: TextStyle(fontSize: 13,
+              fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface))),
+      for (final key in permissionLabels.keys)
+        permissionMenuRow(
+          context,
+          key,
+          mode,
+        ),
+      const PopupMenuDivider(),
+      PopupMenuItem<String>(
+          enabled: false, height: 38,
+          child: Text('开启完全访问需要再次确认。', style: TextStyle(fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant))),
+    ];
+
 Color localWarningColor(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
         ? Colors.orange.shade300
@@ -509,14 +545,6 @@ class _LocalAgentControlsState extends State<LocalAgentControls> {
               selected: selected,
               badge: badge,
               color: color));
-  PopupMenuEntry<String> _title(String text) => PopupMenuItem(
-      enabled: false,
-      height: 34,
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface)));
   PopupMenuEntry<String> _note(String text) => PopupMenuItem(
       enabled: false,
       height: 38,
@@ -629,21 +657,7 @@ class _LocalAgentControlsState extends State<LocalAgentControls> {
 
   Future<void> _permission() async {
     final mode = '${_selection['mode'] ?? 'assist'}';
-    final choice = await _menu(permissionKey, [
-      _title('访问权限'),
-      for (final key in permissionLabels.keys)
-        _row(key, permissionLabels[key]!,
-            subtitle: permissionDescriptions[key],
-            icon: key == 'full'
-                ? CupertinoIcons.lock_open
-                : key == 'ask'
-                    ? CupertinoIcons.person_badge_plus
-                    : CupertinoIcons.checkmark_shield,
-            selected: key == mode,
-            color: key == 'full' ? localWarningColor(context) : null),
-      const PopupMenuDivider(),
-      _note('开启完全访问需要再次确认。'),
-    ]);
+    final choice = await _menu(permissionKey, localPermissionMenuItems(context, mode));
     if (choice == null || choice == mode || !mounted) return;
     if (choice != 'full') {
       await _select(mode: choice);

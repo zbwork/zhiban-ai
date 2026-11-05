@@ -70,10 +70,10 @@ void main() {
     final sidebar = find.byKey(const ValueKey('desktop-sidebar'));
     expect(tester.getSize(sidebar).width, 180);
     expect(find.text('本地用户'), findsOneWidget);
-    for (final label in ['对话', '数字员工', '技能广场']) {
+    for (final label in ['对话', '数字员工', '技能广场', '自动任务']) {
       expect(find.text(label), findsOneWidget);
     }
-    for (final label in ['自动任务', '云盘', '通讯录']) {
+    for (final label in ['云盘', '通讯录']) {
       expect(find.text(label), findsNothing);
     }
     await tester.tap(find.text('数字员工'));

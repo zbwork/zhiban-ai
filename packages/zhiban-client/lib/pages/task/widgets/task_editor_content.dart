@@ -18,6 +18,7 @@ class TaskEditorContent extends StatefulWidget {
     this.conversations = const <ConversationItem>[],
     this.promptTemplateService,
     this.showHeader = true,
+    this.localWorkspace = false,
     this.compact = false,
     super.key,
   });
@@ -29,6 +30,7 @@ class TaskEditorContent extends StatefulWidget {
   final VoidCallback onCancel;
   final ValueChanged<CronJobDraft> onSubmit;
   final bool showHeader;
+  final bool localWorkspace;
   final bool compact;
 
   @override
@@ -103,7 +105,7 @@ class _TaskEditorContentState extends State<TaskEditorContent> {
     _runOnceAt = draft.runOnceAt;
     _agentId = _initialAgentId(draft);
     _conversationUuid = _initialConversationUuid(draft);
-    _loadTemplates();
+    if (!widget.localWorkspace) _loadTemplates();
   }
 
   static final ButtonStyle _cancelButtonStyle = OutlinedButton.styleFrom(
@@ -477,10 +479,7 @@ class _TaskEditorContentState extends State<TaskEditorContent> {
             padding: EdgeInsets.symmetric(horizontal: isNarrow ? 16 : 20),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 10
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: _feedbackIsError
                     ? const Color(0xFFFFF1EF)
@@ -837,7 +836,9 @@ class _TaskEditorContentState extends State<TaskEditorContent> {
         _TaskEditorSelect<String>(
           label: '执行内容来源',
           value: _promptMode,
-          items: const ['custom', 'template'],
+          items: widget.localWorkspace
+              ? const ['custom']
+              : const ['custom', 'template'],
           labelBuilder: (value) => value == 'template' ? '使用模板' : '自定义提示',
           onChanged: (value) {
             setState(() => _promptMode = value);
@@ -947,10 +948,7 @@ class _TaskEditorSection extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             subtitle,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF667085)
-            ),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF667085)),
           ),
           const SizedBox(height: 16),
           child,
@@ -1185,10 +1183,8 @@ class _TaskEditorSelect<T> extends StatelessWidget {
           menuMaxHeight: 220,
           options: items
               .map(
-                (item) => UiSelectOption<T>(
-                  value: item,
-                  label: labelBuilder(item)
-                ),
+                (item) =>
+                    UiSelectOption<T>(value: item, label: labelBuilder(item)),
               )
               .toList(),
         ),
@@ -1231,10 +1227,7 @@ class _TaskEditorSwitchField extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              UiSwitch(
-                value: value,
-                onChanged: onChanged
-              ),
+              UiSwitch(value: value, onChanged: onChanged),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
