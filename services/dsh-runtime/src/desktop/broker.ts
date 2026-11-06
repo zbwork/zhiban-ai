@@ -174,6 +174,9 @@ export class DesktopBroker {
         if ((protocol === 'messages') !== (run.config.protocol === 'anthropic-messages')) throw new LocalError('local.model_protocol_mismatch');
         const body = z.record(z.string(), z.unknown()).parse(req.body);
         if (body['model'] !== run.task.model) throw new LocalError('local.model_mismatch');
+        // Omission preserves the Responses default and avoids gateways that
+        // incorrectly parse the explicit auto string as a tool object.
+        if (protocol === 'responses' && body['tool_choice'] === 'auto') delete body['tool_choice'];
         const controller = new AbortController();
         const disconnected = () => controller.abort();
         reply.raw.once('close', disconnected);

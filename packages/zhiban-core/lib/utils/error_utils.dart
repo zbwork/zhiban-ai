@@ -116,11 +116,12 @@ String? formatKnownModelFailure(String raw) {
   final canonical = status == null ? '' : '$base（HTTP $status）。';
   final detail =
       raw.contains(':') ? raw.substring(raw.indexOf(':') + 1).trim() : '';
-  return code.startsWith('model.') &&
+  final message = code.startsWith('model.') &&
           detail == canonical &&
           canonical.isNotEmpty
       ? canonical
       : '$base。';
+  return code.startsWith('model.') ? '$message（$code）' : message;
 }
 
 String formatBackendErrorMessage(

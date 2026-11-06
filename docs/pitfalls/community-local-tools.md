@@ -1,5 +1,7 @@
 # 社区版本地工具集成
 
+- EasyO 修复不能只按提交名整批同步。社区 BYOK 同样经过 Codex transport/Broker，会受祖先配置发现与 Responses 默认 tool_choice 网关解析影响；商业账务与常驻通道恢复则不在社区聊天链路。独立 CODEX_HOME 不阻止祖先项目配置发现，必须限制到隔离 cwd；仅省略 Responses 默认 auto，不改变显式工具策略。回归需覆盖用户目录祖先，不能只用 /tmp。
+
 - 社区 helper 按轮启动，LocalAgentService.online 描述的是服务端常驻通道。共享顶栏若直接读取后者，会将社区空闲态误报为“本机运行组件未连接”。调用方显式指定按需启动提示，不能用假 online 状态绕过问题，也不能据提示宣称组件健康。
 
 - HTTP 400 不一定是固定 schema 错误。2026-11-03 实测 BeeBridge deepseek-flash 在首轮和工具成功后的续轮均可能返回 `bad_response_status_code` / `Request body format invalid`；同一请求体原样再发 HTTP 200。不能据错误分类认定 PDF 不可读，也不能把改工具后的偶然成功当作因果证据。社区代理仅对该目的端已确认拒绝做一次原样重试，不重放工具或成功流；仍失败则显示原错误。现有 ledger 不保留原始上游错误，历史截图的具体原文不可追溯。

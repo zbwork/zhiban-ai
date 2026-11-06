@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zhiban_core/chat/chat_models.dart';
+import 'package:zhiban_core/utils/error_utils.dart';
 import '../model_service/models/ai_endpoint_type.dart';
 import 'services/community_runtime.dart';
 
@@ -432,9 +433,12 @@ class LocalWorkspaceController extends ChangeNotifier {
             replyId,
             status == 'complete'
                 ? reply
-                : [reply, data['error_message'] as String? ?? '本地执行未完成']
-                    .where((s) => s.isNotEmpty)
-                    .join('\n'),
+                : [
+                    reply,
+                    formatKnownModelFailure(
+                            '${data['error_code'] ?? ''}: ${data['error_message'] ?? ''}') ??
+                        (data['error_message'] as String? ?? '本地执行未完成')
+                  ].where((s) => s.isNotEmpty).join('\n'),
             status,
             attachments: jsonEncode(files.map((f) => f.toJson()).toList()));
         return (await store.db

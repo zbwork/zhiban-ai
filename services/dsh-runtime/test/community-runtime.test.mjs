@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { mkdtemp, mkdir, writeFile, readFile, realpath, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
@@ -12,9 +12,37 @@ import { randomUUID, createHash } from 'node:crypto';
 const packageRoot = process.env.COMMUNITY_RUNTIME_TEST_ROOT;
 assert.ok(packageRoot, 'COMMUNITY_RUNTIME_TEST_ROOT must name a built runtime');
 const { communityModel, communityToolGuide } = await import(pathToFileURL(join(packageRoot, 'dist/desktop/community.js')));
+const { DesktopBroker } = await import(pathToFileURL(join(packageRoot, 'dist/desktop/broker.js')));
 const { readModelFailure } = await import(pathToFileURL(join(packageRoot, 'dist/desktop/model-error.js')));
 const { officeCreate, officeCreateInput } = await import(pathToFileURL(join(packageRoot, 'dist/desktop/office-schema.js')));
 const { z } = await import(pathToFileURL(join(packageRoot, 'node_modules/zod/index.js')));
+
+test('broker normalizes only the default Responses tool choice before BYOK forwarding', async () => {
+  const run = { task: { model: 'fixture', engine: 'codex_app_server' }, config: { protocol: 'openai-compatible' }, controller: new AbortController() };
+  const seen = [];
+  const broker = new DesktopBroker({
+    supervisor: () => ({ authorize: () => run }), tools: [],
+    model: async (_task, protocol, body) => {
+      seen.push({ protocol, body });
+      return new Response(JSON.stringify({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] }), { headers: { 'content-type': 'application/json' } });
+    },
+  });
+  const base = await broker.listen();
+  try {
+    for (const protocol of ['responses', 'chat/completions']) {
+      for (const choice of [undefined, 'auto', 'none', 'required', { type: 'function', name: 'clock' }]) {
+        const response = await fetch(base + '/llmgw/v1/by-key/' + protocol, {
+          method: 'POST', headers: { authorization: 'Bearer scoped-key', 'content-type': 'application/json' },
+          body: JSON.stringify({ model: 'fixture', tool_choice: choice }),
+        });
+        assert.equal(response.status, 200);
+        await response.text();
+        assert.equal(seen.at(-1).protocol, protocol);
+        assert.deepEqual(seen.at(-1).body.tool_choice, protocol === 'responses' && choice === 'auto' ? undefined : choice);
+      }
+    }
+  } finally { await broker.close(); }
+});
 
 test('community tool backup is derived from the actual registry without invented tools', () => {
   const tools = [{ name: 'list_files', description: 'list actual files', inputSchema: { type: 'object', properties: { path: { type: 'string' } } } }];
@@ -122,8 +150,9 @@ test('model proxy rejects redirects, nonlocal HTTP, model mismatch and protocol 
   } finally { server.closeAllConnections(); server.close(); }
 });
 
-for (const mode of ['allow', 'deny', 'cancel', 'codex', 'ask', 'full', 'full-unconfirmed', 'codex-ask', 'codex-full']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'community-runtime-test-')));
+for (const mode of ['allow', 'deny', 'cancel', 'codex', 'codex-home-parent', 'ask', 'full', 'full-unconfirmed', 'codex-ask', 'codex-full']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
+  // Exercise user-profile ancestry without reading or changing real config.
+  const root = await realpath(await mkdtemp(join(mode === 'codex-home-parent' ? homedir() : tmpdir(), 'community-runtime-test-')));
   let calls = 0;
   const run = randomUUID(), employee = randomUUID();
   const stateRoot = join(root, 'community-runtime', employee);
@@ -166,6 +195,7 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex', 'ask', 'full', 'full-unc
     ];
     const step = steps[calls++];
     if (mode.startsWith('codex')) {
+      assert.notEqual(body.tool_choice, 'auto');
       const namespace = (body.tools ?? []).find(tool => tool.type === 'namespace' && tool.tools?.some(child => child.name === step?.[0]));
       const name = namespace ? step?.[0] : (body.tools ?? []).find(tool => tool.name?.endsWith(step?.[0]))?.name ?? 'mcp__local__' + step?.[0];
       const item = step ? { type: 'function_call', id: 'fc_' + calls, call_id: 'call-' + calls, name, ...(namespace ? { namespace: namespace.name } : {}), arguments: JSON.stringify(step[1]), status: 'completed' } : { type: 'message', id: 'msg_' + calls, role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: '本机验证完成', annotations: [] }] };
@@ -205,7 +235,7 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex', 'ask', 'full', 'full-unc
       if (event.type === 'approval') {
         approved = true;
         const path = mode === 'cancel' ? '/app/runs/' + run + '/cancel' : '/app/runs/' + run + '/approvals/' + event.id;
-        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'codex', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode), scope: 'once' }) }).catch(reject);
+        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'codex', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode), scope: 'once' }) }).catch(reject);
       }
       if (event.type === 'error') { if (mode === 'full-unconfirmed') resolve(event); else reject(new Error(event.code)); }
       if (event.type === 'result') resolve(event);
@@ -233,7 +263,7 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex', 'ask', 'full', 'full-unc
     assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('original-attachment-bytes')),
       'real engine reads imported original file');
     assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('community-ok')), JSON.stringify(toolResults));
-    if (['allow', 'codex', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode)) {
+    if (['allow', 'codex', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode)) {
       assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('shell-ok')), JSON.stringify(toolResults));
       assert.equal(await readFile(join(workspace, 'shell-result.txt'), 'utf8'), 'shell-ok');
     } else {

@@ -9,7 +9,9 @@ import WebSocket from 'ws';
 export async function openCodexTransport(binary, options = {}) {
   const events = new EventEmitter();
   const args = ['app-server', '--listen'];
-  const config = options.config ?? [];
+  // CODEX_HOME does not stop ancestor project configuration discovery.
+  // Keep that discovery inside the isolated task cwd on both transports.
+  const config = [...(options.config ?? []), '-c', 'project_root_markers=[]'];
   const receive = (bytes) => {
     try {
       if (bytes.length > 4_000_000) throw new Error('app_server_frame_too_large');

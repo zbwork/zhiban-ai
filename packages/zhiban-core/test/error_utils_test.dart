@@ -22,29 +22,35 @@ void main() {
       expect(isQuotaErrorMessage(code), isFalse);
     }
   });
+  test('upstream failure exposes its stable code in live and history errors', () {
+    final visible = formatBackendErrorPayload(
+        errorCode: 'model.upstream_failure', errorMessage: 'SECRET');
+    expect(visible, '模型平台处理请求失败，请稍后重试。（model.upstream_failure）');
+    expect(formatChatSendError(_dioError('model.upstream_failure: SECRET')), visible);
+  });
   test('upstream missing messages field keeps its specific reason and HTTP 500',
       () {
     expect(
         formatBackendErrorPayload(
             errorCode: 'model.messages_required',
             errorMessage: '模型请求缺少 messages 字段（HTTP 500）。'),
-        '模型请求缺少 messages 字段（HTTP 500）。');
+        '模型请求缺少 messages 字段（HTTP 500）。（model.messages_required）');
   });
   test('model request errors retain safe details in both SSE and history', () {
     expect(
         formatBackendErrorPayload(
             errorCode: 'model.request_invalid',
             errorMessage: '模型请求格式错误（HTTP 400）。'),
-        '模型请求格式错误（HTTP 400）。');
+        '模型请求格式错误（HTTP 400）。（model.request_invalid）');
     expect(
         formatBackendErrorMessage(
             'model.request_invalid: SECRET https://internal/（HTTP 400）。'),
-        '模型请求格式错误。');
+        '模型请求格式错误。（model.request_invalid）');
     expect(
         formatBackendErrorPayload(
             errorCode: 'model.upstream_quota',
             errorMessage: 'billing.insufficient_credits SECRET'),
-        '模型平台账户额度不足，请检查模型平台余额。');
+        '模型平台账户额度不足，请检查模型平台余额。（model.upstream_quota）');
     expect(
         formatBackendErrorMessage(
             'billing.model_access_recovering: internal state'),

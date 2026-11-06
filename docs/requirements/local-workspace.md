@@ -1,5 +1,17 @@
 # 社区版本地工作区
 
+## 上游本地执行修复适配（2026-11-05）
+
+对照 EasyO 的 7b5638d25 与 2e14c05de：社区 helper 同样复用 Codex transport 和 DesktopBroker，需要限制祖先项目配置发现，并兼容 Responses 默认工具选择；共享模型错误格式化保留白名单 model.* 错误码及规范 HTTP 状态，不展示服务商任意正文。
+
+- Codex 启动参数强制追加 `project_root_markers=[]`，配置发现停止在隔离 cwd，不读取真实用户配置、不扩大沙箱白名单。
+- Broker 仅在 Responses 中省略 `tool_choice: "auto"`；保留 none、required、指定工具及其他协议的原请求。
+- 实时与历史错误使用同一固定文案和稳定模型错误码，敏感正文仍过滤。
+
+适配判断：采用上游已定位、已验证的最小修复。行业依据沿用上游调研的 [项目根发现规则](https://developers.openai.com/codex/config-advanced/#project-root-detection) 与 [Responses 创建接口](https://platform.openai.com/docs/api-reference/responses/create) 默认工具选择语义；本次是同实现缺陷回移，不声称重新核验在线文档。社区当前为每轮 helper、BYOK 直连；不引入商业余额快照、登录通道重连或服务端就绪流程。
+
+验收：用户目录祖先场景中真实 Codex 能完成本地文件工具往返；默认及显式工具策略逐项验证；模型错误码与 HTTP 状态展示且不泄漏原始详情；文件审批、拒绝、取消和现有模型选择保持。
+
 ## 本地执行顶栏提示（2026-11-05）
 
 社区聊天顶栏保留本地图标和标记，悬浮提示为“本地执行，发送消息时自动启动”。该提示说明执行方式，不代表组件已就绪或任务已成功；不得读取服务端 LocalAgentService 的常驻连接状态来判断社区 helper。组件缺失、模型协议不兼容等错误仍由发送流程报告。服务端模式保留原已连接/未连接状态，已删除员工保留删除提示。通过共享顶栏的显式能力参数区分两种执行方式，默认服务端行为。

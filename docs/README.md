@@ -18,3 +18,5 @@
 - [本地定时任务踩坑](pitfalls/local-scheduled-tasks.md)
 
 - [本地定时任务验证](verification/local-scheduled-tasks-2026-11-05.md)
+
+- [EasyO 近期修复对照与验证](verification/upstream-bugfix-port-2026-11-05.md)
