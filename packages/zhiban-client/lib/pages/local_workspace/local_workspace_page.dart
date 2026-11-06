@@ -651,19 +651,26 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                   const VerticalDivider(width: 0.8),
                   Expanded(
                       child: e == null
-                          ? Column(children: [
-                              const Expanded(
-                                  child: ChatEmptyState(
-                                      message: '创建数字员工，开始第一次对话')),
-                              FilledButton(
-                                  onPressed: () => _edit(c),
-                                  child: const Text('新建数字员工')),
-                              TextButton(
-                                  onPressed: () =>
-                                      context.go(RoutePaths.modelService),
-                                  child: const Text('配置模型 API Key')),
-                              const SizedBox(height: 48),
-                            ])
+                          ? Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: ChatEmptyState(
+                                title: '从第一位数字员工开始',
+                                message: '让它帮你写作、整理资料，或处理日常工作。',
+                                actions: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    FilledButton(
+                                        onPressed: () => _edit(c),
+                                        child: const Text('创建数字员工')),
+                                    const SizedBox(height: 8),
+                                    TextButton(
+                                        onPressed: () =>
+                                            context.go(RoutePaths.modelService),
+                                        child: const Text('模型服务设置')),
+                                  ],
+                                ),
+                              ),
+                            )
                           : Column(children: [
                               ChatDetailHeader(
                                   title: e['name'] as String,

@@ -296,13 +296,6 @@ class _TaskPageBodyContentState extends ConsumerState<_TaskPageBodyContent> {
 
     return Column(
       children: [
-        if (widget.localAgents != null)
-          Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-              child: Text('任务在客户端运行期间执行；关闭后暂停，重新打开会补执行一次到期任务。',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant))),
         Container(
           padding: EdgeInsets.fromLTRB(
             hPad,

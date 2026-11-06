@@ -15,10 +15,14 @@ class ChatEmptyState extends StatelessWidget {
     super.key,
     this.bottomInset = 0,
     this.message = '暂无消息，开始新的对话吧',
+    this.title,
+    this.actions,
   });
 
   final double bottomInset;
   final String message;
+  final String? title;
+  final Widget? actions;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +40,16 @@ class ChatEmptyState extends StatelessWidget {
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 10),
+            if (title != null) ...[
+              Text(
+                title!,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Text(
               message,
               textAlign: TextAlign.center,
@@ -46,15 +60,20 @@ class ChatEmptyState extends StatelessWidget {
                 height: 1.2,
               ),
             ),
-            const SizedBox(height: 16),
-            Container(
-              width: 34,
-              height: 2,
-              decoration: BoxDecoration(
-                color: const Color(0xFFDDE5F2),
-                borderRadius: BorderRadius.circular(999),
+            if (actions != null) ...[
+              const SizedBox(height: 24),
+              actions!,
+            ] else ...[
+              const SizedBox(height: 16),
+              Container(
+                width: 34,
+                height: 2,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDDE5F2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
