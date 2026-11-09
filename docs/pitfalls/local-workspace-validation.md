@@ -58,3 +58,11 @@ ChatSessionView.composerEnabled=false 的既有语义是员工删除后的只读
 ## 技能广场来源
 
 Bus匿名公开接口是广场唯一来源，不再分发官网或旧manifest快照。原SkillIcon继续使用网络图标及默认图标，旧数据库asset地址在打开时清空。目录不等于执行包，安装仍须校验实际SKILL.md及完整资源，不能将简介当执行指令。
+
+## 从桌面 App 宿主运行共享包测试
+
+共享包 `flutter_test_config.dart` 不能无条件将 ClientAssets.packageName 置空：从 apps/zhiban-app 运行共享测试时，资源仍位于 packages/zhiban_client/，错误归零会导致模型目录和技能别名读取失败，进而产生技能目录空等连带失败。按当前测试根是否实际具有 model_catalog/providers.json 选择资源命名空间；不修改生产资源契约、不跳过断言。
+
+## 先确认实际引擎再排查工具后中断
+
+员工本地执行不等于使用DSH。该次个人任务规划专家元数据为 codex_app_server，模型请求诊断为 responses；失败终态 engine_error 为 other，固定关键词 parse/missing/stream disconnected。不能将它先归因于 DSH 或丢失历史。安全诊断与任务台账可还原工具完成和模型请求顺序，不输出凭据、原始提示词或原始上游错误。

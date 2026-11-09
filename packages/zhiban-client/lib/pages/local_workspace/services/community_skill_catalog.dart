@@ -78,6 +78,11 @@ class CommunitySkillCatalog {
           throw const FormatException('技能目录字段无效');
         }
       }
+      final icon = raw['icon_url'] as String? ?? '';
+      if (icon.startsWith('/api/public/v1/skills/')) {
+        raw['icon_url'] =
+            Uri.parse(_dio.options.baseUrl).resolve(icon).toString();
+      }
       for (final field in ['category_id', 'sort_order', 'install_count']) {
         if (raw[field] != null && raw[field] is! int) {
           throw const FormatException('技能目录数字字段无效');

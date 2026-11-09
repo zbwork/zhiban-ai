@@ -43,6 +43,29 @@ void main() {
     expect(requests, 2);
     expect(await client.cached(), hasLength(51));
   });
+  test('public avatar uses the catalog origin and survives cached reload',
+      () async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://catalog.example/root'));
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+      handler.resolve(Response(requestOptions: options, data: {
+        'success': true,
+        'data': {
+          'total': 1,
+          'items': [
+            {
+              ...employee('one'),
+              'avatar_url': '/api/public/v1/agents/one/avatar/hash.png'
+            }
+          ]
+        },
+      }));
+    }));
+    final catalog = CommunityEmployeeCatalog(dio: dio);
+    expect((await catalog.fetch()).single['avatar_url'],
+        'https://catalog.example/api/public/v1/agents/one/avatar/hash.png');
+    expect((await catalog.cached()).single['avatar_url'],
+        'https://catalog.example/api/public/v1/agents/one/avatar/hash.png');
+  });
   test('invalid refresh does not overwrite last successful cache', () async {
     final dio = Dio(BaseOptions(baseUrl: 'https://catalog.example'));
     var invalid = false;
@@ -101,6 +124,38 @@ void main() {
     expect(controller.employees, hasLength(1));
     expect(controller.employees.single['name'], '自己修改的名字');
     expect(await store.messages(id), isEmpty);
+  });
+  test('avatar refresh keeps official conversation identity and history',
+      () async {
+    sqfliteFfiInit();
+    final store = await LocalWorkspaceStore.open(
+        factory: databaseFactoryFfi, path: inMemoryDatabasePath);
+    final controller = LocalWorkspaceController(store);
+    addTearDown(() async {
+      controller.dispose();
+      await store.db.close();
+    });
+    final item = {
+      ...employee('one'),
+      'avatar_url': 'https://catalog.example/old.png'
+    };
+    final id = await controller.useOfficialEmployee(item);
+    await store.addMessage(id, 'user', 'keep history');
+    await controller.saveEmployee({
+      ...controller.employees.single,
+      'provider_id': 'existing-provider',
+      'model_id': 'existing-model'
+    });
+    expect(
+        await controller.useOfficialEmployee(
+            {...item, 'avatar_url': 'https://catalog.example/new.png'}),
+        id);
+    final row = controller.employees.single;
+    expect(jsonDecode(row['metadata'] as String)['avatar_url'],
+        'https://catalog.example/new.png');
+    expect(row['provider_id'], 'existing-provider');
+    expect(row['model_id'], 'existing-model');
+    expect((await store.messages(id)).single['content'], 'keep history');
   });
   test(
       'cloud official opens on this computer without requiring backend execution',

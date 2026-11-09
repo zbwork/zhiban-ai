@@ -20,3 +20,7 @@
 - [本地定时任务验证](verification/local-scheduled-tasks-2026-11-05.md)
 
 - [EasyO 近期修复对照与验证](verification/upstream-bugfix-port-2026-11-05.md)
+
+- [官方员工完整复验及未通过项（2026-11-09）](verification/community-employees-2026-11-09.md)
+
+- [头像、技能图标与 Codex 续答修复交付（2026-11-09）](verification/community-final-fixes-2026-11-09.md)

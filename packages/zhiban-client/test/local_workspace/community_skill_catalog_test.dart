@@ -31,6 +31,31 @@ void main() {
     await expectLater(client.fetch(), throwsFormatException);
   });
 
+  test('public skill icon uses catalog origin, not commercial API environment',
+      () async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://catalog.example/root'));
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+      handler.resolve(Response(requestOptions: options, data: {
+        'success': true,
+        'data': {
+          'items': [
+            {
+              'skill_uuid': 'one',
+              'code': 'one',
+              'name': 'One',
+              'icon_url': '/api/public/v1/skills/one/icon/hash.png'
+            }
+          ],
+          'categories': [],
+          'total': 1
+        },
+      }));
+    }));
+    final data = await CommunitySkillCatalog(dio: dio).fetch();
+    expect(data['items'][0]['icon_url'],
+        'https://catalog.example/api/public/v1/skills/one/icon/hash.png');
+  });
+
   test('market uses only current Bus response and clears on failure', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     final store = await LocalWorkspaceStore.open(
@@ -98,7 +123,9 @@ void main() {
     expect((await store.skills()).where((s) => s['listed'] == 1), isEmpty);
     expect((await store.skills()).any((s) => s['name'] == '服务器技能'), isTrue);
     expect(await store.cachedSkillCatalog(), isNotNull);
-    expect((await store.skills()).firstWhere((s) => s['id'] == 'old')['icon_url'], isEmpty);
+    expect(
+        (await store.skills()).firstWhere((s) => s['id'] == 'old')['icon_url'],
+        isEmpty);
     await store
         .cacheSkillCatalog({'items': [], 'categories': [], 'total': 0}, []);
     expect((await store.skills()).where((s) => s['listed'] == 1), isEmpty);

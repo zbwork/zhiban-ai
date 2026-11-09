@@ -165,7 +165,9 @@ class LocalWorkspaceController extends ChangeNotifier {
             (priorMeta['source_template_version'] == item['version'] &&
                 priorMeta['source_template_updated_at'] == item['updated_at'] &&
                 (item['intro'] == null ||
-                    priorMeta['description'] == item['intro'])))) {
+                    priorMeta['description'] == item['intro']) &&
+                (item['avatar_url'] == null ||
+                    priorMeta['avatar_url'] == item['avatar_url'])))) {
       return prior['id'] as String;
     }
     final id = prior?['id'] as String? ?? LocalWorkspaceStore.uuid.v4();

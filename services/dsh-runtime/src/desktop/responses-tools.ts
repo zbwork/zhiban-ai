@@ -1,8 +1,10 @@
-/** Repair only unambiguous flattened names that were advertised on this request. */
+/** Repair only response-local omissions and unambiguous advertised tool names.
+ * Never replay a request/tool or invent an identity. */
 export function normalizeResponsesTools(response: Response, tools: unknown): Response {
-  if (!response.body || !response.headers.get('content-type')?.includes('text/event-stream') || !Array.isArray(tools)) return response;
+  if (!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) return response;
   const aliases = new Map<string, { name: string; namespace: string } | null>();
-  for (const tool of tools) {
+  const advertised = Array.isArray(tools) ? tools : [];
+  for (const tool of advertised) {
     if (tool?.type !== 'namespace' || typeof tool.name !== 'string' || !Array.isArray(tool.tools)) continue;
     for (const child of tool.tools) {
       if (child?.type !== 'function' || typeof child.name !== 'string') continue;
@@ -10,8 +12,9 @@ export function normalizeResponsesTools(response: Response, tools: unknown): Res
       aliases.set(key, aliases.has(key) ? null : { namespace: tool.name, name: child.name });
     }
   }
-  for (const tool of tools) if (typeof tool?.name === 'string' && tool.type !== 'namespace' && aliases.has(tool.name)) aliases.set(tool.name, null);
-  if (!aliases.size) return response;
+  for (const tool of advertised) if (typeof tool?.name === 'string' && tool.type !== 'namespace' && aliases.has(tool.name)) aliases.set(tool.name, null);
+  let responseId: string | undefined;
+  let conflictingIds = false;
   const normalize = (item: unknown): boolean => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
     const value = item as Record<string, unknown>;
@@ -26,6 +29,21 @@ export function normalizeResponsesTools(response: Response, tools: unknown): Res
     try {
       const data = JSON.parse(line.slice(5)) as Record<string, unknown>;
       let changed = normalize(data['item']);
+      const envelope = data['response'];
+      if (envelope && typeof envelope === 'object' && !Array.isArray(envelope)) {
+        const value = envelope as Record<string, unknown>;
+        const id = value['id'];
+        if (['response.created', 'response.in_progress', 'response.completed'].includes(String(data['type'])) && typeof id === 'string' && id.length > 0 && id.length <= 1024) {
+          if (responseId !== undefined && responseId !== id) conflictingIds = true;
+          else responseId = id;
+        }
+        // A pinned Codex parser requires the final ID even after tools ran.
+        // Inherit only the unique ID already observed on this exact response.
+        if (data['type'] === 'response.completed' && id === undefined && responseId !== undefined && !conflictingIds) {
+          value['id'] = responseId;
+          changed = true;
+        }
+      }
       const output = (data['response'] as { output?: unknown[] } | undefined)?.output;
       if (Array.isArray(output)) for (const item of output) changed = normalize(item) || changed;
       return changed ? `data: ${JSON.stringify(data)}${line.endsWith('\r') ? '\r' : ''}` : line;

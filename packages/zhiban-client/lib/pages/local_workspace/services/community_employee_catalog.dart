@@ -64,6 +64,11 @@ class CommunityEmployeeCatalog {
               (item['tags'] as List).any((v) => v is! String))) {
         throw const FormatException('数字员工标签无效');
       }
+      final avatar = item['avatar_url'] as String? ?? '';
+      if (avatar.startsWith('/api/public/v1/agents/')) {
+        item['avatar_url'] =
+            Uri.parse(_dio.options.baseUrl).resolve(avatar).toString();
+      }
       return item;
     }).toList();
   }

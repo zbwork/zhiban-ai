@@ -44,6 +44,19 @@ test('broker normalizes only the default Responses tool choice before BYOK forwa
   } finally { await broker.close(); }
 });
 
+test('Responses final ID is inherited only from an unambiguous identity on this stream', async () => {
+  const { normalizeResponsesTools } = await import(pathToFileURL(join(packageRoot, 'dist/desktop/responses-tools.js')));
+  const stream = events => new Response(events.map(e => 'data: ' + JSON.stringify(e) + '\n\n').join(''), {headers:{'content-type':'text/event-stream'}});
+  const final = {type:'response.completed',response:{status:'completed',output:[]}};
+  const created = id => ({type:'response.created',response:{id,status:'in_progress',output:[]}});
+  const read = async events => (await normalizeResponsesTools(stream(events), undefined).text()).split('\n').filter(x=>x.startsWith('data:')).map(x=>JSON.parse(x.slice(5)));
+  assert.equal((await read([created('resp_a'), final])).at(-1).response.id, 'resp_a');
+  assert.equal((await read([final])).at(-1).response.id, undefined);
+  assert.equal((await read([created('resp_a'),created('resp_b'),final])).at(-1).response.id, undefined);
+  assert.equal((await read([created('resp_a'), {...final,response:{...final.response,id:'resp_existing'}}])).at(-1).response.id, 'resp_existing');
+  assert.equal((await read([created('resp_a'), {...final,response:{...final.response,id:null}}])).at(-1).response.id, null);
+});
+
 test('community tool backup is derived from the actual registry without invented tools', () => {
   const tools = [{ name: 'list_files', description: 'list actual files', inputSchema: { type: 'object', properties: { path: { type: 'string' } } } }];
   const guide = communityToolGuide(tools);
@@ -150,7 +163,7 @@ test('model proxy rejects redirects, nonlocal HTTP, model mismatch and protocol 
   } finally { server.closeAllConnections(); server.close(); }
 });
 
-for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'codex-home-parent', 'ask', 'full', 'full-unconfirmed', 'codex-ask', 'codex-full']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
+for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'codex-missing-response-id', 'codex-home-parent', 'ask', 'full', 'full-unconfirmed', 'codex-ask', 'codex-full']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
   // Exercise user-profile ancestry without reading or changing real config.
   const root = await realpath(await mkdtemp(join(mode === 'codex-home-parent' ? homedir() : tmpdir(), 'community-runtime-test-')));
   let calls = 0;
@@ -202,7 +215,7 @@ for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'code
       const response = { id: 'resp_' + calls, object: 'response', status: 'completed', model: 'test-model', output: [item], usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 } };
       const events = [ ['response.created', { response: { ...response, status: 'in_progress', output: [] } }], ['response.output_item.added', { output_index: 0, item: step ? { ...item, arguments: '' } : item }],
         ...(step ? [['response.function_call_arguments.delta', { item_id: item.id, output_index: 0, delta: item.arguments }], ['response.function_call_arguments.done', { item_id: item.id, output_index: 0, arguments: item.arguments }]] : []),
-        ['response.output_item.done', { output_index: 0, item }], ['response.completed', { response }] ];
+        ['response.output_item.done', { output_index: 0, item }], ['response.completed', { response: mode === 'codex-missing-response-id' && calls === 1 ? Object.fromEntries(Object.entries(response).filter(([key]) => key !== 'id')) : response }] ];
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       res.end(events.map(([type, data], sequence_number) => 'event: ' + type + '\ndata: ' + JSON.stringify({ type, sequence_number, ...data }) + '\n\n').join(''));
       return;
@@ -235,7 +248,7 @@ for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'code
       if (event.type === 'approval') {
         approved = true;
         const path = mode === 'cancel' ? '/app/runs/' + run + '/cancel' : '/app/runs/' + run + '/approvals/' + event.id;
-        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'legacy-official', 'codex', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode), scope: 'once' }) }).catch(reject);
+        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'legacy-official', 'codex', 'codex-missing-response-id', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode), scope: 'once' }) }).catch(reject);
       }
       if (event.type === 'error') { if (mode === 'full-unconfirmed') resolve(event); else reject(new Error(event.code)); }
       if (event.type === 'result') resolve(event);
@@ -263,7 +276,7 @@ for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'code
     assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('original-attachment-bytes')),
       'real engine reads imported original file');
     assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('community-ok')), JSON.stringify(toolResults));
-    if (['allow', 'legacy-official', 'codex', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode)) {
+    if (['allow', 'legacy-official', 'codex', 'codex-missing-response-id', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode)) {
       assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('shell-ok')), JSON.stringify(toolResults));
       assert.equal(await readFile(join(workspace, 'shell-result.txt'), 'utf8'), 'shell-ok');
     } else {

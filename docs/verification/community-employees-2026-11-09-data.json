@@ -1,0 +1,793 @@
+{
+  "employees": [
+    {
+      "name": "个人任务规划专家",
+      "uuid": "91e2ef16-a451-49c9-9bf7-b3985d2fe114",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "演示设计顾问",
+      "uuid": "b3316206-e8b7-4644-9eda-348023502fe3",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "商务写作顾问",
+      "uuid": "e4c808fc-aad0-4fd3-8f8a-4a982f64c144",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "研究分析师",
+      "uuid": "a108e56c-b3d2-4312-8afc-b3c68cc3e479",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "客服运营专家",
+      "uuid": "b644af80-f2c8-409b-a889-cb569f18910c",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "软件测试工程师",
+      "uuid": "77bee9ef-1b5d-45d9-b9ad-2d428796c942",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "应收应付管理专家",
+      "uuid": "0faa344d-1863-41d9-b44a-77d53ba5f802",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "税务合规顾问",
+      "uuid": "73b9f389-9f8e-4d64-8fee-5c9e4c5178c1",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "财务核算专家",
+      "uuid": "d161401d-034f-4f71-ba29-09850275180c",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "高级产品经理",
+      "uuid": "354d422e-70b7-4ad3-b596-f74c7d187ce2",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 5,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "客户成功经理",
+      "uuid": "2e00fc44-adc1-4333-b45f-a8d321468ff9",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "投标管理专家",
+      "uuid": "e39adcee-c260-4549-84c2-7d3f9ec8f87a",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "合同管理专家",
+      "uuid": "86d07f38-8703-4a45-afbd-102a6f95f1fa",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "采购管理专家",
+      "uuid": "4e87b4fb-54a1-4783-b2a6-191a9d6d9240",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "经营分析师",
+      "uuid": "4f987948-675e-4a67-b4ce-f57fcae87932",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "内容策划专家",
+      "uuid": "5b5ffbb7-7db3-4b28-afbb-fc3bbaa13f24",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "销售运营分析师",
+      "uuid": "81c4f9cf-5ccc-4afe-aea4-807cdaaac4eb",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "高级项目经理",
+      "uuid": "90621676-0312-4176-81bb-b0c00e31f649",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 5,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "会议管理专家",
+      "uuid": "dd9e96fe-db77-4aa9-802e-151ec6b09c82",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 3,
+      "missing_skills": [],
+      "execution": "local"
+    },
+    {
+      "name": "人力资源专家",
+      "uuid": "4442fdce-b531-4e0c-a940-355cd0d15309",
+      "intro": true,
+      "avatar_status": 403,
+      "avatar_mime": "text/html",
+      "avatar_bytes": 0,
+      "skill_count": 0,
+      "missing_skills": [],
+      "execution": "local"
+    }
+  ],
+  "skills": [
+    {
+      "name": "产品路线图与指标设计",
+      "uuid": "4a6f7a1f-1322-457e-a12a-3c889bc826df",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "产品机会评估与优先级",
+      "uuid": "e14051aa-8f39-4957-8e60-eddf17a6f907",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "干系人与跨团队依赖管理",
+      "uuid": "c819d107-c283-4807-80ee-49372a224331",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "项目变更影响与决策记录",
+      "uuid": "22c1fbbc-893f-43d2-a14c-1961fd196f00",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "提醒与复盘",
+      "uuid": "0d8a25b6-1d1f-4cb9-b0ce-462cbb3ca315",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "优先级与周计划",
+      "uuid": "2629e5f9-1da2-4f5f-90a2-8743f0d88e7a",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "行动项提取",
+      "uuid": "5a4392c4-ec67-416e-8304-787a46e3218b",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "讲稿与汇报检查",
+      "uuid": "928c179f-09d4-4cee-a722-f8a2adb0646f",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "演示稿结构与图表建议",
+      "uuid": "e8578df4-c02e-414a-8190-c050acfd9fd3",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "汇报逻辑设计",
+      "uuid": "75dc7436-1970-425f-959c-bc6a110ba554",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "翻译与语气适配",
+      "uuid": "0efd7a5b-676e-49fd-b3ab-0837b13d7b35",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "常规文档写作与改写",
+      "uuid": "0f78d15f-2a1d-4cf1-a267-c4ca8acc9c11",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "邮件与消息草拟",
+      "uuid": "85cc82ea-5e4b-49c1-8ca9-d89b4bb6f6b1",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "个人知识整理",
+      "uuid": "13cc92b8-df72-44ab-925c-759256beb211",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "多资料比较与综合",
+      "uuid": "41cdd7ec-236b-4f2f-8f2a-0bc162112195",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "可信资料检索",
+      "uuid": "2ee6ae78-1cb3-4aeb-a82c-f8250edbd8ba",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "客服知识与流程改进",
+      "uuid": "e7162dc3-304c-45a2-b646-6d335c6e2426",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "服务质量与SLA汇总",
+      "uuid": "3612b365-aa3c-4c17-b37f-7b0c2c707b89",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "工单分类与升级检查",
+      "uuid": "a204fc06-1cef-4c7a-97df-02cb8165b100",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "回归与发布质量检查",
+      "uuid": "16951319-cacf-4259-9f32-7757f7c7d9a1",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "测试执行证据与缺陷整理",
+      "uuid": "ad0954ed-e4dd-46c4-bb99-efaf91373b96",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "测试范围与用例设计",
+      "uuid": "d7168c16-1c10-43e5-bcc0-5222393ca5f9",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "政策变化与税务风险提醒",
+      "uuid": "43302a2c-1388-4992-8baa-f9c2bbc74ab5",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "发票与申报底稿核对",
+      "uuid": "67885fa6-7ea1-46d2-9409-3624a96ca22a",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "税务资料准备",
+      "uuid": "06166d82-057f-4667-b777-e54e71bb8edc",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "账龄与对账差异检查",
+      "uuid": "c077a506-53fa-400c-8fa3-86d04f7a4233",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "应付发票与付款匹配",
+      "uuid": "93aa6fe6-9c4d-49ef-bf11-8142b48aa09b",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "应收开票与回款匹配",
+      "uuid": "84b9df6c-0bdf-457c-9560-5007465eaeb9",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "台账及月结差异检查",
+      "uuid": "6f40b1ca-3f1b-42c1-b583-396a533485c9",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "凭证准备与科目建议",
+      "uuid": "ceee423d-0366-4bfa-9bb8-badf6a40ac1a",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "票据与费用单据整理",
+      "uuid": "51b14abd-83f6-432a-baba-c4eb186ff203",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "需求变更与版本影响",
+      "uuid": "7a9fca45-034e-4693-a735-6a8e7437af09",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "需求说明与验收条件",
+      "uuid": "007bd5e8-c9f6-40ca-af23-d4cf80554853",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "反馈归类与需求澄清",
+      "uuid": "262186a1-2dcd-4b7f-9602-8d0716b8f4ce",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "服务复盘与续约准备",
+      "uuid": "7927d8a6-493f-4f39-b2e4-3583893ba9bd",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "客户使用与风险检查",
+      "uuid": "8fddb488-8ab4-4d94-ba7d-e1815024c3f1",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "客户接手与成功计划",
+      "uuid": "9a64823c-6368-4777-ad54-bad6805b10c7",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "投标响应草案与漏项检查",
+      "uuid": "6d76b46d-22fb-4ef8-b5b3-d232f98c592a",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "资质与响应证据匹配",
+      "uuid": "bd3e9814-ea2f-4421-9e20-9c266a15680e",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "招标要求与时间节点拆解",
+      "uuid": "9a40779c-25e4-49a4-9f13-27580cbba00d",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "合同履约与到期事项检查",
+      "uuid": "d6d708f6-3664-4e62-b292-b8bf102db839",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "合同版本及模板偏离检查",
+      "uuid": "bfdea59c-b194-4352-9b4d-1f29fc7bc71d",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "合同要素与义务整理",
+      "uuid": "57f0fad9-474e-43ee-be51-412955133209",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "供应商资料检查",
+      "uuid": "21bd582c-0719-45bf-8c52-2b941ae6edb8",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "报价标准化与比价",
+      "uuid": "995040f2-4d35-4115-aaa1-dcf81eda98ff",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "采购需求与询价准备",
+      "uuid": "cd587f82-4a51-45c2-9a63-2dd7323b5a21",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "经营简报与图表说明",
+      "uuid": "2c79d7a6-39d2-4256-9990-b121d53170f6",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "经营差异与异常分析",
+      "uuid": "e96d242b-9a9d-444b-9ece-0a31315c4bb5",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "经营指标汇总",
+      "uuid": "d783b67a-f3d7-49ea-9dc8-a51ba71276c5",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "品牌与事实审核",
+      "uuid": "21577f3c-6ac0-4947-bea0-98fc2a70e7e2",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "有据内容初稿",
+      "uuid": "25a8bb03-fecc-4146-b747-cd604e884bb2",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "选题与内容排期",
+      "uuid": "5dcb7651-0ddc-4621-bafd-d7feae6dd2dd",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "销售运营周报",
+      "uuid": "62671f72-0be6-4dfc-b3f9-0a985a3c454b",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "停滞商机检查",
+      "uuid": "e1d14cf1-e57f-4b57-8c03-892ce58784df",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "客户与商机记录整理",
+      "uuid": "1a853401-3936-41f5-a762-1b08f1f76c57",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "项目周报生成",
+      "uuid": "a6946693-1a84-4c81-8143-31ddd6259649",
+      "icon_status": "URLError",
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "项目进度与风险检查",
+      "uuid": "e727a727-b53b-43ef-a416-aa162d01b907",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "项目计划与里程碑",
+      "uuid": "9e0b203b-5603-488d-86e5-0cbb791cfb07",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 5
+    },
+    {
+      "name": "会议事项跟踪与交接",
+      "uuid": "4ac7a63c-6641-4b73-9675-dae2dea98582",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "会议纪要与决议提取",
+      "uuid": "702bb8ae-e134-477f-9e79-72945bfef940",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "会议准备与议程编排",
+      "uuid": "d550ed24-dcbd-475e-9011-53bea9c6a7d0",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "Steam 促销助手",
+      "uuid": "8efd0306-1542-44ec-aed1-0b21c3a27bc8",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "SoulTrace Agent Skill",
+      "uuid": "d39efe3d-e971-4a1c-a7b5-6f1412165ab6",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 1
+    },
+    {
+      "name": "vercel-cli-with-tokens",
+      "uuid": "73efba73-a662-4693-9d9d-2c2c295f9f15",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 1
+    },
+    {
+      "name": "React View Transitions Skill",
+      "uuid": "fb085819-2d69-4829-8f36-f01d53310b85",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 8
+    },
+    {
+      "name": "steam游戏比价工具",
+      "uuid": "30636620-8861-49fb-a8ea-c1fa35e5fd74",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 4
+    },
+    {
+      "name": "simple",
+      "uuid": "9e7ac996-4d45-4481-aff8-423733048fe3",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 1
+    },
+    {
+      "name": "weather",
+      "uuid": "109d0797-26a1-4a9c-8290-c16348bf8dc2",
+      "icon_status": 403,
+      "bundle_ok": true,
+      "files": 2
+    },
+    {
+      "name": "白月光.skill",
+      "uuid": "a13157f4-8d9f-4979-8e48-7a2a92f3bd76",
+      "icon_status": 403,
+      "bundle_ok": false,
+      "bundle_error": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+    },
+    {
+      "name": "hue",
+      "uuid": "82b03c3e-b159-4238-9f79-ffb1c2cf25a7",
+      "icon_status": "URLError",
+      "bundle_ok": false,
+      "bundle_error": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+    },
+    {
+      "name": "ml-paper-writing",
+      "uuid": "c246032f-a8f3-4263-a1b6-863d4e9bc98c",
+      "icon_status": "URLError",
+      "bundle_ok": false,
+      "bundle_error": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+    },
+    {
+      "name": "特朗普.skill",
+      "uuid": "0b90c7bd-0b0f-4506-9b26-f1b97dc59c84",
+      "icon_status": 403,
+      "bundle_ok": false,
+      "bundle_error": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+    },
+    {
+      "name": "Product Marketing Context",
+      "uuid": "f6303b44-6047-4246-bbcf-17d9b8eb1b4e",
+      "icon_status": "URLError",
+      "bundle_ok": true,
+      "files": 2
+    },
+    {
+      "name": "arxiv-translator",
+      "uuid": "337f617c-cf6d-4e8c-9160-1a789fd3ff54",
+      "icon_status": "URLError",
+      "bundle_ok": true,
+      "files": 6
+    },
+    {
+      "name": "vercel-react-native-skills",
+      "uuid": "5e2ff2ae-2841-4f45-9b1c-c8e79c405514",
+      "icon_status": "URLError",
+      "bundle_ok": false,
+      "bundle_error": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+    },
+    {
+      "name": "DLC 雷达",
+      "uuid": "f585a869-1021-43b2-8bb9-5a2d18f3130f",
+      "icon_status": 403,
+      "bundle_ok": false,
+      "bundle_error": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+    },
+    {
+      "name": "代码日报",
+      "uuid": "e1c1e04f-9313-412d-b8db-6b8d457f8677",
+      "icon_status": "none",
+      "bundle_ok": true,
+      "files": 3
+    },
+    {
+      "name": "合同起草",
+      "uuid": "489c0c8a-34d6-45d0-bbb0-2621ae7ab363",
+      "icon_status": "none",
+      "bundle_ok": false,
+      "bundle_error": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+    },
+    {
+      "name": "企业官网生成",
+      "uuid": "9ac2b3cd-0de3-4248-b142-6a32c6357b12",
+      "icon_status": "URLError",
+      "bundle_ok": false,
+      "bundle_error": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+    },
+    {
+      "name": "营销宣传页生成",
+      "uuid": "779da6e5-3331-485c-a1e3-effca8f722a6",
+      "icon_status": "URLError",
+      "bundle_ok": false,
+      "bundle_error": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+    },
+    {
+      "name": "个人主页生成",
+      "uuid": "d2f06522-1bdb-4f69-9e11-41f995235fa4",
+      "icon_status": "URLError",
+      "bundle_ok": true,
+      "files": 3
+    }
+  ]
+}
