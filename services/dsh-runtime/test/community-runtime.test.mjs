@@ -150,12 +150,12 @@ test('model proxy rejects redirects, nonlocal HTTP, model mismatch and protocol 
   } finally { server.closeAllConnections(); server.close(); }
 });
 
-for (const mode of ['allow', 'deny', 'cancel', 'codex', 'codex-home-parent', 'ask', 'full', 'full-unconfirmed', 'codex-ask', 'codex-full']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
+for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'codex-home-parent', 'ask', 'full', 'full-unconfirmed', 'codex-ask', 'codex-full']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
   // Exercise user-profile ancestry without reading or changing real config.
   const root = await realpath(await mkdtemp(join(mode === 'codex-home-parent' ? homedir() : tmpdir(), 'community-runtime-test-')));
   let calls = 0;
   const run = randomUUID(), employee = randomUUID();
-  const stateRoot = join(root, 'community-runtime', employee);
+  const stateRoot = join(root, 'community-runtime', mode === 'legacy-official' ? 'official-' + randomUUID() : employee);
   const customWorkspace = join(root, 'user-selected-workspace');
   await mkdir(customWorkspace);
   const skillsDir = join(stateRoot, 'skills', randomUUID());
@@ -235,7 +235,7 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex', 'codex-home-parent', 'as
       if (event.type === 'approval') {
         approved = true;
         const path = mode === 'cancel' ? '/app/runs/' + run + '/cancel' : '/app/runs/' + run + '/approvals/' + event.id;
-        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'codex', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode), scope: 'once' }) }).catch(reject);
+        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'legacy-official', 'codex', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode), scope: 'once' }) }).catch(reject);
       }
       if (event.type === 'error') { if (mode === 'full-unconfirmed') resolve(event); else reject(new Error(event.code)); }
       if (event.type === 'result') resolve(event);
@@ -263,7 +263,7 @@ for (const mode of ['allow', 'deny', 'cancel', 'codex', 'codex-home-parent', 'as
     assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('original-attachment-bytes')),
       'real engine reads imported original file');
     assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('community-ok')), JSON.stringify(toolResults));
-    if (['allow', 'codex', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode)) {
+    if (['allow', 'legacy-official', 'codex', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode)) {
       assert.ok(toolResults.some(e => String(e.frame.data.tool_result).includes('shell-ok')), JSON.stringify(toolResults));
       assert.equal(await readFile(join(workspace, 'shell-result.txt'), 'utf8'), 'shell-ok');
     } else {

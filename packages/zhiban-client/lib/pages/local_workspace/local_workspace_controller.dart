@@ -19,6 +19,7 @@ import 'services/local_turn_input.dart';
 import 'services/local_attachment.dart';
 import 'services/local_workspace_store.dart';
 import 'services/community_skill_catalog.dart';
+import 'services/community_employee_catalog.dart';
 import 'services/community_skill_installer.dart';
 import '../skills/models/skill_models.dart';
 import 'package:flutter/services.dart';
@@ -113,6 +114,114 @@ class LocalWorkspaceController extends ChangeNotifier {
   bool catalogFromServer = false;
   Set<String> marketSkillIds = {};
   String? catalogError;
+
+  List<Map<String, dynamic>> officialEmployees = [];
+  Map<String, String> officialSkillNames = {};
+  bool employeeCatalogAttempted = false;
+  bool employeeCatalogRefreshing = false;
+  String? employeeCatalogError;
+  final Set<String> _addingOfficialEmployees = {};
+
+  Future<void> syncEmployeeCatalog() async {
+    if (employeeCatalogRefreshing) return;
+    employeeCatalogAttempted = true;
+    employeeCatalogRefreshing = true;
+    employeeCatalogError = null;
+    _notify();
+    final client = CommunityEmployeeCatalog();
+    try {
+      if (officialEmployees.isEmpty) {
+        officialEmployees = await client.cached();
+        _notify();
+      }
+      officialEmployees = await client.fetch();
+      await syncSkillCatalog();
+      final skillsCatalog = await store.cachedSkillCatalog();
+      officialSkillNames = {
+        for (final skill in skillsCatalog?['items'] as List? ?? [])
+          skill['skill_uuid'] as String: skill['name'] as String,
+      };
+    } catch (_) {
+      employeeCatalogError = '官方员工目录加载失败，已保留本地内容，可点击刷新重试';
+    } finally {
+      employeeCatalogRefreshing = false;
+      _notify();
+    }
+  }
+
+  Future<String> useOfficialEmployee(Map<String, dynamic> item) async {
+    final source = item['uuid'] as String;
+    final existing = employees.where((row) =>
+        (jsonDecode(row['metadata'] as String? ?? '{}')
+            as Map)['source_template_uuid'] ==
+        source);
+    final prior = existing.isEmpty ? null : existing.first;
+    final priorMeta = prior == null
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(
+            jsonDecode(prior['metadata'] as String? ?? '{}') as Map);
+    if (prior != null &&
+        (busy(prior['id'] as String) ||
+            (priorMeta['source_template_version'] == item['version'] &&
+                priorMeta['source_template_updated_at'] == item['updated_at'] &&
+                (item['intro'] == null ||
+                    priorMeta['description'] == item['intro'])))) {
+      return prior['id'] as String;
+    }
+    final id = prior?['id'] as String? ?? LocalWorkspaceStore.uuid.v4();
+    final engine =
+        item['local_engine'] == 'codex_app_server' ? 'codex_app_server' : 'dsh';
+    if (!_addingOfficialEmployees.add(source)) throw StateError('正在准备该员工，请稍候');
+    try {
+      final bound = <String>[];
+      final requiredSkills = (item['skill_uuids'] as List).cast<String>();
+      if (requiredSkills.isNotEmpty) {
+        await syncSkillCatalog();
+        if (catalogError != null) throw StateError('技能目录加载失败，请重试');
+        final catalog = await store.cachedSkillCatalog();
+        final aliases = await _skillAliases();
+        for (final uuid in requiredSkills) {
+          final matches = (catalog?['items'] as List? ?? [])
+              .where((raw) => raw['skill_uuid'] == uuid);
+          if (matches.isEmpty) throw StateError('员工依赖的技能暂不可获取，请刷新目录重试');
+          final skill = matches.first as Map;
+          final skillId = (aliases[skill['code']] ?? 'server-$uuid') as String;
+          await installSkill(skillId);
+          bound.add(skillId);
+        }
+      }
+      await refresh();
+      final prompt = item['system_prompt'] as String;
+      await saveEmployee({
+        'id': id,
+        'name': item['name'],
+        'prompt': prompt.isEmpty
+            ? '你是数字员工 ${item['name']}。主要职责：${item['intro'] ?? ''}'
+            : prompt,
+        'provider_id': prior?['provider_id'] ?? '',
+        'model_id': prior?['model_id'] ?? '',
+        'skills': jsonEncode(bound),
+        'created': prior?['created'] ?? DateTime.now().millisecondsSinceEpoch,
+        'metadata': jsonEncode({
+          ...priorMeta,
+          'description': item['intro'] ?? '',
+          'system_prompt': prompt,
+          'welcome_msg': item['welcome_msg'],
+          'avatar_url': item['avatar_url'],
+          'tags': item['tags'] ?? [],
+          'execution_locus': 'local',
+          'local_engine': engine,
+          'source_template_uuid': source,
+          'source_template_version': item['version'],
+          'source_template_updated_at': item['updated_at'],
+          'unavailable_capabilities': item['unavailable_capabilities'] ?? [],
+        }),
+      });
+      return id;
+    } finally {
+      _addingOfficialEmployees.remove(source);
+    }
+  }
 
   Future<Map<String, dynamic>> _skillAliases() async =>
       Map<String, dynamic>.from(jsonDecode(await rootBundle.loadString(

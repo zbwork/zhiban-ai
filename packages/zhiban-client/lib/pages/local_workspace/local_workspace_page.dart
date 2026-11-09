@@ -370,14 +370,32 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
       );
 
   Widget _employees(LocalWorkspaceController c) {
-    final employees = c.employees.where((e) => [e['name'], e['prompt']]
-        .join(' ')
-        .toLowerCase()
-        .contains(_keyword.toLowerCase()));
+    if (!c.employeeCatalogAttempted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(c.syncEmployeeCatalog());
+      });
+    }
+    final official = c.officialEmployees.where((item) => [
+          item['name'],
+          item['intro']
+        ].join(' ').toLowerCase().contains(_keyword.toLowerCase()));
+
+    final employees = c.employees.where((e) =>
+        _metadata(e)['source_template_uuid'] == null &&
+        [e['name'], e['prompt']]
+            .join(' ')
+            .toLowerCase()
+            .contains(_keyword.toLowerCase()));
     LocalRow row(AgentItem agent) =>
         c.employees.firstWhere((e) => e['id'] == agent.agentId);
     return Column(children: [
-      _header('数字员工', '集中搜索、管理并打开数字员工会话。'),
+      _header('数字员工', c.employeeCatalogError ?? '浏览官方员工，或管理你自己的数字员工。',
+          trailing: TextButton.icon(
+              onPressed: c.employeeCatalogRefreshing
+                  ? null
+                  : () => c.syncEmployeeCatalog(),
+              icon: const Icon(CupertinoIcons.refresh, size: 16),
+              label: Text(c.employeeCatalogRefreshing ? '刷新中' : '刷新'))),
       Expanded(
           child: SizedBox(
         width: double.infinity,
@@ -388,6 +406,38 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                 DigitalEmployeeCatalogItem.personal(_agent(c, e))
             ],
             enterprise: const [],
+            platform: [
+              for (final item in official)
+                DigitalEmployeeCatalogItem(
+                    agent: AgentItem(
+                      agentId: 'catalog-${item['uuid']}',
+                      name: item['name'] as String,
+                      description: item['intro'] as String? ?? '',
+                      skills: [
+                        for (final uuid in item['skill_uuids'] as List)
+                          if (c.officialSkillNames.containsKey(uuid))
+                            AgentSkillItem(
+                              slug: uuid as String,
+                              skillName: c.officialSkillNames[uuid]!,
+                              status: 'published',
+                              isInstalled: false,
+                            ),
+                      ],
+                      avatarUrl: item['avatar_url'] as String? ?? '',
+                      systemPrompt: item['system_prompt'] as String,
+                      welcomeMsg: item['welcome_msg'] as String? ?? '',
+                      tags: (item['tags'] as List? ?? []).cast<String>(),
+                      executionLocus: 'local',
+                      localEngine: item['local_engine'] == 'codex_app_server'
+                          ? 'codex_app_server'
+                          : 'dsh',
+                      status: 'published',
+                      isDefault: false,
+                      syncStatus: 'synced',
+                      lastSyncedAt: null,
+                    ),
+                    source: DigitalEmployeeCatalogSource.platform),
+            ],
           ),
           requestCreateAgentDraft: (_) async => null,
           requestEditAgentDraft: (_, agent) async => null,
@@ -397,8 +447,22 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
           onLocalEdit: (agent) => _edit(c, row(agent)),
           onLocalDelete: (agent) => _delete(c, row(agent)),
           onLocalOpen: (agent) async {
-            _selected = agent.agentId;
-            context.go(RoutePaths.chat);
+            try {
+              final id = agent.agentId.startsWith('catalog-')
+                  ? await c.useOfficialEmployee(c.officialEmployees.firstWhere(
+                      (item) => 'catalog-${item['uuid']}' == agent.agentId))
+                  : agent.agentId;
+              if (!mounted) return;
+              _selected = id;
+              context.go(RoutePaths.chat);
+            } catch (error) {
+              if (mounted) {
+                BotToast.showText(
+                    text: error is StateError
+                        ? error.message.toString()
+                        : '员工准备失败，请稍后重试');
+              }
+            }
           },
           filterTrailing: Row(mainAxisSize: MainAxisSize.min, children: [
             SizedBox(
@@ -592,11 +656,11 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
   Widget _chat(LocalWorkspaceController c) {
     final e = c.employees.where((e) => e['id'] == _selected).firstOrNull ??
         c.employees.firstOrNull;
-    final id = e?['id'] as String?;
+    final id = e?['id'] as String? ?? '';
     final matches =
         c.employees.where((e) => (e['name'] as String).contains(_keyword));
     return AttachmentPreviewHost(
-        sessionKey: id ?? 'empty',
+        sessionKey: id.isEmpty ? 'empty' : id,
         child: Builder(
             builder: (context) => Row(children: [
                   SizedBox(
@@ -676,13 +740,17 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                                   title: e['name'] as String,
                                   localAgent: _agent(c, e),
                                   localExecutionOnDemand: true,
-                                  trailing: IconButton(
-                                      tooltip: '编辑数字员工',
-                                      onPressed: c.busy(id!)
+                                  trailing:
+                                      _metadata(e)['source_template_uuid'] !=
+                                              null
                                           ? null
-                                          : () => _edit(c, e),
-                                      icon:
-                                          const Icon(CupertinoIcons.ellipsis))),
+                                          : IconButton(
+                                              tooltip: '编辑数字员工',
+                                              onPressed: c.busy(id)
+                                                  ? null
+                                                  : () => _edit(c, e),
+                                              icon: const Icon(
+                                                  CupertinoIcons.ellipsis))),
                               Expanded(
                                   child: FutureBuilder<List<LocalRow>>(
                                       key: ValueKey(id),

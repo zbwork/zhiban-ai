@@ -123,6 +123,8 @@ void main() {
             ])))!;
     final model = PendingLocalModel();
     final controller = LocalWorkspaceController(store, modelClient: model);
+    // The employee catalog transport is covered separately with deterministic fixtures.
+    controller.employeeCatalogAttempted = true;
     await tester.runAsync(() => controller.saveEmployee({
           'id': 'e',
           'name': '本地助手',

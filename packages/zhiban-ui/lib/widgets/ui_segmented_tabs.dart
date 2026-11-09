@@ -273,6 +273,10 @@ class _UiSegmentedTabsImplState<T> extends State<_UiSegmentedTabsImpl<T>> {
               ),
       ),
     );
-    return widget.expand ? Expanded(child: segment) : segment;
+    final interactive = MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: segment,
+    );
+    return widget.expand ? Expanded(child: interactive) : interactive;
   }
 }

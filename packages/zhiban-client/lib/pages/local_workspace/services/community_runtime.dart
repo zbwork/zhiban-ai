@@ -16,6 +16,20 @@ typedef CommunityApproval = Future<bool> Function(
 
 /// One supervised helper per in-flight turn. Credentials only cross anonymous stdin.
 class CommunityRuntime {
+  /// Keep legacy storage paths/history intact, but never send a non-UUID to
+  /// the execution protocol. New employees always have native UUID identities.
+  static String employeeIdentity(String employee) {
+    final uuid = RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
+    if (uuid.hasMatch(employee)) return employee;
+    if (employee.startsWith('official-') &&
+        uuid.hasMatch(employee.substring(9))) {
+      return LocalWorkspaceStore.uuid.v5('6ba7b811-9dad-11d1-80b4-00c04fd430c8',
+          'zhiban-community/legacy-employee/$employee');
+    }
+    throw const LocalModelException('数字员工标识无效，请重新创建该员工');
+  }
+
   Future<Map<String, dynamic>> run({
     required AiProviderConfig provider,
     required AiEndpointType protocol,
@@ -36,6 +50,7 @@ class CommunityRuntime {
     required CommunityApproval approve,
     required void Function(Map<String, dynamic>) onEvent,
   }) async {
+    final executionEmployee = employeeIdentity(employee);
     final paths = LocalAgentService.instance.componentPaths;
     final entry = '${paths['package']}/dist/desktop/community.js';
     if (!File(entry).existsSync() || !File(paths['node']!).existsSync()) {
@@ -68,6 +83,8 @@ class CommunityRuntime {
         connectTimeout: const Duration(seconds: 5),
         receiveTimeout: const Duration(seconds: 15)));
     var submitted = false;
+    var executionAttachments = attachments;
+    List<LocalAttachment> executionCopies = [];
     var closed = false;
     void write(Map<String, dynamic> input) =>
         process.stdin.writeln(jsonEncode(input));
@@ -163,11 +180,16 @@ class CommunityRuntime {
       });
       await ready.future.timeout(const Duration(seconds: 45));
       if (cancelToken.isCancelled) throw const LocalModelException('已停止生成');
+      if (executionEmployee != employee && attachments.isNotEmpty) {
+        executionCopies = await LocalAttachmentService()
+            .persist(executionEmployee, attachments);
+        executionAttachments = executionCopies;
+      }
       String? confirmation;
       if (permissionMode == 'full') {
         final proof = await dio.post<Map<String, dynamic>>(
             '/app/workspaces/full-confirmation',
-            data: {'conversation': employee});
+            data: {'conversation': executionEmployee});
         confirmation = proof.data!['id'] as String;
       }
       if (cancelToken.isCancelled) throw const LocalModelException('已停止生成');
@@ -175,7 +197,7 @@ class CommunityRuntime {
       write({
         'type': 'submit',
         'id': runId,
-        'employee': employee,
+        'employee': executionEmployee,
         'name': name,
         'messageId': messageId,
         'engine': engine,
@@ -184,7 +206,7 @@ class CommunityRuntime {
         if (workspace != null && workspace.isNotEmpty) 'workspace': workspace,
         if (skillsDir != null) 'skillsDir': skillsDir,
         'attachments': [
-          for (final file in attachments)
+          for (final file in executionAttachments)
             {
               'name': file.name,
               'path': await File(file.path).resolveSymbolicLinks(),
@@ -221,6 +243,9 @@ class CommunityRuntime {
       await subscription.cancel();
       await errors.cancel();
       dio.close(force: true);
+      for (final copy in executionCopies) {
+        await File(copy.path).delete().catchError((_) => File(copy.path));
+      }
     }
   }
 }
