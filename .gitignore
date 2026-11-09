@@ -1,2 +1,6 @@
 # Generated local coding bridge dependencies; prepare with go mod vendor.
 /apps/zhiban-local-bridge/vendor/
+
+# Python build helpers
+__pycache__/
+*.py[cod]
