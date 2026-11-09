@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>知办AI</string>
+	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconFile</key>
@@ -20,7 +20,7 @@
 		<string>zh-Hans</string>
 	</array>
 	<key>CFBundleName</key>
-	<string>知办AI</string>
+	<string>$(PRODUCT_NAME)</string>
 	<key>LSHasLocalizedDisplayName</key>
 	<true/>
 	<key>CFBundlePackageType</key>
@@ -30,7 +30,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<string>13.5</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -54,8 +54,6 @@
 	<true/>
 	<key>SUAutomaticallyUpdate</key>
 	<true/>
-	<key>SUFeedURL</key>
-	<string>https://zb.qkfintech.cn/api/agent-bus/v1/app/appcast?platform=macos&amp;channel=stable</string>
 	<key>SUPublicEDKey</key>
 	<string>LzE3WU+mTsTvLOV5PDWWDWSadWPnbzmy3xYE9KD+DBE=</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

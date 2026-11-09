@@ -29,3 +29,13 @@ Future.whenComplete 的清理回调必须返回 void。直接返回 pending.remo
 图片验收须同时覆盖员工列表、详情与已有会话列表。部署后全量图片HTTP200且metadata正确，聊天列表仍显示默认机器人：LocalWorkspacePage投影ConversationItem漏传agentAvatarUrl。复用原组件不会自动继承业务元数据；修复投影字段，并验证重启后的实际显示、同一会话身份与历史保留，不能仅凭API通过判定UI通过。
 
 同一轮补查发现ChatSessionView入口也漏传头像字段。验收应覆盖列表投影和会话内容传参两条路径；当前气泡布局没有渲染头像，字段传递回归不等于截图中出现了消息头像，不应据此新增与原设计不符的元素。
+
+## 社区发布的Xcode目标作用域
+
+不能在xcodebuild命令行全局覆盖PRODUCT_NAME、PRODUCT_BUNDLE_IDENTIFIER、INFOPLIST_FILE来改社区App身份；这些设置会同时影响Pods，产生多个同名framework输出。社区身份应写在Runner专属AppInfo.xcconfig和Runner/Info.plist，插件保留自身产品标识。首次归档因此失败，修复后重新归档验证。
+
+## Xcode 27 lipo多架构校验兼容
+
+本机Xcode 27.0(27A266a)、macOS 27.2。Flutter 3.35.6的thinFramework调用lipo <binary> -verify_arch arm64 x86_64；本机lipo返回“requires exactly one input file”，而同一真实fat二进制-info显示双架构、分别-verify_arch arm64及x86_64均返回0。因此不能把异常解释为缺架构，也不能删掉架构检查。发布构建通过专用PATH适配器仅将Flutter该输入形式拆成逐架构原生lipo校验，任一失败仍中止；其他lipo命令原样转发，不修改全局Xcode或Flutter SDK，不把适配器放入App。
+
+Xcode目标级PRODUCT_BUNDLE_IDENTIFIER高于AppInfo.xcconfig，归档后必须检查展开后的Info.plist和签名identifier。LSMinimumSystemVersion也会由deployment target重写，不能只改Info.plist文本；主App配置须设置真实deployment target并核对最终值。归档首次成功并不等于发布身份正确。
