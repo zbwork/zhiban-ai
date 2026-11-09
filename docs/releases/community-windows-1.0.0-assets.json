@@ -1,0 +1,138 @@
+{
+  "version": "1.0.0+10001",
+  "platform": "windows",
+  "arch": "x64",
+  "source_commit": "50f77a053fdb68b985346e7a0fad8a1ade7928d0",
+  "artifact": {
+    "name": "ZhiBanAI_Community_1.0.0_windows_x64.exe",
+    "bytes": 392632082,
+    "signature": "NotSigned",
+    "sha256": "32ebb05819a1b98811edd5127419515b609d662470b915c58d268cf2ca45d737",
+    "finished": "2026-11-09T18:02:32.8820548+08:00",
+    "status": "passed"
+  },
+  "pruned": [
+    {
+      "path": "node_modules/@openai/codex-win32-x64/vendor",
+      "reason": "uses-native-codex-appcontainer-build",
+      "files": 4,
+      "bytes": 250418576
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/win32-arm64",
+      "reason": "not-windows-x64",
+      "files": 6,
+      "bytes": 11768384
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/linux-x64",
+      "reason": "not-windows-x64",
+      "files": 1,
+      "bytes": 75976
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/linux-arm64",
+      "reason": "not-windows-x64",
+      "files": 1,
+      "bytes": 69112
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/darwin-x64",
+      "reason": "not-windows-x64",
+      "files": 2,
+      "bytes": 67824
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/darwin-arm64",
+      "reason": "not-windows-x64",
+      "files": 2,
+      "bytes": 137384
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/win32-x64/conpty.pdb",
+      "reason": "debug-symbols",
+      "files": 1,
+      "bytes": 6311936
+    },
+    {
+      "path": "node_modules/node-pty/prebuilds/win32-x64/conpty_console_list.pdb",
+      "reason": "debug-symbols",
+      "files": 1,
+      "bytes": 4321280
+    }
+  ],
+  "checks": {
+    "node": true,
+    "engine": true,
+    "office": true,
+    "browser": true,
+    "isolation": true,
+    "codex": true
+  },
+  "validation": {
+    "runtime_tests": 25,
+    "runtime_failed": 0,
+    "runtime_skipped": 0,
+    "installed_ordinary_tests": 24,
+    "installed_ordinary_failed": 0,
+    "installed_ordinary_skipped": 0,
+    "startup": {
+      "path": "C:\\Program Files\\知办AI社区版\\ZhiBanAI.exe",
+      "pid": 14768,
+      "windowTitle": "知办AI社区版",
+      "responding": true,
+      "hasWindow": true
+    },
+    "startup_elevated": false,
+    "images_checked": 99,
+    "images_failed": 0,
+    "without_custom_icon": [
+      {
+        "kind": "skill",
+        "name": "代码日报"
+      },
+      {
+        "kind": "skill",
+        "name": "合同起草"
+      }
+    ],
+    "fresh_install": "Program Files Chinese product directory, prior own candidate removed"
+  },
+  "comparison": {
+    "before_bytes": 454248482,
+    "after_bytes": 392632082,
+    "saved_bytes": 61616400,
+    "original_windows_full_1_4_0_bytes": 394706326,
+    "removed_uncompressed_bytes": 273170472,
+    "offline_webview2_bytes": 212745424,
+    "offline_webview2_retained": true
+  },
+  "not_run": [
+    "Windows 10 hardware",
+    "Windows ARM64 native package",
+    "live paid model",
+    "per-page GUI visual verification"
+  ],
+  "github": {
+    "release_id": 438890376,
+    "draft": true,
+    "url": "https://github.com/zbwork/zhiban-ai/releases/tag/untagged-93cd71f49bb07e11bd98",
+    "asset": {
+      "id": 727021880,
+      "name": "ZhiBanAI_Community_1.0.0_windows_x64.exe",
+      "state": "uploaded",
+      "size": 392632082,
+      "digest": "sha256:32ebb05819a1b98811edd5127419515b609d662470b915c58d268cf2ca45d737",
+      "browser_download_url": "https://github.com/zbwork/zhiban-ai/releases/download/untagged-93cd71f49bb07e11bd98/ZhiBanAI_Community_1.0.0_windows_x64.exe"
+    },
+    "checksums": {
+      "id": 727030714,
+      "name": "SHA256SUMS",
+      "state": "uploaded",
+      "size": 319,
+      "digest": "sha256:127c1d2183b32210f46fb185202685f4a5429c0f125776938a87e0a01024cd55"
+    },
+    "macos_assets_unchanged": true,
+    "git_refs_pushed": false
+  }
+}

@@ -34,15 +34,15 @@
 
 ## 产物与已完成验证
 
-- 产品源码：`607f23a`；独立目录D:\zbc100，未重置原构建工作区，未推送Git。初始归档SHA256为`ee5a77d04377b01430056c39bbfc64db86c09ba320da9a1e5ab26d06bd39d659`，修复增量归档为`d6168f1c8594f97c642cccd0712c5b18f15e055830585357b0160134ccf232c1`。
+- 首轮产品源码：`607f23a`；最终裁剪源码：`50f77a0`；独立目录D:\zbc100，未重置原构建工作区，未推送Git。初始归档SHA256为`ee5a77d04377b01430056c39bbfc64db86c09ba320da9a1e5ab26d06bd39d659`，修复增量归档为`d6168f1c8594f97c642cccd0712c5b18f15e055830585357b0160134ccf232c1`。
 - 构建环境：Windows 11 x64，Flutter3.35.6/Dart3.9.2、Go1.26.3、Python3.12.10、Rust1.93.0。Go代理连接超时后，仅构建进程使用goproxy.cn并保留go.sum校验；未关闭TLS或更改全局网络。
-- `ZhiBanAI_Community_1.0.0_windows_x64.exe`：454248482字节，SHA256 `93ef68bdee96ec6cd0a87d977e1155879aed1b7d2d05e2b7a7eebe2cd3bcab5a`。未做Authenticode发布者签名；不能将包内Node/Microsoft WebView2的有效签名归到社区主程序或安装器。
+- 初始候选：454248482字节，SHA256 `93ef68bdee96ec6cd0a87d977e1155879aed1b7d2d05e2b7a7eebe2cd3bcab5a`。最终 `ZhiBanAI_Community_1.0.0_windows_x64.exe`：392632082字节，SHA256 `32ebb05819a1b98811edd5127419515b609d662470b915c58d268cf2ca45d737`。未做Authenticode发布者签名；不能将包内Node/Microsoft WebView2的有效签名归到社区主程序或安装器。
 - 正式包主程序1.0.0+10001，CompanyName为cn.qkfintech.zhiban.community。主程序、Bridge、Node、Codex、sandbox和path addon的PE machine均为0x8664。
 - 包内Node/engine/office/browser/isolation/codex自检全部true。脚本模型驱动真实DSH/Codex的25项测试全部通过、无跳过；包含工具失败后恢复、缺失Responses终态ID、审批/拒绝/取消、附件原字节、技能参考文件及目录链接越界拒绝、缺失deny目录的写入/替换阻断和清理。
 - Windows网络校验99个实际图片URL全部成功，PNG签名与原摘要相符。代码日报和合同起草没有图标URL，属于无自定义图标数据；未冒充GUI回退渲染验收。首次网络夹具误将空URL请求成网站根地址，原始报告保留，最终报告明确排除这两个非图片请求。
-- Windows打包Python测试9项中8通过、1因Windows无独立CMake PATH而跳过；实际Flutter CMake/MSVC Release已成功。Codex缓存Python测试5项全部通过。Mac侧同一打包测试及CMake配置夹具通过（Windows专属项按平台跳过）。
+- Windows打包Python测试10项中9通过、1因Windows无独立CMake PATH而跳过；实际Flutter CMake/MSVC Release已成功。Codex缓存Python测试5项全部通过。Mac侧同一打包测试及CMake配置夹具通过（Windows专属项按平台跳过）。
 - 原完整版1.4.0安装器为394706326字节。现存内部Release文件树为1147980718字节，本包为1144152497字节，少3828221字节；旧安装器与现存Release文件树未证明逐字节一致，不能据此解释安装器压缩体积差。没有把另一个CPU架构重复装入新包。
-- 短路径实际安装已通过，正在补充默认Program Files中文目录、普通权限运行和原生窗口启动结果。
+- 最终包卸载旧候选后，在默认 `C:\Program Files\知办AI社区版` 干净安装通过，无需重启；重复vendor和ARM64目录均不存在。非提升权限下包内六项自检全部true，24项工具/续答/隔离测试全部通过、无跳过；真实窗口标题“知办AI社区版”，响应正常。仅验证原生窗口存在/响应，未冒充逐页视觉检查。
 
 未完成：Windows10实机、Windows ARM64原生包、真实付费模型调用及各GUI页面逐项人工点选/视觉验收。远端Windows的网络图片校验和进程窗口状态不能替代图片的实际渲染验收。
 
@@ -53,3 +53,12 @@
 采用：仅Windows目标安装树裁剪重复Codex vendor、node-pty非x64预编译与PDB调试符号，锁文件、构建缓存、实际兼容版、x64 addon/DLL/EXE和许可不变；裁剪发生在原有组件自检之前，并记录清单。源码、隔离门禁、工具和文件预览能力保留。依据：Windows生产路径在src/desktop/codex-engine.ts显式固定native/codex；PDB为调试信息（[Microsoft /PDB](https://learn.microsoft.com/en-us/cpp/build/reference/pdb-use-program-database?view=msvc-170)），不参与PE运行时加载。
 
 用户已明确选择保留完整离线安装；WebView2离线安装器保持不变，仅清理确认未使用的冗余。
+
+## 最终体积与验收
+
+- 保留完整离线WebView2，删除18个确认不使用的文件，共273170472字节：npm重复Codex vendor（250418576字节）、非Windows x64的node-pty预编译文件、x64 PDB调试符号。版本/许可元数据和实际native/codex兼容程序保持。清单位于包内manifest.packaging_pruned。
+- 安装器从454.25 MB降到392.63 MB，减少61616400字节；原Windows完整版为394.71 MB。最终应用文件树870983345字节，不含安装时临时解出的WebView2离线exe。
+- 本机复制后的SHA256与构建机一致。最终构建与裁剪后25项真实运行测试通过，干净安装后普通权限24项通过。99个图片URL网络校验结果沿用同轮Windows验证，裁剪不涉及图片数据。
+- 新安装器以相同版本名替换Release草稿内旧454 MB候选，同时更新三平台SHA256SUMS；不改变两个macOS资产，不创建/推送远端Git标签。最终GitHub资产摘要与ID另存发布资产JSON。
+
+最终[资产、裁剪清单与验收摘要](community-windows-1.0.0-assets.json)记录GitHub服务端摘要，已与本机及构建机SHA256一致。Windows资产ID727021880；SHA256SUMS资产ID727030714。两个macOS资产ID与摘要保持不变。裁剪增量源码归档SHA256为`3cafc55a0c633d8c93e74d4c9501fa5dc129e4cfe4485f48649de04d2d429eb7`。本次创建的临时构建/测试任务与窗口已清理，原构建Runner、Ngrok和原工作区保留。
