@@ -1,0 +1,28 @@
+{
+  "release_id": 438890376,
+  "tag_name": "untagged-93cd71f49bb07e11bd98",
+  "draft": true,
+  "artifacts": [
+    {
+      "id": 726777478,
+      "name": "ZhiBanAI_Community_1.0.0_macos_arm64.dmg",
+      "size": 216741806,
+      "digest": "sha256:10d3b90b763274ce7662d09bc549e68f9efc7a576f49e261f235cf0c2e58d6c9",
+      "state": "uploaded"
+    },
+    {
+      "id": 726787159,
+      "name": "ZhiBanAI_Community_1.0.0_macos_x64.dmg",
+      "size": 240353048,
+      "digest": "sha256:5ded84c09a290fe8682bccf05e6403955e82fca5d563d40637b39df8323571ed",
+      "state": "uploaded"
+    },
+    {
+      "id": 726787226,
+      "name": "SHA256SUMS",
+      "size": 212,
+      "digest": "sha256:973fdba03914d3a911f3501ad893c61f04ed28b39b0e21e293627db7670a4003",
+      "state": "uploaded"
+    }
+  ]
+}

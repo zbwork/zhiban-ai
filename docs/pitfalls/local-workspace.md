@@ -39,3 +39,9 @@ Future.whenComplete 的清理回调必须返回 void。直接返回 pending.remo
 本机Xcode 27.0(27A266a)、macOS 27.2。Flutter 3.35.6的thinFramework调用lipo <binary> -verify_arch arm64 x86_64；本机lipo返回“requires exactly one input file”，而同一真实fat二进制-info显示双架构、分别-verify_arch arm64及x86_64均返回0。因此不能把异常解释为缺架构，也不能删掉架构检查。发布构建通过专用PATH适配器仅将Flutter该输入形式拆成逐架构原生lipo校验，任一失败仍中止；其他lipo命令原样转发，不修改全局Xcode或Flutter SDK，不把适配器放入App。
 
 Xcode目标级PRODUCT_BUNDLE_IDENTIFIER高于AppInfo.xcconfig，归档后必须检查展开后的Info.plist和签名identifier。LSMinimumSystemVersion也会由deployment target重写，不能只改Info.plist文本；主App配置须设置真实deployment target并核对最终值。归档首次成功并不等于发布身份正确。
+
+## 安装包体积必须比较相同架构和压缩格式
+
+不能把单arm64完整版的DMG与universal社区版直接比较。发布前先核对架构manifest、展开逻辑字节和hdiutil imageinfo编码在用/浪费字节，再沿用既有HFS+ ULMO参数；首次社区包因架构加倍与不同压缩参数达到约900MB。按CPU分别交付保留相同功能，不能通过删除运行能力来冒充瘦身。
+
+按CPU验证Bridge initialize时必须传该产物的协议架构：arm64或x64（Mach-O名称x86_64映射为协议x64）。把宿主arm64参数传给Rosetta运行的Intel helper会被正常拒绝为Invalid params；不能将验证脚本传参错误判成组件启动故障或放宽校验。

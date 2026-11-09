@@ -20,7 +20,7 @@
 
 ## 本地服务候选部署
 
-候选版本 v0.1.0-rc.1 尚未正式发布。以下服务流程在 macOS Docker 环境验证；公开源码树的后端、管理台与 macOS Debug 构建已通过；Windows 与完整交互仍待验收，因此暂不提供签名安装包或正式下载地址。
+可选服务端候选版本 v0.1.0-rc.1 尚未正式发布。以下服务流程在 macOS Docker 环境验证；公开源码树的后端、管理台构建已通过。macOS桌面社区版1.0.0的签名、公证和安装包状态见[发布记录](releases/community-macos-1.0.0.md)；按机器CPU选择arm64（M系列）或x64（Intel），最低macOS 13.5。Windows仍未验收。
 
 需要 Docker Compose v2、OpenSSL、公开镜像和源码下载网络。进入 `deploy/community`，复制 `.env.example` 为 `.env`，为其中三个字段分别填写 `openssl rand -hex 24` 生成的不同随机值，然后执行 `./community-up.sh`。初次启动会构建镜像、生成 JWT 密钥、迁移空库和初始化对象存储。禁止指向现有商业数据库。
 
@@ -40,7 +40,7 @@
 
 ## 平台发布验收清单
 
-本候选采用源码交付；服务流程的验证环境是 macOS 与 Docker Compose v2。公开树 macOS Debug 源码构建已通过，尚无 Windows 验收结果或签名安装包。以下为后续平台发布的验收清单，不是启动上述本地服务的额外必填配置：
+服务端候选采用源码交付，验证环境是macOS与Docker Compose v2；桌面macOS 1.0.0已完成原生Release、签名与公证验证，发布状态见上述记录。Windows尚无验收结果。以下为平台发布的验收清单，不是启动上述本地服务的额外必填配置：
 
 1. 支持的操作系统、架构及工具链版本。
 2. 对应发布版本的下载或源码获取方式、校验方式和签名状态。

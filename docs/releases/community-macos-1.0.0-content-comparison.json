@@ -1,0 +1,217 @@
+{
+  "node": {
+    "old_files": 2,
+    "new_files": 2,
+    "old_bytes": 120758710,
+    "new_bytes": 120758710,
+    "added": [],
+    "removed": [],
+    "changed": [
+      "bin/node"
+    ]
+  },
+  "dsh-runtime/node_modules": {
+    "old_files": 28262,
+    "new_files": 28262,
+    "old_bytes": 499439621,
+    "new_bytes": 499439621,
+    "added": [],
+    "removed": [],
+    "changed": [
+      "@img/sharp-darwin-arm64/lib/sharp-darwin-arm64-0.35.3.node",
+      "@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib",
+      "@koromix/koffi-darwin-arm64/darwin_arm64/koffi.node",
+      "@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node",
+      "@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex/codex",
+      "@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/path/rg",
+      "@vscode/ripgrep-darwin-arm64/bin/rg",
+      "node-addon-require-builtin-darwin-arm64/prebuilt/darwin-arm64-napi-v9.node",
+      "node-pty/prebuilds/darwin-arm64/pty.node",
+      "node-pty/prebuilds/darwin-arm64/spawn-helper"
+    ]
+  },
+  "dsh-runtime/dist": {
+    "old_files": 79,
+    "new_files": 81,
+    "old_bytes": 604937,
+    "new_bytes": 629641,
+    "added": [
+      "desktop/community-attachments.js",
+      "desktop/community.js"
+    ],
+    "removed": [],
+    "changed": [
+      "desktop/broker.js",
+      "desktop/codex-engine.js",
+      "desktop/engine.js",
+      "desktop/ledger.js",
+      "desktop/model-error.js",
+      "desktop/office-schema.js",
+      "desktop/responses-tools.js",
+      "desktop/tools.js"
+    ]
+  },
+  "dsh-runtime/assets": {
+    "old_files": 124,
+    "new_files": 124,
+    "old_bytes": 847872,
+    "new_bytes": 848712,
+    "added": [],
+    "removed": [],
+    "changed": [
+      "bridge/codex-transport.mjs",
+      "bridge/local-media",
+      "bridge/local-tool-errors.json",
+      "skills/aigc-ppt/SKILL.md",
+      "skills/code-daily-summary/SKILL.md",
+      "skills/code-daily-summary/scripts/test_summarize.py"
+    ]
+  },
+  "old_categories": {
+    "Contents/Info.plist": 2594,
+    "Contents/PkgInfo": 8,
+    "Contents/_CodeSignature": 11302807,
+    "Contents/MacOS": 543776,
+    "Contents/Resources/AppIcon.icns": 71750,
+    "Contents/Resources/Assets.car": 1075864,
+    "Contents/Resources/hbal_se_v1.0.15.nn": 1681852,
+    "Contents/Frameworks/libhbal_se.dylib": 2226000,
+    "Contents/Frameworks/libffmpeg.dylib": 5334592,
+    "Contents/Helpers/ZhibanLocalBridge.app": 12409339,
+    "Contents/Frameworks/url_launcher_macos.framework": 173103,
+    "Contents/Frameworks/connectivity_plus.framework": 146630,
+    "Contents/Frameworks/file_selector_macos.framework": 208744,
+    "Contents/Frameworks/screen_retriever_macos.framework": 139469,
+    "Contents/Frameworks/window_manager.framework": 217381,
+    "Contents/Frameworks/shared_preferences_foundation.framework": 211619,
+    "Contents/Frameworks/package_info_plus.framework": 81542,
+    "Contents/Frameworks/flutter_inappwebview_macos.framework": 2155462,
+    "Contents/Frameworks/local_notifier.framework": 130501,
+    "Contents/Frameworks/sqflite_darwin.framework": 256842,
+    "Contents/Frameworks/share_plus.framework": 138855,
+    "Contents/Frameworks/pasteboard.framework": 135033,
+    "Contents/Frameworks/audioplayers_darwin.framework": 252788,
+    "Contents/Frameworks/path_provider_foundation.framework": 147109,
+    "Contents/Frameworks/device_info_plus.framework": 160989,
+    "Contents/Frameworks/open_file_mac.framework": 128024,
+    "Contents/Frameworks/App.framework": 56596747,
+    "Contents/Frameworks/DingRTC.framework": 26533606,
+    "Contents/Frameworks/OrderedSet.framework": 165511,
+    "Contents/Frameworks/Sparkle.framework": 2255047,
+    "Contents/Frameworks/flutter_secure_storage_macos.framework": 185704,
+    "Contents/Frameworks/MoziWhiteboard.framework": 3131519,
+    "Contents/Frameworks/desktop_drop.framework": 174431,
+    "Contents/Frameworks/FlutterMacOS.framework": 14208811,
+    "Contents/Resources/zh-Hans.lproj": 12585,
+    "Contents/Resources/Base.lproj": 16082,
+    "Contents/Resources/local-agent": 622163348
+  },
+  "new_categories": {
+    "Contents/Info.plist": 2509,
+    "Contents/PkgInfo": 8,
+    "Contents/_CodeSignature": 22477389,
+    "Contents/MacOS": 1132656,
+    "Contents/Resources/AppIcon.icns": 71750,
+    "Contents/Resources/Assets.car": 1075864,
+    "Contents/Resources/hbal_se_v1.0.15.nn": 1681852,
+    "Contents/Frameworks/libhbal_se.dylib": 5128816,
+    "Contents/Frameworks/libffmpeg.dylib": 11773504,
+    "Contents/Helpers/ZhibanLocalBridge.app": 24456491,
+    "Contents/Frameworks/url_launcher_macos.framework": 313769,
+    "Contents/Frameworks/connectivity_plus.framework": 269792,
+    "Contents/Frameworks/file_selector_macos.framework": 365826,
+    "Contents/Frameworks/screen_retriever_macos.framework": 262418,
+    "Contents/Frameworks/window_manager.framework": 389994,
+    "Contents/Frameworks/shared_preferences_foundation.framework": 401325,
+    "Contents/Frameworks/package_info_plus.framework": 147104,
+    "Contents/Frameworks/flutter_inappwebview_macos.framework": 4330512,
+    "Contents/Frameworks/local_notifier.framework": 237114,
+    "Contents/Frameworks/sqflite_darwin.framework": 486340,
+    "Contents/Frameworks/share_plus.framework": 263105,
+    "Contents/Frameworks/pasteboard.framework": 241358,
+    "Contents/Frameworks/audioplayers_darwin.framework": 473353,
+    "Contents/Frameworks/path_provider_foundation.framework": 270911,
+    "Contents/Frameworks/device_info_plus.framework": 282103,
+    "Contents/Frameworks/open_file_mac.framework": 218498,
+    "Contents/Frameworks/App.framework": 69507463,
+    "Contents/Frameworks/DingRTC.framework": 58908390,
+    "Contents/Frameworks/OrderedSet.framework": 289713,
+    "Contents/Frameworks/Sparkle.framework": 2746567,
+    "Contents/Frameworks/flutter_secure_storage_macos.framework": 307666,
+    "Contents/Frameworks/MoziWhiteboard.framework": 6588543,
+    "Contents/Frameworks/desktop_drop.framework": 314820,
+    "Contents/Frameworks/FlutterMacOS.framework": 28495659,
+    "Contents/Resources/zh-Hans.lproj": 12614,
+    "Contents/Resources/Base.lproj": 16111,
+    "Contents/Resources/local-agent": 1282191229
+  },
+  "binary_signature_comparison": [
+    {
+      "path": "node/bin/node",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/@img/sharp-darwin-arm64/lib/sharp-darwin-arm64-0.35.3.node",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/@koromix/koffi-darwin-arm64/darwin_arm64/koffi.node",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex/codex",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/path/rg",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/@vscode/ripgrep-darwin-arm64/bin/rg",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/node-addon-require-builtin-darwin-arm64/prebuilt/darwin-arm64-napi-v9.node",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/node-pty/prebuilds/darwin-arm64/pty.node",
+      "only_signature_differs": true
+    },
+    {
+      "path": "dsh-runtime/node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper",
+      "only_signature_differs": true
+    }
+  ],
+  "original_dmg": {
+    "bytes": 217465745,
+    "sha256": "3e508c65b647e9b2e0b6aeb931625d3101548174f42a0d688bb427b4d2a57e41",
+    "format": "ULMO",
+    "size_information": {
+      "CUDIFEncoding-bytes-in-use": 204452140,
+      "CUDIFEncoding-bytes-total": 217300844,
+      "CUDIFEncoding-bytes-wasted": 12848704,
+      "Compressed Bytes": 204452140,
+      "Compressed Ratio": 0.23774510095772006,
+      "Sector Count": 2102848,
+      "Total Bytes": 1076658176,
+      "Total Empty Bytes": 216695808,
+      "Total Non-Empty Bytes": 859962368
+    },
+    "installed_matches_original_dmg": true,
+    "installed_diff_counts": {
+      "added": 0,
+      "removed": 0,
+      "changed": 0
+    },
+    "filesystem": "hfs"
+  }
+}
