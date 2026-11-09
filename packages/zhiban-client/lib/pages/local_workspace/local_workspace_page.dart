@@ -699,6 +699,10 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                                                         as String,
                                                     agentName: employee['name']
                                                         as String,
+                                                    agentAvatarUrl:
+                                                        _metadata(employee)[
+                                                                'avatar_url']
+                                                            as String?,
                                                     lastMessage:
                                                         employee['last_content']
                                                             as String?,
@@ -830,6 +834,9 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                                           _messageViews[id] = messages;
                                         }
                                         final session = ChatSessionView(
+                                          agentAvatarUrl:
+                                              _metadata(e)['avatar_url']
+                                                  as String?,
                                           autoScrollOnMessageUpdate: false,
                                           sentTextHistory: [
                                             for (final row in rows)

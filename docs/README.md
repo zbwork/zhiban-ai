@@ -24,3 +24,5 @@
 - [官方员工完整复验及未通过项（2026-11-09）](verification/community-employees-2026-11-09.md)
 
 - [头像、技能图标与 Codex 续答修复交付（2026-11-09）](verification/community-final-fixes-2026-11-09.md)
+
+- [部署后图片全量及历史工具真实续答验证（2026-11-09）](verification/community-deployed-2026-11-09.md)

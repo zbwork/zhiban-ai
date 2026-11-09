@@ -1,0 +1,1004 @@
+[
+  {
+    "kind": "employee",
+    "name": "个人任务规划专家",
+    "url": "/api/public/v1/agents/91e2ef16-a451-49c9-9bf7-b3985d2fe114/avatar/51853c5f1110c01458a3ae770bc26aa2cae27b59f2473a811c6e8acdebf44a9c.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1283459,
+    "sha256": "51853c5f1110c01458a3ae770bc26aa2cae27b59f2473a811c6e8acdebf44a9c",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "演示设计顾问",
+    "url": "/api/public/v1/agents/b3316206-e8b7-4644-9eda-348023502fe3/avatar/96003e6ac3ecf3aa26bf3eea55bbc0c9fb33e0c25901d311074cc5bbcea3ea4f.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1444388,
+    "sha256": "96003e6ac3ecf3aa26bf3eea55bbc0c9fb33e0c25901d311074cc5bbcea3ea4f",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "商务写作顾问",
+    "url": "/api/public/v1/agents/e4c808fc-aad0-4fd3-8f8a-4a982f64c144/avatar/01484ca042c90b5fa2b6a96e3e866c7f95e9b898948c2e078890384815fdf62a.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 2049182,
+    "sha256": "01484ca042c90b5fa2b6a96e3e866c7f95e9b898948c2e078890384815fdf62a",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "研究分析师",
+    "url": "/api/public/v1/agents/a108e56c-b3d2-4312-8afc-b3c68cc3e479/avatar/6ee241809fc9faa8370e06e6d86f44a05a10b7560bacaa3731635b417ed0a398.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1756303,
+    "sha256": "6ee241809fc9faa8370e06e6d86f44a05a10b7560bacaa3731635b417ed0a398",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "客服运营专家",
+    "url": "/api/public/v1/agents/b644af80-f2c8-409b-a889-cb569f18910c/avatar/d097512be5149312997c895a21cdee316510b9cff85b3787bdd82e756ce5e417.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1418749,
+    "sha256": "d097512be5149312997c895a21cdee316510b9cff85b3787bdd82e756ce5e417",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "软件测试工程师",
+    "url": "/api/public/v1/agents/77bee9ef-1b5d-45d9-b9ad-2d428796c942/avatar/e06843962907fc68c41313db4c7e911876b64a4373bbcb2556f6c13ec02e60aa.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1587428,
+    "sha256": "e06843962907fc68c41313db4c7e911876b64a4373bbcb2556f6c13ec02e60aa",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "应收应付管理专家",
+    "url": "/api/public/v1/agents/0faa344d-1863-41d9-b44a-77d53ba5f802/avatar/3225e6c19b1612b97aaa8ee1f7919ec91486ecd3998cb030b3a74b82fb8ad338.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1557630,
+    "sha256": "3225e6c19b1612b97aaa8ee1f7919ec91486ecd3998cb030b3a74b82fb8ad338",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "税务合规顾问",
+    "url": "/api/public/v1/agents/73b9f389-9f8e-4d64-8fee-5c9e4c5178c1/avatar/54ce3d133e1c0f2b26f37f8864be2a9756bb9579c344c7db4fb48264d7a52ac6.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1985694,
+    "sha256": "54ce3d133e1c0f2b26f37f8864be2a9756bb9579c344c7db4fb48264d7a52ac6",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "财务核算专家",
+    "url": "/api/public/v1/agents/d161401d-034f-4f71-ba29-09850275180c/avatar/2da8a7a7257a83a44ae3959e7872fc648bc4396530fc2adc92599c70633dece2.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1628771,
+    "sha256": "2da8a7a7257a83a44ae3959e7872fc648bc4396530fc2adc92599c70633dece2",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "高级产品经理",
+    "url": "/api/public/v1/agents/354d422e-70b7-4ad3-b596-f74c7d187ce2/avatar/2e45bc2f8a62224c31cbf7b6fa8a5f172580abe0530534915bfabdfc13a7128a.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1719830,
+    "sha256": "2e45bc2f8a62224c31cbf7b6fa8a5f172580abe0530534915bfabdfc13a7128a",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "客户成功经理",
+    "url": "/api/public/v1/agents/2e00fc44-adc1-4333-b45f-a8d321468ff9/avatar/1b689fc6feb87e41941f1f02fa671942aeb20fb67bd0edd471de8f4360f9ebbc.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1472476,
+    "sha256": "1b689fc6feb87e41941f1f02fa671942aeb20fb67bd0edd471de8f4360f9ebbc",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "投标管理专家",
+    "url": "/api/public/v1/agents/e39adcee-c260-4549-84c2-7d3f9ec8f87a/avatar/359cfd38f6cf4b8c478306b0dcb35cff26e7d46c16654bb4c454f3d63ba9029d.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1458176,
+    "sha256": "359cfd38f6cf4b8c478306b0dcb35cff26e7d46c16654bb4c454f3d63ba9029d",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "合同管理专家",
+    "url": "/api/public/v1/agents/86d07f38-8703-4a45-afbd-102a6f95f1fa/avatar/b168e9b549ed5fcc55d7e0f2297b68e106a45e5449be412c9071a5eb0437c687.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1530655,
+    "sha256": "b168e9b549ed5fcc55d7e0f2297b68e106a45e5449be412c9071a5eb0437c687",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "采购管理专家",
+    "url": "/api/public/v1/agents/4e87b4fb-54a1-4783-b2a6-191a9d6d9240/avatar/631995a3e58a745de7cf09473f01e7b8811ad7d55fc7206162d19ad200684c9a.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1661541,
+    "sha256": "631995a3e58a745de7cf09473f01e7b8811ad7d55fc7206162d19ad200684c9a",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "经营分析师",
+    "url": "/api/public/v1/agents/4f987948-675e-4a67-b4ce-f57fcae87932/avatar/e1a7022b304e38608ea959bf02880be24b3fea2843acae5e62bbf45825d6e42b.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1448593,
+    "sha256": "e1a7022b304e38608ea959bf02880be24b3fea2843acae5e62bbf45825d6e42b",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "内容策划专家",
+    "url": "/api/public/v1/agents/5b5ffbb7-7db3-4b28-afbb-fc3bbaa13f24/avatar/e91f4f7160475a3ee14522afcb891905e8aa21d774985ca761ad7ca3ad333bbb.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1305892,
+    "sha256": "e91f4f7160475a3ee14522afcb891905e8aa21d774985ca761ad7ca3ad333bbb",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "销售运营分析师",
+    "url": "/api/public/v1/agents/81c4f9cf-5ccc-4afe-aea4-807cdaaac4eb/avatar/0ae2a7cd47d04fa5087898171cb33cb76c594019d1c287136ac224b6030e287c.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1573157,
+    "sha256": "0ae2a7cd47d04fa5087898171cb33cb76c594019d1c287136ac224b6030e287c",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "高级项目经理",
+    "url": "/api/public/v1/agents/90621676-0312-4176-81bb-b0c00e31f649/avatar/96fb00349fa594d4dea539326d72ec8d2999f47a4a454d3ec915c6d526b64f4f.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1693300,
+    "sha256": "96fb00349fa594d4dea539326d72ec8d2999f47a4a454d3ec915c6d526b64f4f",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "会议管理专家",
+    "url": "/api/public/v1/agents/dd9e96fe-db77-4aa9-802e-151ec6b09c82/avatar/76598c37272cc0242d4c3c98c72138cf534dc4689b70b04a5b7d4944484a983d.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1554152,
+    "sha256": "76598c37272cc0242d4c3c98c72138cf534dc4689b70b04a5b7d4944484a983d",
+    "hash_verified": true
+  },
+  {
+    "kind": "employee",
+    "name": "人力资源专家",
+    "url": "/api/public/v1/agents/4442fdce-b531-4e0c-a940-355cd0d15309/avatar/cc18da96851620fab0f97b537ffbffc48d0c8158bdd1374cf9328a25d95beae4.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 1998385,
+    "sha256": "cc18da96851620fab0f97b537ffbffc48d0c8158bdd1374cf9328a25d95beae4",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "产品路线图与指标设计",
+    "url": "/api/public/v1/skills/4a6f7a1f-1322-457e-a12a-3c889bc826df/icon/d5ed21cf6203684114290b53d765c311fd2a7765f6fd1e630b9871c145a2423e.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 769403,
+    "sha256": "d5ed21cf6203684114290b53d765c311fd2a7765f6fd1e630b9871c145a2423e",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "产品机会评估与优先级",
+    "url": "/api/public/v1/skills/e14051aa-8f39-4957-8e60-eddf17a6f907/icon/af7e341c32e30837effe175b36cf6881e4a84b7cac9add09f47499f8414df12f.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 842012,
+    "sha256": "af7e341c32e30837effe175b36cf6881e4a84b7cac9add09f47499f8414df12f",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "干系人与跨团队依赖管理",
+    "url": "/api/public/v1/skills/c819d107-c283-4807-80ee-49372a224331/icon/c1b4263a3cb9c83e4c1b3d8b71377c8ce8f4ad020cd9a3b2ffb93e9e7affd20e.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 774310,
+    "sha256": "c1b4263a3cb9c83e4c1b3d8b71377c8ce8f4ad020cd9a3b2ffb93e9e7affd20e",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "项目变更影响与决策记录",
+    "url": "/api/public/v1/skills/22c1fbbc-893f-43d2-a14c-1961fd196f00/icon/ec98d5cb57b3827e8059be56436ea71e8e19335313b03c29c50b4dc3d0be8233.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 666637,
+    "sha256": "ec98d5cb57b3827e8059be56436ea71e8e19335313b03c29c50b4dc3d0be8233",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "提醒与复盘",
+    "url": "/api/public/v1/skills/0d8a25b6-1d1f-4cb9-b0ce-462cbb3ca315/icon/7cb173aeaadcc6d3f2d883f192eedb0d42b6fdfbc97f4595ebfedb8d1f1fea42.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 278624,
+    "sha256": "7cb173aeaadcc6d3f2d883f192eedb0d42b6fdfbc97f4595ebfedb8d1f1fea42",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "优先级与周计划",
+    "url": "/api/public/v1/skills/2629e5f9-1da2-4f5f-90a2-8743f0d88e7a/icon/7d546bc7af109351cfff8d880cc5e12e822749dac198a352de943f686e5972b5.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 294715,
+    "sha256": "7d546bc7af109351cfff8d880cc5e12e822749dac198a352de943f686e5972b5",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "行动项提取",
+    "url": "/api/public/v1/skills/5a4392c4-ec67-416e-8304-787a46e3218b/icon/d0baeb9889df27ca62982e40db9b410aa25fa8a2756f3a5c332b64c938cf070e.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 236817,
+    "sha256": "d0baeb9889df27ca62982e40db9b410aa25fa8a2756f3a5c332b64c938cf070e",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "讲稿与汇报检查",
+    "url": "/api/public/v1/skills/928c179f-09d4-4cee-a722-f8a2adb0646f/icon/20725415fd26a182cf4962282751b9637f63ad95e814135cbac3c15e485e2967.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 249488,
+    "sha256": "20725415fd26a182cf4962282751b9637f63ad95e814135cbac3c15e485e2967",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "演示稿结构与图表建议",
+    "url": "/api/public/v1/skills/e8578df4-c02e-414a-8190-c050acfd9fd3/icon/a8b3399dc6b8f7c56c8a898bf008b387fba9f25b7b852247b5d2117e51ab8339.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 254021,
+    "sha256": "a8b3399dc6b8f7c56c8a898bf008b387fba9f25b7b852247b5d2117e51ab8339",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "汇报逻辑设计",
+    "url": "/api/public/v1/skills/75dc7436-1970-425f-959c-bc6a110ba554/icon/1776dddf3a49c7530d453d8cd6d24f91dad89383b7ab2c396f5bc7378702ce58.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 235312,
+    "sha256": "1776dddf3a49c7530d453d8cd6d24f91dad89383b7ab2c396f5bc7378702ce58",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "翻译与语气适配",
+    "url": "/api/public/v1/skills/0efd7a5b-676e-49fd-b3ab-0837b13d7b35/icon/719ffa677ca5ac89ab439da5f1ff54cc8cf09bccfd8a0bfe6b279e7487033419.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 249366,
+    "sha256": "719ffa677ca5ac89ab439da5f1ff54cc8cf09bccfd8a0bfe6b279e7487033419",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "常规文档写作与改写",
+    "url": "/api/public/v1/skills/0f78d15f-2a1d-4cf1-a267-c4ca8acc9c11/icon/d851d3fe11b14d7a0e113cc74ba100552826918667619e67f78b1d643a69f255.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 263106,
+    "sha256": "d851d3fe11b14d7a0e113cc74ba100552826918667619e67f78b1d643a69f255",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "邮件与消息草拟",
+    "url": "/api/public/v1/skills/85cc82ea-5e4b-49c1-8ca9-d89b4bb6f6b1/icon/8930715e0308cbbcc03f6875d829f7cbfb58f0094070f3b31dbdc758718a72d7.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 271258,
+    "sha256": "8930715e0308cbbcc03f6875d829f7cbfb58f0094070f3b31dbdc758718a72d7",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "个人知识整理",
+    "url": "/api/public/v1/skills/13cc92b8-df72-44ab-925c-759256beb211/icon/610d9607e0022feb172ca04aa4d000713f17236d4a8914eeb1f4c6419e5a9eaf.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 273487,
+    "sha256": "610d9607e0022feb172ca04aa4d000713f17236d4a8914eeb1f4c6419e5a9eaf",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "多资料比较与综合",
+    "url": "/api/public/v1/skills/41cdd7ec-236b-4f2f-8f2a-0bc162112195/icon/01199f3ccb97c77ad1a02975d1cdf726f5aa7480f803f00a409bbe40f18370d3.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 282390,
+    "sha256": "01199f3ccb97c77ad1a02975d1cdf726f5aa7480f803f00a409bbe40f18370d3",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "可信资料检索",
+    "url": "/api/public/v1/skills/2ee6ae78-1cb3-4aeb-a82c-f8250edbd8ba/icon/954e9d898b340f5692b5cb39784582a06de2105e478194d44a3e3ca520feb6e6.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 277546,
+    "sha256": "954e9d898b340f5692b5cb39784582a06de2105e478194d44a3e3ca520feb6e6",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "客服知识与流程改进",
+    "url": "/api/public/v1/skills/e7162dc3-304c-45a2-b646-6d335c6e2426/icon/dff784ba59395d8df9e2acef0c90b8ced9dff0182816ba0d2d795fed6039239b.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 264290,
+    "sha256": "dff784ba59395d8df9e2acef0c90b8ced9dff0182816ba0d2d795fed6039239b",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "服务质量与SLA汇总",
+    "url": "/api/public/v1/skills/3612b365-aa3c-4c17-b37f-7b0c2c707b89/icon/0c1638865233b5b8fd8ecb642351f047da29257432c4b15986ca37fceb108834.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 255574,
+    "sha256": "0c1638865233b5b8fd8ecb642351f047da29257432c4b15986ca37fceb108834",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "工单分类与升级检查",
+    "url": "/api/public/v1/skills/a204fc06-1cef-4c7a-97df-02cb8165b100/icon/9bfad66c514c64a0e586521c4934ae9efa1cbe6eb19cb91652aff70b542a6b82.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 246187,
+    "sha256": "9bfad66c514c64a0e586521c4934ae9efa1cbe6eb19cb91652aff70b542a6b82",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "回归与发布质量检查",
+    "url": "/api/public/v1/skills/16951319-cacf-4259-9f32-7757f7c7d9a1/icon/4b0cfa916555abb1b752792ffb88cbc59182e885a4af6260ad819eef6545044c.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 257289,
+    "sha256": "4b0cfa916555abb1b752792ffb88cbc59182e885a4af6260ad819eef6545044c",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "测试执行证据与缺陷整理",
+    "url": "/api/public/v1/skills/ad0954ed-e4dd-46c4-bb99-efaf91373b96/icon/aba51e74f89af4b500d4ca2c90d57fb1d8e5465d030d3e83c26fd1e7dc1077a0.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 275026,
+    "sha256": "aba51e74f89af4b500d4ca2c90d57fb1d8e5465d030d3e83c26fd1e7dc1077a0",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "测试范围与用例设计",
+    "url": "/api/public/v1/skills/d7168c16-1c10-43e5-bcc0-5222393ca5f9/icon/5efa3585e88e629f9c2687b8950aa1386766b238c4daf87d161dfc2e73499d18.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 254964,
+    "sha256": "5efa3585e88e629f9c2687b8950aa1386766b238c4daf87d161dfc2e73499d18",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "政策变化与税务风险提醒",
+    "url": "/api/public/v1/skills/43302a2c-1388-4992-8baa-f9c2bbc74ab5/icon/b888a80363922ecdc3541e530ea8e221de47591559d45f4f8574f448b29b8bf4.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 288817,
+    "sha256": "b888a80363922ecdc3541e530ea8e221de47591559d45f4f8574f448b29b8bf4",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "发票与申报底稿核对",
+    "url": "/api/public/v1/skills/67885fa6-7ea1-46d2-9409-3624a96ca22a/icon/0790d9a15398b1c4a08d8e0cc808da2e085319879f0fbc75aeb476cb8d707f60.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 267619,
+    "sha256": "0790d9a15398b1c4a08d8e0cc808da2e085319879f0fbc75aeb476cb8d707f60",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "税务资料准备",
+    "url": "/api/public/v1/skills/06166d82-057f-4667-b777-e54e71bb8edc/icon/64fe9f17de15e399d5234063066c590fc84869d7bbd7aaeed133f7df0286e233.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 298852,
+    "sha256": "64fe9f17de15e399d5234063066c590fc84869d7bbd7aaeed133f7df0286e233",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "账龄与对账差异检查",
+    "url": "/api/public/v1/skills/c077a506-53fa-400c-8fa3-86d04f7a4233/icon/c0aa299dfce803352b565299b5f7db7626df78e46cb71b4e517c33edf25543c5.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 259191,
+    "sha256": "c0aa299dfce803352b565299b5f7db7626df78e46cb71b4e517c33edf25543c5",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "应付发票与付款匹配",
+    "url": "/api/public/v1/skills/93aa6fe6-9c4d-49ef-bf11-8142b48aa09b/icon/4b220b0f6be8fcffe4d650022ae09fd5cff4da1e616b1711cb1202ade3a2e789.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 251601,
+    "sha256": "4b220b0f6be8fcffe4d650022ae09fd5cff4da1e616b1711cb1202ade3a2e789",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "应收开票与回款匹配",
+    "url": "/api/public/v1/skills/84b9df6c-0bdf-457c-9560-5007465eaeb9/icon/1c8022b3a55b72337c035235c69fd29e7b1cebb184f11d4f6aa73b967d45c300.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 263086,
+    "sha256": "1c8022b3a55b72337c035235c69fd29e7b1cebb184f11d4f6aa73b967d45c300",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "台账及月结差异检查",
+    "url": "/api/public/v1/skills/6f40b1ca-3f1b-42c1-b583-396a533485c9/icon/e03a1fb245a4f0de4e3c25126a4258c777aff9c73df5f750ed212b2e6ee0e12b.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 280542,
+    "sha256": "e03a1fb245a4f0de4e3c25126a4258c777aff9c73df5f750ed212b2e6ee0e12b",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "凭证准备与科目建议",
+    "url": "/api/public/v1/skills/ceee423d-0366-4bfa-9bb8-badf6a40ac1a/icon/ae9c25a015f8684dd70143c6864429acee46b4491ecd9b7cb4f7a2574503a7d4.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 253504,
+    "sha256": "ae9c25a015f8684dd70143c6864429acee46b4491ecd9b7cb4f7a2574503a7d4",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "票据与费用单据整理",
+    "url": "/api/public/v1/skills/51b14abd-83f6-432a-baba-c4eb186ff203/icon/a77f63687957890d5b1a999424791a18f8e65a7a9d4cd2066d1b2af61ca65370.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 278280,
+    "sha256": "a77f63687957890d5b1a999424791a18f8e65a7a9d4cd2066d1b2af61ca65370",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "需求变更与版本影响",
+    "url": "/api/public/v1/skills/7a9fca45-034e-4693-a735-6a8e7437af09/icon/b71efc39348ca06958bb2a9deadbf09bdcd9e1bb7487ad5484c5351ef12c2678.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 718496,
+    "sha256": "b71efc39348ca06958bb2a9deadbf09bdcd9e1bb7487ad5484c5351ef12c2678",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "需求说明与验收条件",
+    "url": "/api/public/v1/skills/007bd5e8-c9f6-40ca-af23-d4cf80554853/icon/0855b9e53dd8a6d0f37dc4a09dc59c2515dcf64106f189d36456598e957babb0.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 475818,
+    "sha256": "0855b9e53dd8a6d0f37dc4a09dc59c2515dcf64106f189d36456598e957babb0",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "反馈归类与需求澄清",
+    "url": "/api/public/v1/skills/262186a1-2dcd-4b7f-9602-8d0716b8f4ce/icon/ad983b4987c7fb48a8bb0cb48139bc58b4709becc01514ee824ffc6015fd1061.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 401992,
+    "sha256": "ad983b4987c7fb48a8bb0cb48139bc58b4709becc01514ee824ffc6015fd1061",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "服务复盘与续约准备",
+    "url": "/api/public/v1/skills/7927d8a6-493f-4f39-b2e4-3583893ba9bd/icon/8ceb44b475747ebec524a5b1349f30c2a88ef41781231d5b3484f4b1481a9f6d.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 784999,
+    "sha256": "8ceb44b475747ebec524a5b1349f30c2a88ef41781231d5b3484f4b1481a9f6d",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "客户使用与风险检查",
+    "url": "/api/public/v1/skills/8fddb488-8ab4-4d94-ba7d-e1815024c3f1/icon/d5f5adba9b991d5f6c6dc5fcf54352e919fa3bc76c7c7ccb68e0d6b502ac707f.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 715001,
+    "sha256": "d5f5adba9b991d5f6c6dc5fcf54352e919fa3bc76c7c7ccb68e0d6b502ac707f",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "客户接手与成功计划",
+    "url": "/api/public/v1/skills/9a64823c-6368-4777-ad54-bad6805b10c7/icon/2e82d9481013e4184ed874cfa99dddc33fc594d21d6972c9d5bd3c4f2016883f.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 706602,
+    "sha256": "2e82d9481013e4184ed874cfa99dddc33fc594d21d6972c9d5bd3c4f2016883f",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "投标响应草案与漏项检查",
+    "url": "/api/public/v1/skills/6d76b46d-22fb-4ef8-b5b3-d232f98c592a/icon/a88de06a9b969003f04a96743a4c648a09caf55de6a834461fd6a8a5eb60a591.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 537475,
+    "sha256": "a88de06a9b969003f04a96743a4c648a09caf55de6a834461fd6a8a5eb60a591",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "资质与响应证据匹配",
+    "url": "/api/public/v1/skills/bd3e9814-ea2f-4421-9e20-9c266a15680e/icon/623600a23c380578f227bca192655a08b6c7e5828d5e40293891e4a5da3516e4.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 518573,
+    "sha256": "623600a23c380578f227bca192655a08b6c7e5828d5e40293891e4a5da3516e4",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "招标要求与时间节点拆解",
+    "url": "/api/public/v1/skills/9a40779c-25e4-49a4-9f13-27580cbba00d/icon/42a841d1481a1d8ca053fcf28df1ee6c91791a1a00d3bda8be6aef4376d38494.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 340361,
+    "sha256": "42a841d1481a1d8ca053fcf28df1ee6c91791a1a00d3bda8be6aef4376d38494",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "合同履约与到期事项检查",
+    "url": "/api/public/v1/skills/d6d708f6-3664-4e62-b292-b8bf102db839/icon/b6cb3f15448328e7cfce8751793a14e3c6c5e46e3284227836592baed799fc8e.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 515934,
+    "sha256": "b6cb3f15448328e7cfce8751793a14e3c6c5e46e3284227836592baed799fc8e",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "合同版本及模板偏离检查",
+    "url": "/api/public/v1/skills/bfdea59c-b194-4352-9b4d-1f29fc7bc71d/icon/5730152fcfc17354a6038eed72df355eb5079f12d01760e9f37ea6d1d6794aaf.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 587168,
+    "sha256": "5730152fcfc17354a6038eed72df355eb5079f12d01760e9f37ea6d1d6794aaf",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "合同要素与义务整理",
+    "url": "/api/public/v1/skills/57f0fad9-474e-43ee-be51-412955133209/icon/65daf4e74ffd7b646a5aca3ab85fc194a3b0cfaf1157370f6cba62e727bdc1e2.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 482847,
+    "sha256": "65daf4e74ffd7b646a5aca3ab85fc194a3b0cfaf1157370f6cba62e727bdc1e2",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "供应商资料检查",
+    "url": "/api/public/v1/skills/21bd582c-0719-45bf-8c52-2b941ae6edb8/icon/b95a21bbc7cd2f52fa10d9439ebecad82c0417111d747295a4f826a5038a7233.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 589818,
+    "sha256": "b95a21bbc7cd2f52fa10d9439ebecad82c0417111d747295a4f826a5038a7233",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "报价标准化与比价",
+    "url": "/api/public/v1/skills/995040f2-4d35-4115-aaa1-dcf81eda98ff/icon/26e8f81724b9d4aa4692fc4876ee6a5bd5ab7b592b05c5df710f57815ce2f849.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 470481,
+    "sha256": "26e8f81724b9d4aa4692fc4876ee6a5bd5ab7b592b05c5df710f57815ce2f849",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "采购需求与询价准备",
+    "url": "/api/public/v1/skills/cd587f82-4a51-45c2-9a63-2dd7323b5a21/icon/3e246732977c72a6b2a0236b0f0c4c08a4ccf985259cb81af69006a58a83067f.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 540652,
+    "sha256": "3e246732977c72a6b2a0236b0f0c4c08a4ccf985259cb81af69006a58a83067f",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "经营简报与图表说明",
+    "url": "/api/public/v1/skills/2c79d7a6-39d2-4256-9990-b121d53170f6/icon/e6baa7ed4dfe6e349589a031eb5a1654be6bf6b9acb9414205f1a4cb9e925fa4.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 531509,
+    "sha256": "e6baa7ed4dfe6e349589a031eb5a1654be6bf6b9acb9414205f1a4cb9e925fa4",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "经营差异与异常分析",
+    "url": "/api/public/v1/skills/e96d242b-9a9d-444b-9ece-0a31315c4bb5/icon/31450a4cd857612ec1a61ed401e4591899762b704880bb0b0572da66f21b1d1a.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 752955,
+    "sha256": "31450a4cd857612ec1a61ed401e4591899762b704880bb0b0572da66f21b1d1a",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "经营指标汇总",
+    "url": "/api/public/v1/skills/d783b67a-f3d7-49ea-9dc8-a51ba71276c5/icon/be98dc1ce782a54ce2e1eaa3c3e09ffba74f4574a5c267e26c8d9f86ea0617d7.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 516123,
+    "sha256": "be98dc1ce782a54ce2e1eaa3c3e09ffba74f4574a5c267e26c8d9f86ea0617d7",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "品牌与事实审核",
+    "url": "/api/public/v1/skills/21577f3c-6ac0-4947-bea0-98fc2a70e7e2/icon/67a826f5981b2e8fc6178a66c3fd1128600023158383233eb81b386f90f62497.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 567734,
+    "sha256": "67a826f5981b2e8fc6178a66c3fd1128600023158383233eb81b386f90f62497",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "有据内容初稿",
+    "url": "/api/public/v1/skills/25a8bb03-fecc-4146-b747-cd604e884bb2/icon/554523fc0dc6c62bfa9e6c8e9ba771c2f012b8e4a6b60d717da8b585662baa4a.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 571641,
+    "sha256": "554523fc0dc6c62bfa9e6c8e9ba771c2f012b8e4a6b60d717da8b585662baa4a",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "选题与内容排期",
+    "url": "/api/public/v1/skills/5dcb7651-0ddc-4621-bafd-d7feae6dd2dd/icon/2ab7489f23fb13b3ff3cdc22e0771af2fb95959532248c16fa1a3c94fba7c10a.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 622369,
+    "sha256": "2ab7489f23fb13b3ff3cdc22e0771af2fb95959532248c16fa1a3c94fba7c10a",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "销售运营周报",
+    "url": "/api/public/v1/skills/62671f72-0be6-4dfc-b3f9-0a985a3c454b/icon/a927e77eb02d9f70b3252428b7f4c4d847f1c49dc81d411d87d75978858209ac.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 419353,
+    "sha256": "a927e77eb02d9f70b3252428b7f4c4d847f1c49dc81d411d87d75978858209ac",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "停滞商机检查",
+    "url": "/api/public/v1/skills/e1d14cf1-e57f-4b57-8c03-892ce58784df/icon/de70888031be3c081387c92b648d57e3e20a89471829e4ec1468bbffb863695f.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 582607,
+    "sha256": "de70888031be3c081387c92b648d57e3e20a89471829e4ec1468bbffb863695f",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "客户与商机记录整理",
+    "url": "/api/public/v1/skills/1a853401-3936-41f5-a762-1b08f1f76c57/icon/6814d5037dd7ba540d4c79781d56b9b9fae8d18caefa638c79eb5a0a18851dbf.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 578353,
+    "sha256": "6814d5037dd7ba540d4c79781d56b9b9fae8d18caefa638c79eb5a0a18851dbf",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "项目周报生成",
+    "url": "/api/public/v1/skills/a6946693-1a84-4c81-8143-31ddd6259649/icon/1928275a53f4608ceefc6c7653baaa869232a25c69119bb7e5cae60466f77f7e.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 533155,
+    "sha256": "1928275a53f4608ceefc6c7653baaa869232a25c69119bb7e5cae60466f77f7e",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "项目进度与风险检查",
+    "url": "/api/public/v1/skills/e727a727-b53b-43ef-a416-aa162d01b907/icon/b246107bd04810c42552c1ca9b08c6c2227a0bec46bcd3f2828afd36209cfef6.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 371266,
+    "sha256": "b246107bd04810c42552c1ca9b08c6c2227a0bec46bcd3f2828afd36209cfef6",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "项目计划与里程碑",
+    "url": "/api/public/v1/skills/9e0b203b-5603-488d-86e5-0cbb791cfb07/icon/ca84f3525c97901cfc6b9266353ce9fc20ad43eb1d851bcdd58f00c8aa437721.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 373465,
+    "sha256": "ca84f3525c97901cfc6b9266353ce9fc20ad43eb1d851bcdd58f00c8aa437721",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "会议事项跟踪与交接",
+    "url": "/api/public/v1/skills/4ac7a63c-6641-4b73-9675-dae2dea98582/icon/693d04884b92b0ce63adac6b87743f27f802fa55c8f74f81624ca4d881bb5c22.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 476100,
+    "sha256": "693d04884b92b0ce63adac6b87743f27f802fa55c8f74f81624ca4d881bb5c22",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "会议纪要与决议提取",
+    "url": "/api/public/v1/skills/702bb8ae-e134-477f-9e79-72945bfef940/icon/439d3e9004fb382075a468af7599944e5ef86d99df4934ebf55b947ac37d5025.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 499382,
+    "sha256": "439d3e9004fb382075a468af7599944e5ef86d99df4934ebf55b947ac37d5025",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "会议准备与议程编排",
+    "url": "/api/public/v1/skills/d550ed24-dcbd-475e-9011-53bea9c6a7d0/icon/8a22c85e4866d0bac771eee5b6b76a0ea4ed72a8417f98b58669436c16248ec3.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 661957,
+    "sha256": "8a22c85e4866d0bac771eee5b6b76a0ea4ed72a8417f98b58669436c16248ec3",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "Steam 促销助手",
+    "url": "/api/public/v1/skills/8efd0306-1542-44ec-aed1-0b21c3a27bc8/icon/3a43317c888860778834f61a1b7922c3d2efc3fe2abff23c2027c4c4da460c07.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 12857,
+    "sha256": "3a43317c888860778834f61a1b7922c3d2efc3fe2abff23c2027c4c4da460c07",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "SoulTrace Agent Skill",
+    "url": "/api/public/v1/skills/d39efe3d-e971-4a1c-a7b5-6f1412165ab6/icon/2d14e6922ed2c6a91a63902500db33d0955eed7a83ef68b23a20b36b9e6343be.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 32016,
+    "sha256": "2d14e6922ed2c6a91a63902500db33d0955eed7a83ef68b23a20b36b9e6343be",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "vercel-cli-with-tokens",
+    "url": "/api/public/v1/skills/73efba73-a662-4693-9d9d-2c2c295f9f15/icon/568c2d7fd6acbc57c16764e812b3c8acb9d6bd70cbb35f491e086b03e2f2555c.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 20636,
+    "sha256": "568c2d7fd6acbc57c16764e812b3c8acb9d6bd70cbb35f491e086b03e2f2555c",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "React View Transitions Skill",
+    "url": "/api/public/v1/skills/fb085819-2d69-4829-8f36-f01d53310b85/icon/f2f3bd751fa22dc4f151e3a3355fb1e6f4445c51dd5bd3115581a8490522b613.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 19307,
+    "sha256": "f2f3bd751fa22dc4f151e3a3355fb1e6f4445c51dd5bd3115581a8490522b613",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "steam游戏比价工具",
+    "url": "/api/public/v1/skills/30636620-8861-49fb-a8ea-c1fa35e5fd74/icon/af2050208626c57ef6e6d604afd2e1b98ab9e624da91f98e2849111adfdf8d36.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 8359,
+    "sha256": "af2050208626c57ef6e6d604afd2e1b98ab9e624da91f98e2849111adfdf8d36",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "simple",
+    "url": "/api/public/v1/skills/9e7ac996-4d45-4481-aff8-423733048fe3/icon/86a169819e7252d4b53e21b126656a75c313064d526ef5aeb23c872c1741732e.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 19146,
+    "sha256": "86a169819e7252d4b53e21b126656a75c313064d526ef5aeb23c872c1741732e",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "weather",
+    "url": "/api/public/v1/skills/109d0797-26a1-4a9c-8290-c16348bf8dc2/icon/3b59851196f5b7e5d0ec000d27b43f4cc768346ec28bee5cb91f8373bd7c6784.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 22810,
+    "sha256": "3b59851196f5b7e5d0ec000d27b43f4cc768346ec28bee5cb91f8373bd7c6784",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "白月光.skill",
+    "url": "/api/public/v1/skills/a13157f4-8d9f-4979-8e48-7a2a92f3bd76/icon/66c46a7ce5059eab2890d637d5cb459227bf7e4c1dba872a04c83f703e382ba4.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 31973,
+    "sha256": "66c46a7ce5059eab2890d637d5cb459227bf7e4c1dba872a04c83f703e382ba4",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "hue",
+    "url": "/api/public/v1/skills/82b03c3e-b159-4238-9f79-ffb1c2cf25a7/icon/19ff17bf85a3ce8652afa664a150d11f5dbbfaf1dffe09ea73ff74314cb88736.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 38900,
+    "sha256": "19ff17bf85a3ce8652afa664a150d11f5dbbfaf1dffe09ea73ff74314cb88736",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "ml-paper-writing",
+    "url": "/api/public/v1/skills/c246032f-a8f3-4263-a1b6-863d4e9bc98c/icon/ead06a26610727914289ccd211bf0cedbdfe2b562b00acf9838c349e934bd68e.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 6726,
+    "sha256": "ead06a26610727914289ccd211bf0cedbdfe2b562b00acf9838c349e934bd68e",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "特朗普.skill",
+    "url": "/api/public/v1/skills/0b90c7bd-0b0f-4506-9b26-f1b97dc59c84/icon/2224a683e8b55727facfb73dc004b272bc6b2f616c67d16617a7b71d7bb489f9.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 22912,
+    "sha256": "2224a683e8b55727facfb73dc004b272bc6b2f616c67d16617a7b71d7bb489f9",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "Product Marketing Context",
+    "url": "/api/public/v1/skills/f6303b44-6047-4246-bbcf-17d9b8eb1b4e/icon/657fca9309d9cc7c67accc23d7b71de3a85263b651e10bd8ae43c218a1efb445.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 14449,
+    "sha256": "657fca9309d9cc7c67accc23d7b71de3a85263b651e10bd8ae43c218a1efb445",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "arxiv-translator",
+    "url": "/api/public/v1/skills/337f617c-cf6d-4e8c-9160-1a789fd3ff54/icon/ed15490750e667b53add89384ae97a3c8511acbf6e996942e34ff2408972fdea.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 16563,
+    "sha256": "ed15490750e667b53add89384ae97a3c8511acbf6e996942e34ff2408972fdea",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "vercel-react-native-skills",
+    "url": "/api/public/v1/skills/5e2ff2ae-2841-4f45-9b1c-c8e79c405514/icon/4f5a398dc0ccd8a9a9ce83ef2c7bc5ae5931393e8075205e5fb57f5c66c307b5.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 22236,
+    "sha256": "4f5a398dc0ccd8a9a9ce83ef2c7bc5ae5931393e8075205e5fb57f5c66c307b5",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "DLC 雷达",
+    "url": "/api/public/v1/skills/f585a869-1021-43b2-8bb9-5a2d18f3130f/icon/0cb019b7d74e258b4d44df3f3b04bae5441cd8e2f0c657a174d2328e877f3982.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 25854,
+    "sha256": "0cb019b7d74e258b4d44df3f3b04bae5441cd8e2f0c657a174d2328e877f3982",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "代码日报",
+    "url": "",
+    "status": "none"
+  },
+  {
+    "kind": "skill",
+    "name": "合同起草",
+    "url": "",
+    "status": "none"
+  },
+  {
+    "kind": "skill",
+    "name": "企业官网生成",
+    "url": "/api/public/v1/skills/9ac2b3cd-0de3-4248-b142-6a32c6357b12/icon/32842706c7dd2747a2107b1a2e90f56886b875d2ab818e7464857735ec302b34.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 279189,
+    "sha256": "32842706c7dd2747a2107b1a2e90f56886b875d2ab818e7464857735ec302b34",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "营销宣传页生成",
+    "url": "/api/public/v1/skills/779da6e5-3331-485c-a1e3-effca8f722a6/icon/f8f2d74e858f45a67266188224bbb06ed59728e1fb563dcb94077e3663285aa7.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 302489,
+    "sha256": "f8f2d74e858f45a67266188224bbb06ed59728e1fb563dcb94077e3663285aa7",
+    "hash_verified": true
+  },
+  {
+    "kind": "skill",
+    "name": "个人主页生成",
+    "url": "/api/public/v1/skills/d2f06522-1bdb-4f69-9e11-41f995235fa4/icon/a1c2a727abaaa078f8985148396d9266c192ed6b36d14a6c623b20d4494b7b6a.png",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 284063,
+    "sha256": "a1c2a727abaaa078f8985148396d9266c192ed6b36d14a6c623b20d4494b7b6a",
+    "hash_verified": true
+  }
+]

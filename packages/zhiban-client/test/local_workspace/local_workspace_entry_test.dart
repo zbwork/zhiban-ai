@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:file_selector/file_selector.dart';
 import 'package:zhiban_client/pages/chat/widgets/desktop_drop.dart';
 import 'package:dio/dio.dart';
@@ -132,6 +133,10 @@ void main() {
           'provider_id': 'p',
           'model_id': 'chat',
           'skills': '["s"]',
+          // SVG avoids network I/O in this projection regression; decoding is
+          // checked separately against the deployed PNG/JPEG catalog.
+          'metadata':
+              jsonEncode({'avatar_url': 'https://catalog.example/avatar.svg'}),
           'created': 1,
         }));
     await tester.runAsync(() => store.addMessage('e', 'user', '已保存的问题'));
@@ -160,6 +165,45 @@ void main() {
       expect(find.byType(ChatSessionView), findsOneWidget);
       expect(find.byType(PromptInput), findsOneWidget);
       expect(find.byType(AttachmentPreviewHost), findsOneWidget);
+      expect(
+          tester
+              .widget<ConversationListPanel>(find.byType(ConversationListPanel))
+              .conversations
+              .single
+              .agentAvatarUrl,
+          'https://catalog.example/avatar.svg');
+      expect(
+          tester
+              .widget<ChatSessionView>(find.byType(ChatSessionView))
+              .agentAvatarUrl,
+          'https://catalog.example/avatar.svg');
+      expect(
+          tester
+              .widget<ChatMessageList>(find.byType(ChatMessageList))
+              .agentAvatarUrl,
+          'https://catalog.example/avatar.svg');
+      await tester.runAsync(() => controller.saveEmployee({
+            ...controller.employees.single,
+            'metadata': '{}',
+          }));
+      await tester.pumpAndSettle();
+      expect(
+          tester
+              .widget<ConversationListPanel>(find.byType(ConversationListPanel))
+              .conversations
+              .single
+              .agentAvatarUrl,
+          isNull);
+      expect(
+          tester
+              .widget<ChatSessionView>(find.byType(ChatSessionView))
+              .agentAvatarUrl,
+          isNull);
+      expect(
+          tester
+              .widget<ChatMessageList>(find.byType(ChatMessageList))
+              .agentAvatarUrl,
+          isNull);
       final originalInputState = tester.state(find.byType(PromptInput));
       final attachmentSession =
           tester.widget<ChatSessionView>(find.byType(ChatSessionView));
