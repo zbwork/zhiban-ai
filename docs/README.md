@@ -28,3 +28,5 @@
 - [部署后图片全量及历史工具真实续答验证（2026-11-09）](verification/community-deployed-2026-11-09.md)
 
 - [社区版macOS 1.0.0发布记录](releases/community-macos-1.0.0.md)
+
+- [社区版Windows 1.0.0构建与验收](releases/community-windows-1.0.0.md)

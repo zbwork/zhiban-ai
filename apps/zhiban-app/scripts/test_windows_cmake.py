@@ -42,7 +42,7 @@ set(PROJECT_BUILD_DIR "${CMAKE_BINARY_DIR}/" PARENT_SCOPE)
             (flutter / 'generated_plugins.cmake').write_text('')
             (flutter / 'generated_plugin_registrant.cc').write_text('')
             for filename in (
-                'flutter_window.cpp', 'main.cpp', 'utils.cpp',
+                'flutter_window.cpp', 'desktop_network_bridge.cpp', 'main.cpp', 'utils.cpp',
                 'win32_window.cpp', 'Runner.rc', 'runner.exe.manifest',
             ):
                 (runner / filename).write_text('')

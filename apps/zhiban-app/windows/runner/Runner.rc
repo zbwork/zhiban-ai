@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "cn.qkfintech.zhiban" "\0"
-            VALUE "FileDescription", "知办AI" "\0"
+            VALUE "CompanyName", "cn.qkfintech.zhiban.community" "\0"
+            VALUE "FileDescription", "知办AI社区版" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "zhiban" "\0"
+            VALUE "InternalName", "zhiban-community" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 cn.qkfintech.zhiban. All rights reserved." "\0"
             VALUE "OriginalFilename", "ZhiBanAI.exe" "\0"
-            VALUE "ProductName", "知办AI" "\0"
+            VALUE "ProductName", "知办AI社区版" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

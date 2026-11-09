@@ -2,7 +2,7 @@
 ;
 ; 用法（在 Windows 上，已装 Inno Setup 6）：
 ;   iscc /DMyAppVersion=1.0.0 installer.iss
-;   产出：Output\zhiban-setup-1.0.0.exe
+;   产出：Output\ZhiBanAI_Community_1.0.0_windows_x64.exe
 ;
 ; 该安装器由 WinSparkle 在检测到更新后下载并运行，完成自动更新。
 ; 默认从 ..\..\build\windows\x64\runner\Release 取 flutter build windows --release 的产物。
@@ -49,13 +49,13 @@
   #define MyAppVersion GetFileVersion(MyAppExeFull)
 #endif
 
-#define MyAppName "知办AI"
-#define MyAppPublisher "cn.qkfintech.zhiban"
+#define MyAppName "知办AI社区版"
+#define MyAppPublisher "cn.qkfintech.zhiban.community"
 #define MyAppExeName "ZhiBanAI.exe"
 
 [Setup]
-; AppId 固定，勿改：Inno 用它识别同一应用以做升级覆盖安装。
-AppId={{A1E8C2F0-7B3D-4C56-9A21-0F4D8E6B12C3}
+; 社区版专用稳定 AppId；社区升级保持此值，不与商业版共用。
+AppId={{B9176F5C-0428-51DC-8398-2B43190465AE}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -64,7 +64,7 @@ PrivilegesRequired=admin
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=Output
-OutputBaseFilename=zhiban-setup-{#MyAppVersion}
+OutputBaseFilename=ZhiBanAI_Community_{#MyAppVersion}_windows_x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
