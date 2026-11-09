@@ -204,7 +204,7 @@ for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'code
       ['declare_deliverables', { files: [{ name: 'hello.txt', mime: 'text/plain', text_contains: ['community-ok'] }] }],
       ['write_file', { path: 'hello.txt', text: 'community-ok' }],
       ['read_file', { path: 'hello.txt' }],
-      ['local_shell', { command: 'printf shell-ok > shell-result.txt; printf shell-ok', timeout_ms: 10000 }],
+      ['local_shell', { command: process.platform === 'win32' ? `[IO.File]::WriteAllText('shell-result.txt','shell-ok'); Write-Output 'shell-ok'` : 'printf shell-ok > shell-result.txt; printf shell-ok', timeout_ms: 10000 }],
     ];
     const step = steps[calls++];
     if (mode.startsWith('codex')) {
@@ -225,7 +225,7 @@ for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'code
     res.end('data: ' + JSON.stringify({ id: 'test', object: 'chat.completion.chunk', choices: [{ index: 0, delta, finish_reason: null }] }) + '\n\ndata: ' + JSON.stringify({ id: 'test', choices: [{ index: 0, delta: {}, finish_reason: step ? 'tool_calls' : 'stop' }] }) + '\n\ndata: [DONE]\n\n');
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const child = spawn(process.execPath, [join(packageRoot, 'dist/desktop/community.js')], { env: { HOME: process.env.HOME, LANG: 'en_US.UTF-8' }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(packageRoot, 'dist/desktop/community.js')], { env: { ...Object.fromEntries(['HOME', 'USERPROFILE', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'ProgramFiles', 'ProgramFiles(x86)', 'LOCALAPPDATA'].filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]])), LANG: 'en_US.UTF-8' }, stdio: ['pipe', 'pipe', 'pipe'] });
   const lines = createInterface({ input: child.stdout });
   const events = []; let workspace; let broker; let key; let approved = false;
   const send = value => child.stdin.write(JSON.stringify(value) + '\n');
