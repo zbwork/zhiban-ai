@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { mkdtemp, mkdir, writeFile, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, realpath, rm, symlink } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -64,6 +64,27 @@ test('community tool backup is derived from the actual registry without invented
   assert.ok(guide.includes(JSON.stringify({ name: 'mcp__local__list_files', description: tools[0].description, parameters: tools[0].inputSchema })));
   assert.equal(guide.includes('search_files(scope=home)'), false);
   assert.equal(guide.includes('computer_capabilities'), false);
+});
+
+test('skill reference paths remain scoped with native separators and junctions', async () => {
+  const { localTools } = await import(pathToFileURL(join(packageRoot, 'dist/desktop/tools.js')));
+  const root = await mkdtemp(join(tmpdir(), 'community-skill-path-'));
+  const skills = join(root, 'skills');
+  const skill = join(skills, 'test-skill');
+  const outside = join(root, 'outside');
+  await mkdir(join(skill, 'references'), { recursive: true }); await mkdir(outside);
+  await writeFile(join(skill, 'references/data.txt'), 'scoped-reference');
+  await writeFile(join(outside, 'secret.txt'), 'must-not-read');
+  await symlink(outside, join(skill, 'outside'), process.platform === 'win32' ? 'junction' : 'dir');
+  try {
+    const tool = localTools({ privateRoot: root, artifacts: {}, brokerPort: 34567 }).find(tool => tool.name === 'read_skill_file');
+    const run = { config: { skillsDir: skills } };
+    const invoke = path => tool.call(run, { skill_code: 'test-skill', path }, new AbortController().signal);
+    assert.equal((await invoke('references/data.txt')).text, 'scoped-reference');
+    for (const path of ['../outside/secret.txt', 'references\\data.txt', join(outside, 'secret.txt'), 'outside/secret.txt']) {
+      await assert.rejects(invoke(path), { code: 'local.invalid_path' });
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test('office sheet schema uses portable bracket escaping and keeps host validation', () => {
@@ -225,7 +246,7 @@ for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'code
     res.end('data: ' + JSON.stringify({ id: 'test', object: 'chat.completion.chunk', choices: [{ index: 0, delta, finish_reason: null }] }) + '\n\ndata: ' + JSON.stringify({ id: 'test', choices: [{ index: 0, delta: {}, finish_reason: step ? 'tool_calls' : 'stop' }] }) + '\n\ndata: [DONE]\n\n');
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const child = spawn(process.execPath, [join(packageRoot, 'dist/desktop/community.js')], { env: { ...Object.fromEntries(['HOME', 'USERPROFILE', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'ProgramFiles', 'ProgramFiles(x86)', 'LOCALAPPDATA'].filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]])), LANG: 'en_US.UTF-8' }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(packageRoot, 'dist/desktop/community.js')], { env: { ...Object.fromEntries(['HOME', 'USERPROFILE', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'ProgramFiles', 'ProgramFiles(x86)', 'LOCALAPPDATA'].filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]])), ...(process.platform === 'win32' ? { HOME: root, USERPROFILE: root, APPDATA: join(root, 'AppData/Roaming'), LOCALAPPDATA: join(root, 'AppData/Local') } : {}), LANG: 'en_US.UTF-8' }, stdio: ['pipe', 'pipe', 'pipe'] });
   const lines = createInterface({ input: child.stdout });
   const events = []; let workspace; let broker; let key; let approved = false;
   const send = value => child.stdin.write(JSON.stringify(value) + '\n');

@@ -17,6 +17,7 @@
 #include <atomic>
 #include <stdexcept>
 #include <iostream>
+#include <memory>
 
 namespace fs = std::filesystem;
 struct Handle {
@@ -52,6 +53,52 @@ static HANDLE parentProcess() {
   return handle;
 }
 struct Grant { std::wstring path; DWORD mask; ACCESS_MODE mode; };
+// ACLs cannot protect an object that does not exist. Materialize only missing
+// deny directories below a granted writable root, and pin each ancestor against
+// rename/reparse replacement until the child is stopped and its ACLs are revoked.
+struct DenyGuards {
+  std::vector<std::wstring> created;
+  std::vector<std::unique_ptr<Handle>> pinned;
+  void pin(const fs::path& path) {
+    auto handle = std::make_unique<Handle>(CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+    check(handle->value != INVALID_HANDLE_VALUE);
+    FILE_ATTRIBUTE_TAG_INFO info{};
+    check(GetFileInformationByHandleEx(handle->value, FileAttributeTagInfo, &info, sizeof(info)));
+    check((info.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) && !(info.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT));
+    pinned.push_back(std::move(handle));
+  }
+  void prepare(const std::vector<Grant>& grants) {
+    for (const auto& target : grants) {
+      if (target.mode != DENY_ACCESS || fs::exists(target.path)) continue;
+      bool authorized = false;
+      for (const auto& root : grants) {
+        if (root.mode != GRANT_ACCESS || !(root.mask & FILE_WRITE_DATA)) continue;
+        const auto& base = root.path;
+        if (target.path.size() > base.size() && _wcsnicmp(target.path.c_str(), base.c_str(), base.size()) == 0 &&
+            (base.back() == L'\\' || target.path[base.size()] == L'\\')) authorized = true;
+      }
+      check(authorized);
+      std::vector<fs::path> missing;
+      auto ancestor = fs::path(target.path);
+      while (!fs::exists(ancestor)) { missing.push_back(ancestor); ancestor = ancestor.parent_path(); }
+      pin(ancestor);
+      for (auto it = missing.rbegin(); it != missing.rend(); ++it) {
+        if (CreateDirectoryW(it->c_str(), nullptr)) created.push_back(it->wstring());
+        else check(GetLastError() == ERROR_ALREADY_EXISTS);
+        pin(*it);
+      }
+    }
+  }
+  void cleanup() noexcept {
+    pinned.clear();
+    // Never recursively remove data or delete a directory that another actor created.
+    for (auto it = created.rbegin(); it != created.rend(); ++it) RemoveDirectoryW(it->c_str());
+    created.clear();
+  }
+  ~DenyGuards() { cleanup(); }
+};
 struct AclLock {
   Handle mutex;
   AclLock() {
@@ -213,9 +260,9 @@ int wmain(int argc, wchar_t** argv) {
       check(i + 1 < argc); std::wstring value = argv[++i];
       if (arg == L"--broker-port") { port = std::stoi(value); check(port > 0 && port <= 65535); }
       else if (arg == L"--read" || arg == L"--write" || arg == L"--deny") {
-        check(fs::path(value).is_absolute() && fs::exists(value));
+        check(fs::path(value).is_absolute() && (arg == L"--deny" || fs::exists(value)));
         DWORD rights = arg == L"--read" ? (FILE_GENERIC_READ | FILE_GENERIC_EXECUTE) : (FILE_GENERIC_READ | FILE_GENERIC_WRITE | FILE_GENERIC_EXECUTE | DELETE);
-        grants.push_back({fs::canonical(value).wstring(), rights, arg == L"--deny" ? DENY_ACCESS : GRANT_ACCESS});
+        grants.push_back({(arg == L"--deny" ? fs::weakly_canonical(value) : fs::canonical(value)).wstring(), rights, arg == L"--deny" ? DENY_ACCESS : GRANT_ACCESS});
       } else if (arg == L"--processes") { maxProcesses = std::stoul(value); check(maxProcesses > 0 && maxProcesses <= 64); }
       else if (arg == L"--memory-mb") { const auto n = std::stoul(value); check(n > 0 && n <= 2048); memory = static_cast<SIZE_T>(n) * 1024 * 1024; }
       else if (arg == L"--cpu-seconds") { const auto n = std::stoul(value); check(n > 0 && n <= 900); cpu = static_cast<LONGLONG>(n) * 10000000; }
@@ -223,6 +270,7 @@ int wmain(int argc, wchar_t** argv) {
     }
     check(commandIndex > 0 && commandIndex < argc && port > 0);
     check(fs::path(argv[commandIndex]).is_absolute());
+    DenyGuards denyGuards; denyGuards.prepare(grants);
     Handle parent(parentProcess());
     Profile profile;
     for (const auto& grant : grants) {
@@ -313,6 +361,7 @@ int wmain(int argc, wchar_t** argv) {
     // perform ACL cleanup before exiting, then exit without racing their descriptors.
     for (auto it = profile.paths.rbegin(); it != profile.paths.rend(); ++it) profile.acl(*it, 0, REVOKE_ACCESS, false);
     profile.paths.clear(); DeleteAppContainerProfile(profile.name.c_str());
+    denyGuards.cleanup();
     ExitProcess(code);
   } catch (...) {
     std::cerr << "local.windows_sandbox_failed\n";

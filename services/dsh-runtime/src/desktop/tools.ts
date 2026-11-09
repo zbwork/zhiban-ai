@@ -1,7 +1,7 @@
 import { desktopEnvironment, desktopShell, persistenceDenyPaths } from './platform.js';
 import { declareDeliverables, deliveryDeclaration, existingDeliveryIssues, inspectArtifact } from './deliverables.js';
 import { homedir } from 'node:os';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { open, realpath } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { z } from 'zod';
@@ -75,9 +75,9 @@ export function localTools(opts: LocalToolOptions): DesktopTool[] {
           if (error.code === 'ENOENT') throw new LocalError('local.skill_unavailable');
           throw error;
         });
-        validateRelativePath(relative(await realpath(run.config.skillsDir), root));
+        validateRelativePath(relative(await realpath(run.config.skillsDir), root).split(sep).join('/'));
         const source = await realpath(join(root, input.path));
-        validateRelativePath(relative(root, source));
+        validateRelativePath(relative(root, source).split(sep).join('/'));
         const fd = await open(source, constants.O_RDONLY | constants.O_NOFOLLOW);
         try {
           const st = await fd.stat();

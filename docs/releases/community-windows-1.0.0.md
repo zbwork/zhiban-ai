@@ -23,3 +23,11 @@
 源码预检补齐遗漏的Windows Codex兼容构建脚本及其缓存校验测试；未降低隔离门禁。
 
 跨平台运行夹具在Windows使用PowerShell命令，并按客户端白名单传入SystemRoot/用户目录等系统变量；不继承模型凭据或开发工具PATH，不跳过工具/续答断言。
+
+## 实机发现与修复约束
+
+首轮22项测试11通过、11失败。技能读取将OS计算的Windows相对路径直接送入POSIX接口参数校验，references/data.txt误报local.invalid_path。仅规范化OS计算结果的分隔符，外部参数继续拒绝反斜杠、绝对路径和..，并保留realpath边界检查。
+
+完全访问命令在原生参数解析时拒绝不存在的deny目录。对照探针：同一network=true命令，存在deny目录时成功，不存在时失败；实际用户Documents/WindowsPowerShell和Documents/PowerShell不存在。采用在已授权可写根下创建缺失保护目录、持有不允许删除/替换的目录句柄、再应用原有唯一SID拒绝ACL；子进程终止和ACL撤销后，仅尝试删除本次创建且仍为空的目录。不能忽略不存在的deny规则，也不放宽ACL或提升客户端权限。
+
+行业依据：[Microsoft SetNamedSecurityInfoW](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-setnamedsecurityinfow)操作现有命名对象；[CreateDirectoryW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectoryw)创建目录并继承父ACL。测试使用独立用户目录夹具，避免为验收改动构建账号真实主目录的ACL。
