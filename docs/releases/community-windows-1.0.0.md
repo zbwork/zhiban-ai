@@ -18,7 +18,7 @@
 - 包内工具执行及历史工具续答定向验证；构建通过不能代替安装或GUI验收，未完成项逐项记录。
 - 记录安装器体积、SHA-256及签名类型。若沿用Ed25519更新签名，不将其称为Authenticode发布者签名。
 
-构建/安装/运行和最终产物结果完成后补录。
+最终安装后的普通权限和启动结果见下方验收记录。
 
 源码预检补齐遗漏的Windows Codex兼容构建脚本及其缓存校验测试；未降低隔离门禁。
 
@@ -31,3 +31,25 @@
 完全访问命令在原生参数解析时拒绝不存在的deny目录。对照探针：同一network=true命令，存在deny目录时成功，不存在时失败；实际用户Documents/WindowsPowerShell和Documents/PowerShell不存在。采用在已授权可写根下创建缺失保护目录、持有不允许删除/替换的目录句柄、再应用原有唯一SID拒绝ACL；子进程终止和ACL撤销后，仅尝试删除本次创建且仍为空的目录。不能忽略不存在的deny规则，也不放宽ACL或提升客户端权限。
 
 行业依据：[Microsoft SetNamedSecurityInfoW](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-setnamedsecurityinfow)操作现有命名对象；[CreateDirectoryW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectoryw)创建目录并继承父ACL。测试使用独立用户目录夹具，避免为验收改动构建账号真实主目录的ACL。
+
+## 产物与已完成验证
+
+- 产品源码：`607f23a`；独立目录D:\zbc100，未重置原构建工作区，未推送Git。初始归档SHA256为`ee5a77d04377b01430056c39bbfc64db86c09ba320da9a1e5ab26d06bd39d659`，修复增量归档为`d6168f1c8594f97c642cccd0712c5b18f15e055830585357b0160134ccf232c1`。
+- 构建环境：Windows 11 x64，Flutter3.35.6/Dart3.9.2、Go1.26.3、Python3.12.10、Rust1.93.0。Go代理连接超时后，仅构建进程使用goproxy.cn并保留go.sum校验；未关闭TLS或更改全局网络。
+- `ZhiBanAI_Community_1.0.0_windows_x64.exe`：454248482字节，SHA256 `93ef68bdee96ec6cd0a87d977e1155879aed1b7d2d05e2b7a7eebe2cd3bcab5a`。未做Authenticode发布者签名；不能将包内Node/Microsoft WebView2的有效签名归到社区主程序或安装器。
+- 正式包主程序1.0.0+10001，CompanyName为cn.qkfintech.zhiban.community。主程序、Bridge、Node、Codex、sandbox和path addon的PE machine均为0x8664。
+- 包内Node/engine/office/browser/isolation/codex自检全部true。脚本模型驱动真实DSH/Codex的25项测试全部通过、无跳过；包含工具失败后恢复、缺失Responses终态ID、审批/拒绝/取消、附件原字节、技能参考文件及目录链接越界拒绝、缺失deny目录的写入/替换阻断和清理。
+- Windows网络校验99个实际图片URL全部成功，PNG签名与原摘要相符。代码日报和合同起草没有图标URL，属于无自定义图标数据；未冒充GUI回退渲染验收。首次网络夹具误将空URL请求成网站根地址，原始报告保留，最终报告明确排除这两个非图片请求。
+- Windows打包Python测试9项中8通过、1因Windows无独立CMake PATH而跳过；实际Flutter CMake/MSVC Release已成功。Codex缓存Python测试5项全部通过。Mac侧同一打包测试及CMake配置夹具通过（Windows专属项按平台跳过）。
+- 原完整版1.4.0安装器为394706326字节。现存内部Release文件树为1147980718字节，本包为1144152497字节，少3828221字节；旧安装器与现存Release文件树未证明逐字节一致，不能据此解释安装器压缩体积差。没有把另一个CPU架构重复装入新包。
+- 短路径实际安装已通过，正在补充默认Program Files中文目录、普通权限运行和原生窗口启动结果。
+
+未完成：Windows10实机、Windows ARM64原生包、真实付费模型调用及各GUI页面逐项人工点选/视觉验收。远端Windows的网络图片校验和进程窗口状态不能替代图片的实际渲染验收。
+
+## 安装器体积复查（用户反馈454 MB偏大）
+
+已用维护者发布的Inno Unpacker 2.71.3直接读取原1.4.0安装器和新1.0.0安装器，均为Inno6.4.3/lzma2。实际新包相对原包增加的主体为native/codex/codex.exe（291870720字节）；npm内@openai/codex-win32-x64/vendor旧二进制239207216字节仍在。Windows bundledCodex明确返回native/codex，npm根包package.json仅用于版本核验；保留版本/许可元数据，仅删未执行的npm vendor副本。两版都有相同212745424字节WebView2离线依赖，不能把它说成此次新增。
+
+采用：仅Windows目标安装树裁剪重复Codex vendor、node-pty非x64预编译与PDB调试符号，锁文件、构建缓存、实际兼容版、x64 addon/DLL/EXE和许可不变；裁剪发生在原有组件自检之前，并记录清单。源码、隔离门禁、工具和文件预览能力保留。依据：Windows生产路径在src/desktop/codex-engine.ts显式固定native/codex；PDB为调试信息（[Microsoft /PDB](https://learn.microsoft.com/en-us/cpp/build/reference/pdb-use-program-database?view=msvc-170)），不参与PE运行时加载。
+
+用户已明确选择保留完整离线安装；WebView2离线安装器保持不变，仅清理确认未使用的冗余。

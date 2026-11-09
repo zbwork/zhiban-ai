@@ -34,6 +34,37 @@ def copy_tree(source, destination):
     shutil.copytree(filesystem_path(source), filesystem_path(destination), symlinks=False)
 
 
+def prune_windows_dependencies(runtime):
+    """Keep the x64 runtime used by the client, not npm's second Codex executable.
+
+    The top-level @openai/codex package metadata is still used for version checks.
+    Build caches and the actual native/codex compatibility build remain intact.
+    """
+    removed = []
+
+    def remove(relative, reason):
+        path = Path(filesystem_path(runtime / relative))
+        if not path.exists():
+            return
+        files = [p for p in path.rglob('*') if p.is_file()] if path.is_dir() else [path]
+        removed.append({'path': relative, 'reason': reason,
+                        'files': len(files), 'bytes': sum(p.stat().st_size for p in files)})
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+    remove('node_modules/@openai/codex-win32-x64/vendor', 'uses-native-codex-appcontainer-build')
+    for target in ('win32-arm64', 'win32-ia32', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64'):
+        remove('node_modules/node-pty/prebuilds/' + target, 'not-windows-x64')
+    target = Path(filesystem_path(runtime / 'node_modules/node-pty/prebuilds/win32-x64'))
+    if target.is_dir():
+        for symbols in target.rglob('*.pdb'):
+            relative = symbols.relative_to(Path(filesystem_path(runtime))).as_posix()
+            remove(relative, 'debug-symbols')
+    return removed
+
+
 def promote_stage(stage, destination):
     """Wait briefly for observed Windows rename contention; never replace a new target."""
     deadline = time.monotonic() + 10
@@ -144,9 +175,10 @@ def main():
             shutil.copy2(args.sandbox, helper / 'native/zhiban-local-sandbox.exe')
             shutil.copy2(args.path_addon, helper / 'native/zhiban-windows-path.node')
             copy_tree(codex, helper / 'native/codex')
+            pruned = prune_windows_dependencies(helper)
             report = json.loads(subprocess.check_output([stage / 'node/node.exe', helper / 'dist/desktop/main.js', '--self-check'], cwd=helper, env=env, text=True, timeout=120))
             validate_checks(report['checks'], os.environ.get('ZHIBAN_WINDOWS_ALLOW_UNAVAILABLE_CODEX') == '1')
-            (stage / 'manifest.json').write_text(json.dumps({'version': 1, 'platform': 'win32', 'arch': 'x64', 'node': NODE_VERSION, 'dsh': '0.1.0-rc.8', 'codex_app_server': '0.132.0', 'codex_build': json.loads((codex / 'build.json').read_text()), 'checks': report['checks'], 'lock_sha256': lock}, indent=2) + '\n')
+            (stage / 'manifest.json').write_text(json.dumps({'version': 1, 'platform': 'win32', 'arch': 'x64', 'node': NODE_VERSION, 'dsh': '0.1.0-rc.8', 'codex_app_server': '0.132.0', 'codex_build': json.loads((codex / 'build.json').read_text()), 'checks': report['checks'], 'lock_sha256': lock, 'packaging_pruned': pruned}, indent=2) + '\n')
             if destination.exists():
                 shutil.rmtree(filesystem_path(destination))
             promote_stage(stage, destination)

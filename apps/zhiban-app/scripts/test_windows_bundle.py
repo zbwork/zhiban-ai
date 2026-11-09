@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from bundle_local_agent_windows import copy_tree, filesystem_path, promote_stage, validate_checks
+from bundle_local_agent_windows import copy_tree, filesystem_path, promote_stage, validate_checks, prune_windows_dependencies
 
 
 class WindowsBundlePromotion(unittest.TestCase):
@@ -104,6 +104,34 @@ class WindowsBundlePaths(unittest.TestCase):
     def test_preserves_extended_paths_and_formats_unc(self):
         self.assertEqual(filesystem_path(r'\\?\C:\bundle'), r'\\?\C:\bundle')
         self.assertEqual(filesystem_path(r'\\server\share\bundle'), r'\\?\UNC\server\share\bundle')
+
+
+
+
+
+class WindowsProductionPruning(unittest.TestCase):
+    def test_removes_only_duplicate_vendor_wrong_arch_and_symbols(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            removed = ['node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/codex/codex.exe',
+                       'node_modules/node-pty/prebuilds/win32-arm64/pty.node',
+                       'node_modules/node-pty/prebuilds/win32-x64/conpty.pdb']
+            retained = ['native/codex/codex.exe', 'native/codex/LICENSE',
+                        'node_modules/@openai/codex/package.json',
+                        'node_modules/@openai/codex-win32-x64/package.json',
+                        'node_modules/node-pty/prebuilds/win32-x64/pty.node',
+                        'node_modules/node-pty/prebuilds/win32-x64/conpty.dll',
+                        'node_modules/node-pty/LICENSE', 'assets/keep.pdb']
+            for name in removed + retained:
+                path = root / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(b'fixture')
+            report = prune_windows_dependencies(root)
+            for name in removed:
+                self.assertFalse((root / name).exists(), name)
+            for name in retained:
+                self.assertEqual((root / name).read_bytes(), b'fixture', name)
+            self.assertEqual(sum(item['files'] for item in report), len(removed))
+            self.assertEqual(sum(item['bytes'] for item in report), 7 * len(removed))
+            self.assertEqual(prune_windows_dependencies(root), [])
 
 
 if __name__ == '__main__':
