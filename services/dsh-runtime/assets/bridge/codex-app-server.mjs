@@ -1,3 +1,4 @@
+import { errorInfo } from './codex-error-info.mjs';
 import { visibleResult } from './codex-visible-result.mjs';
 /** Version-pinned adapter. The parent applies OS confinement to this entire tree. */
 import { openCodexTransport } from './codex-transport.mjs';
@@ -36,16 +37,6 @@ const send = (message) => transport.send(message);
 const request = (method, params) => new Promise((resolve, reject) => {
   const id = ++next; pending.set(id, {resolve,reject}); send({id,method,params});
 });
-const errorInfo = (error) => {
-  const value=error?.codexErrorInfo;
-  const allowed=new Set(['contextWindowExceeded','usageLimitExceeded','serverOverloaded','cyberPolicy','internalServerError','unauthorized','badRequest','threadRollbackFailed','sandboxError','other','httpConnectionFailed','responseStreamConnectionFailed','responseStreamDisconnected','responseTooManyFailedAttempts','activeTurnNotSteerable']);
-  const key=typeof value==='string'?value:Object.keys(value??{})[0];
-  const status=value?.[key]?.httpStatusCode;
-  const message=String(error?.message??'').toLowerCase();
-  const reason=message.includes('image')?'image_response':message.includes('tool')?'tool_response':message.includes('stream')?'stream_response':'unknown';
-  const terms=['input_image','image_url','image','function_call_output','encrypted','reasoning','invalid_request','unsupported','parse','decrypt','verify','expected','array','string','missing','timeout','overloaded','rate limit','quota','400','401','403','429','500','502','503','stream disconnected'].filter(term=>message.includes(term));
-  return {kind:allowed.has(key)?key:'other',terms,...(Number.isInteger(status)&&status>=100&&status<=599?{http_status:status}:{}),reason};
-};
 const finish = (kind, code = 'zap.local_execution_failed') => {
   if (ended) return;
   ended = true;

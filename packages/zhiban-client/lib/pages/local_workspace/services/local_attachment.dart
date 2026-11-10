@@ -33,12 +33,12 @@ class LocalAttachment {
       size: j['size'] as int,
       text: j['text'] as String,
       digest: j['digest'] as String?);
-  ChatFileItem get file => ChatFileItem(
-      fileName: name,
-      filePath: path,
-      fileLink: Uri.file(path).toString(),
-      fileType: ChatFileType.file,
-      sizeBytes: size);
+  ChatFileItem get file => ChatFileItem.fromJson({
+        'name': name,
+        'filePath': path,
+        'fileLink': Uri.file(path).toString(),
+        'size': size,
+      });
   static List<LocalAttachment> decode(Object? json) => (jsonDecode(
           json as String? ?? '[]') as List)
       .map((e) => LocalAttachment.fromJson(Map<String, dynamic>.from(e as Map)))

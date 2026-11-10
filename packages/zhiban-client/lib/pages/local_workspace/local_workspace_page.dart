@@ -834,6 +834,7 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
                                           _messageViews[id] = messages;
                                         }
                                         final session = ChatSessionView(
+                                          showAiDisclaimer: false,
                                           agentAvatarUrl:
                                               _metadata(e)['avatar_url']
                                                   as String?,

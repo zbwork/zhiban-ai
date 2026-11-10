@@ -164,6 +164,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ChatSessionView), findsOneWidget);
       expect(find.byType(PromptInput), findsOneWidget);
+      expect(find.text('内容由AI生成，请仔细甄别'), findsNothing);
       expect(find.byType(AttachmentPreviewHost), findsOneWidget);
       expect(
           tester

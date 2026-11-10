@@ -30,3 +30,5 @@
 - [社区版macOS 1.0.0发布记录](releases/community-macos-1.0.0.md)
 
 - [社区版Windows 1.0.0构建与验收](releases/community-windows-1.0.0.md)
+
+- [社区版 README PC 实机截图](verification/community-readme-desktop-2026-11-10.md)

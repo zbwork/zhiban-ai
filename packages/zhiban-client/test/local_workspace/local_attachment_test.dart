@@ -1,5 +1,9 @@
 import 'dart:convert';
+import 'package:zhiban_core/chat/chat_models.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:zhiban_client/pages/chat/widgets/messages/message_bubble/components/message_bubble_file_attachments.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +20,67 @@ Uint8List document(Map<String, String> parts) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('persisted local images reuse media classification without losing paths',
+      () {
+    for (final name in ['看板.png', 'PHOTO.JPG', 'image.jpeg', 'chart.webp']) {
+      final attachment =
+          LocalAttachment(name: name, path: '/tmp/$name', size: 42, text: '');
+      final restored =
+          LocalAttachment.decode(jsonEncode([attachment.toJson()])).single.file;
+      expect(restored.fileType, ChatFileType.image);
+      expect(restored.filePath, '/tmp/$name');
+      expect(restored.fileLink, Uri.file('/tmp/$name').toString());
+      expect(restored.sizeBytes, 42);
+    }
+    for (final name in [
+      'report.xlsx',
+      'report.docx',
+      'README',
+      'image.png.zip'
+    ]) {
+      expect(
+          LocalAttachment(name: name, path: '/tmp/$name', size: 1, text: '')
+              .file
+              .fileType,
+          ChatFileType.file);
+    }
+  });
+  testWidgets(
+      'local PNG renders a decoded thumbnail instead of a document card',
+      (tester) async {
+    await tester.runAsync(() async {
+      final dir = await Directory.systemTemp.createTemp('local-thumbnail-');
+      try {
+        final file = await File('${dir.path}/看板.png').writeAsBytes(base64Decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQyfj/HwAEygKLuK2khgAAAABJRU5ErkJggg=='));
+        final attachment = LocalAttachment(
+            name: '看板.png',
+            path: file.path,
+            size: await file.length(),
+            text: '');
+        await tester.pumpWidget(ProviderScope(
+            child: MaterialApp(
+                home: Scaffold(
+                    body: MessageBubbleFileAttachments(
+                        files: [attachment.file])))));
+        await precacheImage(FileImage(file),
+                tester.element(find.byType(MessageBubbleImageAttachment)))
+            .timeout(const Duration(seconds: 5));
+        await tester.pump();
+        expect(find.byType(MessageBubbleImageAttachment), findsOneWidget);
+        expect(find.byType(MessageBubbleDocumentAttachment), findsNothing);
+        expect(find.byType(Image), findsOneWidget);
+        expect(
+            tester.widget<Image>(find.byType(Image)).image, isA<FileImage>());
+        expect(tester.getSize(find.byType(Image)).height,
+            kMessageBubbleImageHeight);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        await dir.delete(recursive: true);
+      }
+    });
+  });
   test('extracts Word paragraphs and Excel shared/inline/numeric cells', () {
     final word = document({
       'word/document.xml':

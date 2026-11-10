@@ -1,4 +1,6 @@
 import 'package:flutter/gestures.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:zhiban_client/pages/chat/widgets/messages/message_bubble/components/message_bubble_file_attachments.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zhiban_core/chat/chat_message_tree.dart';
@@ -61,6 +63,36 @@ void main() {
       ),
     );
   }
+
+  testWidgets('deliverables follow response text and retain document opening',
+      (tester) async {
+    final file = ChatFileItem(
+        fileName: 'report.xlsx',
+        filePath: '/tmp/report.xlsx',
+        fileLink: 'file:///tmp/report.xlsx',
+        fileType: ChatFileType.file);
+    final item = ChatAssistantMessageViewData.fromBlocks(
+        status: BubbleStatus.success,
+        files: [file],
+        blocks: [const ChatAssistantTextBlock(content: '分析结果')]);
+    ChatFileItem? opened;
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+            home: Scaffold(
+                body: ChatAssistantMessageView(
+                    item: item,
+                    onOpenAttachment: (value) => opened = value)))));
+    expect(tester.getTopLeft(find.byType(MessageBubbleFileAttachments)).dy,
+        greaterThan(tester.getBottomLeft(find.text('分析结果')).dy));
+    expect(
+        tester.getTopLeft(find.text('AI 生成')).dy,
+        greaterThan(tester
+            .getBottomLeft(find.byType(MessageBubbleFileAttachments))
+            .dy));
+    await tester.tap(find.text('report.xlsx'));
+    expect(opened, same(file));
+    expect(tester.takeException(), isNull);
+  });
 
   for (final status in ['streaming', 'awaiting_user', 'final', 'cancelled']) {
     testWidgets('$status answer shows provenance only after generation ends',

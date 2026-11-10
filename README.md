@@ -1,7 +1,7 @@
 # 知办AI · Zhiban AI
 
 <p>
-  <img src="docs/images/zhiban-product-intro.png" alt="知办AI：新一代 AI 数字员工" width="100%" align="top"><img src="docs/images/zhiban-team-collaboration.png" alt="知办AI：桌面与移动协作界面展示" width="100%" align="top">
+  <img src="docs/images/community-desktop-chat.png" alt="知办AI社区版 PC 对话：经营分析师处理演示数据并生成量化简报" width="100%" align="top">
 </p>
 
 **让数字员工加入你的团队，在自己的环境里开展 AI 协作。**
@@ -14,7 +14,7 @@
 
 启动客户端即可进入本地工作区，无需账号或部署后端。在「模型服务」按现有服务商顺序选择服务商，填写自己的 API Key，内置目录会自动启用一个文本模型；自定义服务商需填写地址和模型。随后新建数字员工，配置角色和技能即可聊天。
 
-员工、会话、消息和技能目录保存在本机 SQLite，API Key 以明文保存在本机私有配置文件。技能广场随客户端包含 149 项：原平台 144 项目录介绍，以及可直接使用的 5 项文本技能（写作、总结、翻译、代码审查与计划）。只有目录、尚无执行包的项目标记“需技能包”，暂不能添加。模型推理仍需连接你选择的服务商。自动任务免登录在本机运行，支持任务管理、立即执行和历史记录；关闭客户端期间不执行，重开后合并补执行一次到期任务。具体边界见[本地工作区契约](docs/requirements/local-workspace.md)。
+员工、会话、消息和技能目录保存在本机 SQLite，API Key 以明文保存在本机私有配置文件。技能广场从公开目录加载技能，可查看介绍并为数字员工下载安装技能包；已安装技能保存在本机。官方数字员工可直接浏览，并使用本机模型开展对话。模型推理仍需连接你选择的服务商。自动任务免登录在本机运行，支持任务管理、立即执行和历史记录；关闭客户端期间不执行，重开后合并补执行一次到期任务。具体边界见[本地工作区契约](docs/requirements/local-workspace.md)。
 
 以下服务端部署及协作能力说明供集成开发参考，不是本地桌面的启动前提。
 
@@ -33,39 +33,37 @@
 
 在「本地开发工具」中安装、检测和配置 Codex、Claude。点击各工具的「API 设置」，填写自己的 API 地址、模型名称和 API Key，再应用配置并检测连接。API Key 以明文保存在本机私有配置文件。Codex 需使用支持 OpenAI Responses 的服务，Claude 需使用支持 Anthropic Messages 的服务。
 
-![本地开发工具：Codex 安装状态与工具入口](docs/images/screenshots/local-dev-tools.png)
-
-![本地开发工具：下载、验证、安装与状态检测](docs/images/screenshots/local-dev-tools-install.png)
+![社区版本地开发工具：Codex 与 Claude 的安装和检测入口](docs/images/screenshots/community-dev-tools.jpg)
 
 ### 与数字员工对话
 
 在同一工作空间中与数字员工沟通，查看回复与业务信息。
 
-![知办AI：与数字员工对话](docs/images/screenshots/chat.png)
+![社区版 PC 对话：经营分析师处理演示数据并生成量化简报](docs/images/community-desktop-chat.png)
 
 ### 数字员工
 
-集中浏览个人与组织数字员工，按职责找到合适的协作对象。
+浏览官方数字员工的岗位介绍与关联技能，也可以创建和管理自己的数字员工。
 
-![知办AI：数字员工](docs/images/screenshots/digital-employees.png)
+![社区版官方数字员工：岗位头像、介绍与关联技能](docs/images/screenshots/community-employees.jpg)
 
 ### 技能广场
 
 按分类浏览与搜索技能，了解可扩展的工作能力。
 
-![知办AI：技能广场](docs/images/screenshots/skills.png)
+![社区版技能广场：技能图标、分类、介绍与添加入口](docs/images/screenshots/community-skills.jpg)
 
 ### 自动任务
 
-查看任务计划、启停任务，并在需要时立即执行。
+为数字员工配置任务提示、运行频率和投递会话，管理任务启停，并在需要时立即执行。下图为未保存的任务配置示例。
 
-![知办AI：自动任务](docs/images/screenshots/scheduled-tasks.png)
+![社区版自动任务：任务提示与执行员工配置草稿](docs/images/screenshots/community-task-editor.jpg)
 
-### 文件与云盘
+### 本地附件与交付文件
 
-通过目录整理工作资料，集中查看文件与共享空间。
+在对话中添加本地文件，让数字员工处理资料并生成交付文件。图片显示缩略图，Excel 等文件可在右侧预览；本地工作区不提供云盘入口。
 
-![知办AI：文件与云盘](docs/images/screenshots/drive.png)
+![社区版本地文件：分析简报与 Excel 工作表预览](docs/images/screenshots/community-local-files.jpg)
 
 ## 核心模块
 

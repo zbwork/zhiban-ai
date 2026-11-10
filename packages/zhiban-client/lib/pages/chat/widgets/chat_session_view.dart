@@ -67,12 +67,14 @@ class ChatSessionView extends StatefulWidget {
     this.sendReady = true,
     this.onOpenApps,
     this.showServerTools = true,
+    this.showAiDisclaimer = true,
     this.sentTextHistory = const [],
     this.autoScrollOnMessageUpdate = true,
   });
 
   final ChatState state;
   final bool showServerTools;
+  final bool showAiDisclaimer;
   final List<String> sentTextHistory;
   final bool autoScrollOnMessageUpdate;
   final RichPromptController? controller;
@@ -578,6 +580,8 @@ class _ChatSessionViewState extends State<ChatSessionView> {
                                       )
                                     else
                                       PromptInput(
+                                        showAiDisclaimer:
+                                            widget.showAiDisclaimer,
                                         showServerTools: widget.showServerTools,
                                         sentTextHistory: widget.sentTextHistory,
                                         onOpenApps: widget.onOpenApps,

@@ -45,3 +45,11 @@ Xcode目标级PRODUCT_BUNDLE_IDENTIFIER高于AppInfo.xcconfig，归档后必须�
 不能把单arm64完整版的DMG与universal社区版直接比较。发布前先核对架构manifest、展开逻辑字节和hdiutil imageinfo编码在用/浪费字节，再沿用既有HFS+ ULMO参数；首次社区包因架构加倍与不同压缩参数达到约900MB。按CPU分别交付保留相同功能，不能通过删除运行能力来冒充瘦身。
 
 按CPU验证Bridge initialize时必须传该产物的协议架构：arm64或x64（Mach-O名称x86_64映射为协议x64）。把宿主arm64参数传给Rosetta运行的Intel helper会被正常拒绝为Invalid params；不能将验证脚本传参错误判成组件启动故障或放宽校验。
+
+## 实机截图与本地产物展示（2026-11-10）
+
+同名社区版安装包、发布 archive 和开发预览可能同时运行。源码或 build 成功不代表用户打开的二进制已更新；验收必须记录实际完整 app 路径，并在退出该进程后替换，再验证真实画面。保留用户数据，不用删除工作区消除旧状态。
+
+LocalAttachment 不应硬编码 ChatFileType.file；复用 ChatFileItem 的统一扩展名分类，历史附件也能获得图片缩略图。助手交付附件应在正文之后，不要为截图另建消息 UI。Widget 测试中的真实文件 IO 和图片预缓存须进入 tester.runAsync，避免 fake-async 下等待真实 IO 而挂起；图片夹具应能真实解码。
+
+README 图片资源写入或替换后，文件存在及系统解码成功仍不等于 Markdown Webview 已加载。VS Code 曾保留失败显示，未改文件执行 Markdown: Refresh Preview 后恢复；交付前需在实际预览中逐图确认，不能只做路径检查。

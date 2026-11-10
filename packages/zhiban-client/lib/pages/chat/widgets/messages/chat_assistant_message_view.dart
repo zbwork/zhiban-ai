@@ -77,19 +77,6 @@ class ChatAssistantMessageView extends StatelessWidget {
       }
     }
 
-    if (item.files.isNotEmpty) {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: MessageBubbleFileAttachments(
-            files: item.files,
-            onOpenAttachment: onOpenAttachment,
-            alignment: CrossAxisAlignment.start,
-          ),
-        ),
-      );
-    }
-
     // 是否已经开始流式输出最终回答正文。"已开始"的判定：item.blocks 里出现
     // 任意非空 text 块。一旦开始，_TimelinePanel 自动从 "思考中…(展开)"
     // 切到 "已完成思考(折叠)"，与微信/ChatGPT 设计稿一致。
@@ -200,6 +187,20 @@ class ChatAssistantMessageView extends StatelessWidget {
           );
           break;
       }
+    }
+
+    // Generated deliverables follow the response that explains them.
+    if (item.files.isNotEmpty) {
+      children.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: MessageBubbleFileAttachments(
+            files: item.files,
+            onOpenAttachment: onOpenAttachment,
+            alignment: CrossAxisAlignment.start,
+          ),
+        ),
+      );
     }
 
     // 处理中但气泡里既没工具时间线也没正文（OpenClaw prep stages 30~50s 静默期），
