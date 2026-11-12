@@ -218,7 +218,14 @@ class LocalAgentService extends ChangeNotifier {
   Future<void> _start() async {
     if (!supported) throw StateError('请在电脑端使用本机数字员工');
     final generation = ++_generation;
+    final connectionEpoch = AppConfig.connectionEpoch;
+    final address = AppConfig.apiUrl();
     final prefs = await SharedPreferences.getInstance();
+    if (_generation != generation ||
+        connectionEpoch != AppConfig.connectionEpoch ||
+        AppConfig.connectionChanging) {
+      throw StateError('本机运行登录已变化');
+    }
     final token = prefs.getString(AppConfig.storageTokenKey) ?? '';
     final who = identity(token);
     if (who == null) {
@@ -232,7 +239,11 @@ class LocalAgentService extends ChangeNotifier {
     errorMessage = '';
     notifyListeners();
     void checkCurrent() {
-      if (_generation != generation) throw StateError('本机运行登录已变化');
+      if (_generation != generation ||
+          connectionEpoch != AppConfig.connectionEpoch ||
+          AppConfig.connectionChanging) {
+        throw StateError('本机运行登录已变化');
+      }
     }
 
     try {
@@ -260,15 +271,16 @@ class LocalAgentService extends ChangeNotifier {
         throw StateError('本机运行组件尚未安装，请安装包含本机运行组件的桌面版本');
       }
       final environment = _hostEnvironment();
-      final installationId =
-          await LocalInstallationStore.loadOrCreate(AppConfig.apiUrl());
+      final installationId = await LocalInstallationStore.loadOrCreate(address);
       checkCurrent();
       final support = await getApplicationSupportDirectory();
       final documents = await getApplicationDocumentsDirectory();
       checkCurrent();
       final process = await Process.start(node, [entry],
           environment: environment, includeParentEnvironment: false);
-      if (_generation != generation) {
+      if (_generation != generation ||
+          connectionEpoch != AppConfig.connectionEpoch ||
+          AppConfig.connectionChanging) {
         process.kill();
         throw StateError('本机运行登录已变化');
       }
@@ -373,8 +385,7 @@ class LocalAgentService extends ChangeNotifier {
       });
       process.stdin.writeln(jsonEncode({
         'type': 'initialize',
-        'baseURL':
-            AppConfig.apiUrl().replaceFirst('://localhost:', '://127.0.0.1:'),
+        'baseURL': address.replaceFirst('://localhost:', '://127.0.0.1:'),
         'accessToken': token,
         'installationId': installationId,
         ...who,
@@ -615,9 +626,8 @@ class LocalAgentService extends ChangeNotifier {
 
   void _cancelComputer(Process? process) {
     if (process != null && Platform.isMacOS) {
-      unawaited(_computer.invokeMethod<void>('cancelSession', {
-        'session': '${process.pid}'
-      }).catchError((_) {}));
+      unawaited(_computer.invokeMethod<void>(
+          'cancelSession', {'session': '${process.pid}'}).catchError((_) {}));
     }
   }
 

@@ -2,6 +2,7 @@
 package adminrouter
 
 import (
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/admincore"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminapps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminorg"
@@ -12,11 +13,13 @@ import (
 )
 
 type Handlers struct {
-	Apps    *adminapps.Handlers
-	Session *adminsession.Handlers
-	Tenant  *admintenant.Handlers
-	Org     *adminorg.Handlers
-	Agents  *communityagent.Handlers
+	AppReadOnly bool
+	Apps        *adminapps.Handlers
+	Session     *adminsession.Handlers
+	Tenant      *admintenant.Handlers
+	Org         *adminorg.Handlers
+	Agents      *communityagent.Handlers
+	Core        *admincore.Handlers
 }
 
 func (h Handlers) Register(mux *http.ServeMux, authMw func(http.Handler) http.Handler) {
@@ -31,7 +34,12 @@ func (h Handlers) Register(mux *http.ServeMux, authMw func(http.Handler) http.Ha
 		return adminAuth(middleware.RequirePasswordValid(middleware.RequireTenant(middleware.RequirePermission(code)(handler))))
 	}
 	if h.Apps != nil {
-		h.Apps.Register(mux, tenantPerm)
+		if h.AppReadOnly {
+			h.Apps.RegisterReadOnly(mux, tenantPerm, platformPerm)
+		} else {
+			h.Apps.Register(mux, tenantPerm)
+			h.Apps.RegisterPlatform(mux, platformPerm)
+		}
 	}
 	if h.Agents != nil {
 		mux.Handle("GET /api/admin/v1/tenant/agents", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Agents.List)))
@@ -41,6 +49,9 @@ func (h Handlers) Register(mux *http.ServeMux, authMw func(http.Handler) http.Ha
 		mux.Handle("DELETE /api/admin/v1/tenant/agents/{uuid}", tenantPerm("tenant.agent.delete", http.HandlerFunc(h.Agents.Delete)))
 		mux.Handle("POST /api/admin/v1/tenant/agents/{uuid}/publish", tenantPerm("tenant.agent.publish", http.HandlerFunc(h.Agents.Publish)))
 		mux.Handle("GET /api/admin/v1/tenant/agent-model-options", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Agents.ModelOptions)))
+	}
+	if h.Core != nil {
+		h.Core.Register(mux, adminAuth, platformPerm, tenantPerm)
 	}
 	mux.HandleFunc("POST /api/admin/v1/auth/login", h.Session.LoginPassword)
 	mux.HandleFunc("POST /api/admin/v1/auth/login/password", h.Session.LoginPassword)

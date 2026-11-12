@@ -17,6 +17,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:zhiban_client/config/app_config.dart';
+import 'package:zhiban_client/pages/server_connection/workspace_connection_scope.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -51,7 +53,36 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       BotToast.showText(text: error);
     });
     final state = ref.watch(loginAccountProvider);
-    return _buildDesktopLoginPage(context, state);
+    final login = _buildDesktopLoginPage(context, state);
+    final connection = WorkspaceConnectionScope.maybeOf(context);
+    if (connection == null) return login;
+    return Column(children: [
+      Material(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 28, 12, 4),
+            child: Row(children: [
+              Expanded(
+                  child: Tooltip(
+                message: AppConfig.apiUrl(),
+                child: Text('服务器 · ${Uri.parse(AppConfig.apiUrl()).authority}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              )),
+              TextButton(
+                  onPressed: connection.returnToLocal,
+                  child: const Text('返回本地')),
+            ]),
+          ),
+        ),
+      ),
+      Expanded(child: login),
+    ]);
   }
 
   void _handleMobileChanged(String value) {

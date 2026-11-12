@@ -825,6 +825,7 @@ class ConversationsNotifier extends AsyncNotifier<List<ConversationItem>> {
 
   Future<void> _refresh(int requestId) async {
     final revisionAtStart = _localRevision;
+    final readsAtStart = _pendingReads.keys.toSet();
     // doc-13 §A: 保留未 adopt 的 pending 数字员工会话栏 (服务端不返回它们);
     // 若该 agent 已有真实会话 (按 agentId) 则不再保留 pending, 避免重复。
     final currentList = state.asData?.value ?? const <ConversationItem>[];
@@ -873,6 +874,7 @@ class ConversationsNotifier extends AsyncNotifier<List<ConversationItem>> {
           final local = current[item.conversationId];
           if (local != null &&
               ((_unreadRevisions[item.conversationId] ?? 0) > revisionAtStart ||
+                  readsAtStart.contains(item.conversationId) ||
                   _pendingReads.containsKey(item.conversationId))) {
             return item.copyWith(
                 unreadCount: local.unreadCount,
@@ -1832,6 +1834,7 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
         sessions: {...base.sessions, active: cached},
       );
       state = AsyncData(ws);
+      _markRestoredConversationReadIfVisible(active);
       return ws;
     }
 
@@ -1905,6 +1908,7 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
     });
     state = AsyncData(wsFinal);
     _resumePendingStream(active, messages);
+    _markRestoredConversationReadIfVisible(active);
     return wsFinal;
   }
 
@@ -2682,16 +2686,31 @@ class ChatNotifier extends AsyncNotifier<ChatState> {
     _markCurrentConversationRead(id);
   }
 
+  void _markRestoredConversationReadIfVisible(String conversationId) {
+    final lifecycle = SchedulerBinding.instance.lifecycleState;
+    if (!ref.read(isChatRouteActiveProvider) ||
+        ref.read(selectedGroupProvider) != null ||
+        ref.read(selectedHumanDirectProvider) != null ||
+        _ws.activeConversationId != conversationId ||
+        lifecycle == AppLifecycleState.paused ||
+        lifecycle == AppLifecycleState.hidden ||
+        lifecycle == AppLifecycleState.detached) {
+      return;
+    }
+    _markCurrentConversationRead(conversationId);
+  }
+
   /// 用户点开会话即视为已读：先本地清零（红点立刻消失），再异步通知后端。
   /// 后端失败不需要回滚——下次 refresh 会重新拉到真实未读数。
   void _markCurrentConversationRead(String conversationId) {
-    if (conversationId.isEmpty) return;
-    ref.read(conversationsProvider.notifier).clearUnreadLocally(conversationId);
-    final service = ref.read(chatServiceProvider);
-    unawaited(
-      service.markConversationRead(conversationId).catchError((Object _) {
-        // 已读上报失败可忽略：下次拉列表时会拿到真实状态。
-      }),
+    if (conversationId.isEmpty || isPendingConversation(conversationId)) return;
+    final item = _conversationItemById(conversationId);
+    markConversationReadEverywhere(
+      ref: ref,
+      wukongClient: ref.read(wukongImClientProvider),
+      conversationId: conversationId,
+      channelId: item?.wukongChannelId,
+      channelType: item?.wukongChannelType,
     );
   }
 

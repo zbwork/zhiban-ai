@@ -4,3 +4,8 @@
 # Python build helpers
 __pycache__/
 *.py[cod]
+
+# Web dependencies and generated community bundles
+node_modules/
+/apps/agent-bus-admin/dist/
+/apps/agent-bus-admin/dist-community/

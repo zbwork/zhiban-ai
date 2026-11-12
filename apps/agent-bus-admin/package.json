@@ -5,10 +5,10 @@
   "type": "module",
   "packageManager": "pnpm@10.32.1",
   "scripts": {
-    "dev": "vite --config vite.community.config.ts --open /community.html",
-    "build": "tsc -b && vite build --config vite.community.config.ts",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview --config vite.community.config.ts"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@radix-ui/react-tooltip": "^1.2.8",

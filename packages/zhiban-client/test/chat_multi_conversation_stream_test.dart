@@ -24,7 +24,6 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show FrameCallback;
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,6 +37,9 @@ import 'package:zhiban_client/pages/chat/providers/conversation_realtime_bridge.
     show wukongImClientProvider;
 import 'package:zhiban_client/pages/digital_employee/providers/digital_employee_providers.dart';
 import 'package:zhiban_client/pages/digital_employee/services/digital_employee_service.dart';
+import 'package:zhiban_client/rtc/fake_rtc_client.dart';
+import 'package:zhiban_client/rtc/rtc_call_controller.dart';
+import 'package:zhiban_client/rtc/rtc_call_tone_player.dart';
 
 // ---------------- 按 streamId 独立控制的 stream fake ----------------
 
@@ -279,6 +281,15 @@ Future<(ProviderContainer, ChatNotifier, _MultiStreamFakeSvc)> _boot({
   final fake = _MultiStreamFakeSvc();
   final c = ProviderContainer(overrides: [
     chatServiceProvider.overrideWith((ref) => fake),
+    rtcCallControllerProvider.overrideWith((ref) {
+      final controller = RtcCallController(
+        clientFactory: FakeRtcClient.new,
+        signalStream: const Stream.empty(),
+        tonePlayer: const SilentTonePlayer(),
+      );
+      ref.onDispose(controller.dispose);
+      return controller;
+    }),
     digitalEmployeeCatalogProvider.overrideWith(() => _FakeCatalog()),
     wukongImClientProvider.overrideWithValue(_OfflineImClient()),
   ]);
@@ -307,19 +318,6 @@ Future<void> _pump([int times = 3]) async {
   for (var i = 0; i < times; i++) {
     await Future<void>.delayed(Duration.zero);
   }
-}
-
-void _mockRtcEventChannels() {
-  final messenger =
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-  const incomingEvents = MethodChannel('easyo/rtc/incoming_panel/events');
-  const meetingEvents = MethodChannel('easyo/rtc/meeting/events');
-  messenger.setMockMethodCallHandler(incomingEvents, (_) async => null);
-  messenger.setMockMethodCallHandler(meetingEvents, (_) async => null);
-  addTearDown(() {
-    messenger.setMockMethodCallHandler(incomingEvents, null);
-    messenger.setMockMethodCallHandler(meetingEvents, null);
-  });
 }
 
 /// 发起一条 send 并推进到「已订阅流」状态（send 本身 await 到流结束，故 unawaited）。
@@ -829,7 +827,6 @@ void main() {
   });
 
   testWidgets('正文 delta 每帧最多提交一次，A/B 队列互不串', (tester) async {
-    _mockRtcEventChannels();
     late ProviderContainer container;
     late ChatNotifier notifier;
     await tester.runAsync(() async {
@@ -907,7 +904,6 @@ void main() {
   });
 
   testWidgets('长回复突发先细粒度起步，预算耗尽后已到内容一次铺出', (tester) async {
-    _mockRtcEventChannels();
     late ChatNotifier notifier;
     final longAnswer = List.filled(4096, '长').join();
     await tester.runAsync(() async {
@@ -942,7 +938,6 @@ void main() {
   });
 
   testWidgets('completed 立即覆盖权威正文并取消待显示尾段', (tester) async {
-    _mockRtcEventChannels();
     late ChatNotifier notifier;
     late _MultiStreamFakeSvc fake;
     await tester.runAsync(() async {
@@ -981,7 +976,6 @@ void main() {
   });
 
   testWidgets('completed 未重复正文时立即 flush 已到达的最后片段', (tester) async {
-    _mockRtcEventChannels();
     late ChatNotifier notifier;
     await tester.runAsync(() async {
       final boot = await _boot(useRealFrames: true);
@@ -1016,7 +1010,6 @@ void main() {
   });
 
   testWidgets('stop 会取消待执行 frame，旧正文不会在停止后出现', (tester) async {
-    _mockRtcEventChannels();
     late ChatNotifier notifier;
     await tester.runAsync(() async {
       final boot = await _boot(useRealFrames: true);
@@ -1665,7 +1658,8 @@ void main() {
       final answer = notifier.debugSession('conv-a')!.messages.last;
       expect(answer.status, BubbleStatus.error);
       expect(answer.failureCode, 'model.request_invalid');
-      expect(answer.failureMessage, '模型请求格式错误（HTTP 400）。');
+      expect(answer.failureMessage,
+          '模型请求格式错误（HTTP 400）。（model.request_invalid）');
     }
 
     check();
@@ -2033,15 +2027,6 @@ void main() {
   });
 
   testWidgets('P1-3: A2A 审批等待期间切到 B，完成状态只回写原会话 A', (tester) async {
-    final messenger = tester.binding.defaultBinaryMessenger;
-    const incomingEvents = MethodChannel('easyo/rtc/incoming_panel/events');
-    const meetingEvents = MethodChannel('easyo/rtc/meeting/events');
-    messenger.setMockMethodCallHandler(incomingEvents, (_) async => null);
-    messenger.setMockMethodCallHandler(meetingEvents, (_) async => null);
-    addTearDown(() {
-      messenger.setMockMethodCallHandler(incomingEvents, null);
-      messenger.setMockMethodCallHandler(meetingEvents, null);
-    });
     await tester.pumpWidget(MaterialApp(
       builder: BotToastInit(),
       navigatorObservers: [BotToastNavigatorObserver()],

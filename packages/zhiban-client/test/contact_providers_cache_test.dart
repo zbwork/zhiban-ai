@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zhiban_core/contacts/contact_models.dart';
 import 'package:zhiban_client/pages/contacts/contact_providers.dart';
 import 'package:zhiban_client/pages/contacts/contact_service.dart';
+import 'package:zhiban_client/pages/contacts/contacts_directory_store.dart';
 
 class _CountingContactsService extends ContactsService {
+  Completer<void>? treeGate;
   int treeCalls = 0;
   int membersCalls = 0; // 按部门 id 查(有直属成员的部门各一次) + 不限部门 kind=agent 兜底一次
   int agentsCalls = 0;
@@ -12,6 +15,7 @@ class _CountingContactsService extends ContactsService {
   @override
   Future<List<ContactDepartment>> tree() async {
     treeCalls += 1;
+    await treeGate?.future;
     return const [
       ContactDepartment(
         id: 'dept-tech',
@@ -47,6 +51,21 @@ class _CountingContactsService extends ContactsService {
 }
 
 void main() {
+  test('clearing directory rejects late refresh before querying new session',
+      () async {
+    final service = _CountingContactsService()..treeGate = Completer<void>();
+    final store = ContactsDirectoryStore.forService(service);
+    final pending = store.refresh();
+    final rejected = expectLater(pending, throwsStateError);
+    await store.clear();
+    service.treeGate!.complete();
+    await rejected;
+    expect(store.current, isNull);
+    expect(service.membersCalls, 0);
+    service.treeGate = null;
+    await store.refresh();
+    expect(store.current, isNotNull);
+  });
   // 通讯录(部门树 + 成员)现在走 ContactsDirectoryStore:每次
   // contactsCacheRefreshProvider.refreshStale() 都无条件后台重新拉一遍全量数据
   // ("每次打开再拉一遍"), 不再像数字员工广场(contactAgentsProvider)那样按
@@ -96,7 +115,8 @@ void main() {
     expect(service.membersCalls, 4);
   });
 
-  test('contactAgentsProvider keeps cached data inside 120s stale time', () async {
+  test('contactAgentsProvider keeps cached data inside 120s stale time',
+      () async {
     var now = DateTime(2026, 6, 3, 10);
     final service = _CountingContactsService();
     final container = ProviderContainer(

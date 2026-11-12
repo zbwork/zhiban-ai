@@ -10,11 +10,13 @@ class AgentDetailContent extends StatelessWidget {
     required this.agent,
     required this.sourceLabel,
     required this.onChat,
+    this.chatLabel = '去聊天',
   });
 
   final AgentItem agent;
   final String sourceLabel;
   final VoidCallback onChat;
+  final String chatLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -111,9 +113,10 @@ class AgentDetailContent extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onChat,
               icon: const Icon(CupertinoIcons.chat_bubble_2_fill, size: 18),
-              label: const Text(
-                '去聊天',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              label: Text(
+                chatLabel,
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               style: FilledButton.styleFrom(
                 shape: RoundedRectangleBorder(

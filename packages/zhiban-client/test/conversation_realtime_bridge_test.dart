@@ -38,6 +38,8 @@ class _FakeChatSvc extends OpenClawChatService {
   final List<Stream<Map<String, dynamic>>> accountStreams;
   int listCalls = 0; // listAllConversations 调用次数 (build + 每次 refresh)
   Future<void>? listGate;
+  Future<void>? historyGate;
+  final readCalls = <String>[];
   Object? listError;
   int accountStreamListenCalls = 0;
   final Map<String, List<ChatMessage>> histories = {};
@@ -62,12 +64,16 @@ class _FakeChatSvc extends OpenClawChatService {
     int page = 1,
     int pageSize = 50,
     String? before,
-  }) async =>
-      histories[conversationId] ?? const [];
+  }) async {
+    await historyGate;
+    return histories[conversationId] ?? const [];
+  }
 
   @override
   Future<void> markConversationRead(String conversationId,
-      {int lastReadMessageSeq = 0}) async {}
+      {int lastReadMessageSeq = 0}) async {
+    readCalls.add(conversationId);
+  }
 
   @override
   Stream<Map<String, dynamic>> streamAccountEvents() {
@@ -772,10 +778,9 @@ void main() {
       ]);
       addTearDown(c.dispose);
 
-      c.read(conversationsProvider.notifier).applyAgentConversationPreview(
-            'a-conv',
-            lastMessage: '这是最终回答'
-          );
+      c
+          .read(conversationsProvider.notifier)
+          .applyAgentConversationPreview('a-conv', lastMessage: '这是最终回答');
 
       final list = _list(c);
       expect(list.first.conversationId, 'a-conv'); // 置顶
@@ -789,10 +794,9 @@ void main() {
       final c = await _boot([_agent('a-conv', 'ag1')]);
       addTearDown(c.dispose);
 
-      c.read(conversationsProvider.notifier).applyAgentConversationPreview(
-            'missing',
-            lastMessage: 'x'
-          );
+      c
+          .read(conversationsProvider.notifier)
+          .applyAgentConversationPreview('missing', lastMessage: 'x');
 
       expect(_byId(c, 'a-conv').lastMessage, isNull); // 未变
     });
@@ -806,10 +810,9 @@ void main() {
       final beforeActive = before.activeConversationId;
       final beforeMsgCount = before.messages.length;
 
-      c.read(conversationsProvider.notifier).applyAgentConversationPreview(
-            'a-conv',
-            lastMessage: '最终回答'
-          );
+      c
+          .read(conversationsProvider.notifier)
+          .applyAgentConversationPreview('a-conv', lastMessage: '最终回答');
 
       final after = c.read(chatProvider).asData!.value;
       expect(after.activeConversationId, beforeActive); // SSE 执行态不被列表 patch 影响
@@ -875,9 +878,7 @@ void main() {
     });
 
     test('本地清零只是乐观 UI; refresh 仍以 WuKong unread 快照为准', () async {
-      final server = <ConversationItem>[
-        _group('群聊', ch: 'g-1', unread: 2)
-      ];
+      final server = <ConversationItem>[_group('群聊', ch: 'g-1', unread: 2)];
       final c = await _boot(server);
       addTearDown(c.dispose);
 
@@ -890,9 +891,7 @@ void main() {
     });
 
     test('WuKong 已读成功后 refresh 返回 0 → 红点保持清除', () async {
-      final server = <ConversationItem>[
-        _group('群聊', ch: 'g-1', unread: 2)
-      ];
+      final server = <ConversationItem>[_group('群聊', ch: 'g-1', unread: 2)];
       final c = await _boot(server);
       addTearDown(c.dispose);
 
@@ -974,10 +973,10 @@ void main() {
       final client =
           _FakeImClient(uid: 'me', status: ImConnectionStatus.connected);
       final creds = _FakeCreds(_connInfo);
-      final c = await _bootBridge([
-        _human('张伟', ch: 'ch-zw'),
-        _human('李四', ch: 'ch-ls')
-      ], client, creds);
+      final c = await _bootBridge(
+          [_human('张伟', ch: 'ch-zw'), _human('李四', ch: 'ch-ls')],
+          client,
+          creds);
       addTearDown(() async {
         await client.dispose();
         c.dispose();
@@ -1036,9 +1035,7 @@ void main() {
         title: '旧昵称',
       );
       final before = svc.listCalls;
-      svc.items = [
-        _human('conv-peer', ch: 'ch-peer', title: '新昵称')
-      ];
+      svc.items = [_human('conv-peer', ch: 'ch-peer', title: '新昵称')];
 
       client.emit(const ImMessage(
         messageId: 'm-after-rename',
@@ -1380,10 +1377,7 @@ void main() {
         'notification_kind': 'call_invite',
         'title': '李娜',
         'body': '邀请你进行语音通话',
-        'route': {
-          'conversation_uuid': 'conv-call',
-          'call_uuid': 'call-1'
-        },
+        'route': {'conversation_uuid': 'conv-call', 'call_uuid': 'call-1'},
       });
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
@@ -2862,6 +2856,76 @@ void main() {
   });
 
   group('ConversationRealtimeBridge reconnect/resume gap refresh (P1)', () {
+    for (final visibleAtCompletion in [true, false]) {
+      test('冷启动历史延迟完成，visible=$visibleAtCompletion，只标读可见会话', () async {
+        final gate = Completer<void>();
+        final svc = _FakeChatSvc([
+          _agent('active', 'ag1', ch: 'agent-ch').copyWith(unreadCount: 1),
+          _human('other', ch: 'other-ch', unread: 2),
+        ])
+          ..historyGate = gate.future;
+        final client = _FakeImClient(uid: 'me');
+        final c =
+            await _bootBridge([], client, _FakeCreds(_connInfo), chatSvc: svc);
+        addTearDown(() async {
+          c.dispose();
+          await client.dispose();
+        });
+        c.read(isChatRouteActiveProvider.notifier).state = true;
+        final loading = c.read(chatProvider.future);
+        await Future<void>.delayed(Duration.zero);
+        expect(svc.readCalls, isEmpty);
+        c.read(isChatRouteActiveProvider.notifier).state = visibleAtCompletion;
+        gate.complete();
+        await loading;
+        await Future<void>.delayed(Duration.zero);
+        expect(svc.readCalls, visibleAtCompletion ? ['active'] : isEmpty);
+        expect(_byId(c, 'active').unreadCount, visibleAtCompletion ? 0 : 1);
+        expect(_byId(c, 'other').unreadCount, 2);
+      });
+    }
+
+    test('前台恢复列表补标当前免打扰会话，离开页面及后台保留未读', () async {
+      final svc = _FakeChatSvc(
+          [_group('current', ch: 'g-1', unread: 1).copyWith(muted: true)]);
+      final client =
+          _FakeImClient(uid: 'me', status: ImConnectionStatus.connected);
+      final c = await _bootBridge([], client, _FakeCreds(_freshInfo()),
+          chatSvc: svc, refreshDebounce: const Duration(milliseconds: 10));
+      addTearDown(() async {
+        c.dispose();
+        await client.dispose();
+      });
+      final bridge = c.read(conversationRealtimeBridgeProvider);
+      await bridge.connected;
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      c.read(selectedGroupProvider.notifier).state = const GroupSelection(
+          conversationId: 'current',
+          roomUuid: 'r',
+          channelId: 'g-1',
+          channelType: 2,
+          title: '群',
+          participants: []);
+      c.read(isChatRouteActiveProvider.notifier).state = true;
+      bridge.onAppResumed();
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(svc.readCalls, ['current']);
+      expect(_byId(c, 'current').unreadCount, 0);
+      c.read(isChatRouteActiveProvider.notifier).state = false;
+      client.emitConvEvent(const ImConversationEvent(
+          kind: ImConversationEventKind.unreadChanged));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(_byId(c, 'current').unreadCount, 1);
+      expect(svc.readCalls, ['current']);
+      c.read(isChatRouteActiveProvider.notifier).state = true;
+      bridge.onAppBackgrounded();
+      client.emitConvEvent(const ImConversationEvent(
+          kind: ImConversationEventKind.unreadChanged));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(svc.readCalls, ['current']);
+      expect(_byId(c, 'current').unreadCount, 1);
+    });
+
     test('reconnect/syncCompleted → 状态跃迁时 debounce 一次 conversations refresh',
         () async {
       final svc = _FakeChatSvc([_group('群', ch: 'g-1', unread: 2)]);

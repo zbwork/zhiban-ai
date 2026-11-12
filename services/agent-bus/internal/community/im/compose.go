@@ -11,17 +11,23 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/encode"
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/log"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/account"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agent"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/conversation"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/convstate"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/event"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/message"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/room"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/agentdirect"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/chat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/contacts"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/directroom"
+	roomsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/room"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/wukongagent"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientchat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientim"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientrooms"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/wukongwh"
 	"io"
 	"net/http"
@@ -102,6 +108,10 @@ func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc c
 	adapter := wukong.NewAdapter(c.WuKong.URL, c.WuKong.TCPAddr, c.WuKong.WSAddr, nil)
 	mapper := wukong.NewDirectRoomMapper(adapter, lookup)
 	rooms := room.New(pool)
+	roomService := roomsvc.New(rooms, account.New(pool), agent.New(pool), conversation.New(pool), message.New(pool), visibility, chatSvc, pool, event.New(pool))
+	roomsvc.SetWuKongGroupProvisionerOnService(roomService, wukong.NewGroupRoomMapper(adapter.Client(), lookup))
+	roomHandlers := &clientrooms.Handlers{Room: roomService, Contacts: visibility, DirectRoom: directroom.New(directroom.Deps{Logger: log.Default(), Rooms: rooms, Accounts: account.New(pool), WuKong: mapper, ConvState: convstate.New(pool)})}
+	roomHandlers.Register(mux, auth)
 	prepare := agentdirect.NewPrepareService(true, agentLookup{agent.New(pool)}, visibility, agentdirect.New(mapper, roomEnsurer{rooms}))
 	trigger := wukongagent.New(pool, chatSvc, visibility, adapter.Client())
 	syncProxy := wukong.NewMessageSyncProxy(adapter.Client(), lookup)

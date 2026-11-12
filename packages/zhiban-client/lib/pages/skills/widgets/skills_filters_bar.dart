@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:zhiban_client/config/color_config.dart';
 import 'package:zhiban_client/pages/skills/models/skill_models.dart';
@@ -19,8 +18,6 @@ class SkillsFiltersBar extends StatelessWidget {
     required this.onSourceChanged,
     required this.onSortChanged,
     required this.onCategoryChanged,
-    required this.onRefresh,
-    required this.isRefreshing,
     this.tabSwitcher,
     this.sortOptions = SortOption.values,
     this.subtitle = '浏览并筛选租户可用技能。',
@@ -38,8 +35,6 @@ class SkillsFiltersBar extends StatelessWidget {
   final ValueChanged<SkillSource> onSourceChanged;
   final ValueChanged<SortOption> onSortChanged;
   final ValueChanged<int?> onCategoryChanged;
-  final VoidCallback onRefresh;
-  final bool isRefreshing;
 
   /// 「技能广场 / 我的技能」切换（F03 §1.5.4 闭环）；桌面端放在页头 trailing。
   final Widget? tabSwitcher;
@@ -127,47 +122,7 @@ class SkillsFiltersBar extends StatelessWidget {
         PageHeader(
           title: '技能广场',
           subtitle: subtitle,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (tabSwitcher != null) ...[
-                tabSwitcher!,
-                const SizedBox(width: 12),
-              ],
-              if (isRefreshing)
-                const Padding(
-                  padding: EdgeInsets.only(right: 10),
-                  child: CupertinoActivityIndicator(radius: 8),
-                ),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF475467),
-                  side: const BorderSide(color: Color(0xFFE4E7EC)),
-                  backgroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                onPressed: isRefreshing ? null : onRefresh,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(CupertinoIcons.refresh, size: 14),
-                    SizedBox(width: 6),
-                    Text('刷新'),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          trailing: tabSwitcher,
         ),
         Container(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),

@@ -8,8 +8,10 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcontacts"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcron"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientdrive"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientfiles"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientknowledge"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientlocal"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientpositions"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/session"
 	"net/http"
 )
@@ -25,6 +27,8 @@ type Handlers struct {
 	Session      *session.Handlers
 	Contacts     *clientcontacts.Handlers
 	Drive        *clientdrive.Handlers
+	Files        *clientfiles.Handlers
+	Positions    *clientpositions.Handlers
 	Local        *clientlocal.Handlers
 }
 
@@ -34,6 +38,12 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	}
 	authT := func(handler http.Handler) http.Handler {
 		return auth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(membership)(handler)))
+	}
+	if h.Files != nil {
+		h.Files.Register(mux, authT)
+	}
+	if h.Positions != nil {
+		mux.Handle("GET /api/agent-bus/v1/agents/positions", authT(http.HandlerFunc(h.Positions.List)))
 	}
 	if h.Apps != nil {
 		h.Apps.Register(mux, authT)
@@ -59,6 +69,10 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 		mux.Handle("GET /api/agent-bus/v1/agents/{uuid}", authT(http.HandlerFunc(h.Agents.Get)))
 	}
 	if h.Catalog != nil {
+		mux.Handle("GET /api/agent-bus/v1/conversations/{uuid}/skill-rail-config", authT(http.HandlerFunc(h.Catalog.SkillRailConfig)))
+		mux.Handle("POST /api/agent-bus/v1/agents/{agent_uuid}/skill-overrides", authT(http.HandlerFunc(h.Catalog.SkillOverrideUpsert)))
+		mux.Handle("DELETE /api/agent-bus/v1/agents/{agent_uuid}/skill-overrides/{skill_uuid}", authT(http.HandlerFunc(h.Catalog.SkillOverrideDelete)))
+		mux.Handle("POST /api/agent-bus/v1/builtin-skills/handshake", authT(http.HandlerFunc(h.Catalog.SkillHandshake)))
 		mux.Handle("GET /api/agent-bus/v1/skills", authT(http.HandlerFunc(h.Catalog.Skills)))
 		mux.Handle("GET /api/agent-bus/v1/skill-categories", authT(http.HandlerFunc(h.Catalog.Categories)))
 	}

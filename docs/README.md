@@ -1,7 +1,20 @@
 # 社区版文档
 
+- [客户端优先修复与验证（2026-11-12）](verification/client-priority-2026-11-12.md)
+
+- [完整后台 admincore 续修验证（2026-11-12）](verification/admincore-2026-11-12.md)
+- [后台逐页请求矩阵（2026-11-12）](verification/admincore-page-matrix-2026-11-12.md)
+
 - [安装与启动](INSTALL.md)
 - [本地工作区需求与验收](requirements/local-workspace.md)
+- [可选服务器工作区](requirements/server-workspace.md)
+- [社区版复用与缺陷修复范围](requirements/community-capability-parity.md)
+- [社区数据库复用核对](architecture/community-schema-reuse.md)
+- [ADR：可选服务器工作区](adr/0003-optional-server-workspace.md)
+- [服务器工作区踩坑](pitfalls/server-workspace.md)
+- [服务器工作区验证](verification/server-workspace-2026-11-10.md)
+- [服务器工作区真实部署联调](verification/server-workspace-2026-11-11.md)
+- [服务器工作区联调规范](standards/server-workspace-integration.md)
 - [ADR：社区版本地工作区](adr/0001-local-workspace.md)
 - [本地工作区验证](verification/local-workspace.md)
 - [2026-11-04 社区版回归记录](verification/community-regression-2026-11-04.md)

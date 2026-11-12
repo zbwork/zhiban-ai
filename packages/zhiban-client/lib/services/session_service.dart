@@ -6,7 +6,6 @@ import 'package:zhiban_client/services/local_agent_service.dart';
 import 'package:zhiban_client/services/conversation_models.dart';
 import 'package:zhiban_client/services/tenant_identity_preview.dart';
 
-
 import 'package:flutter/foundation.dart';
 import 'package:zhiban_client/config/app_config.dart';
 import 'package:zhiban_client/services/session_runtime.dart';
@@ -47,7 +46,9 @@ class SessionService {
   const SessionService();
 
   Future<String?> getToken() async {
+    final epoch = AppConfig.connectionEpoch;
     final prefs = await SharedPreferences.getInstance();
+    if (!isCurrentConnection(epoch)) return null;
     final token = prefs.getString(AppConfig.storageTokenKey);
     if (token == null || token.isEmpty) {
       return null;
@@ -91,7 +92,9 @@ class SessionService {
   }
 
   Future<bool> hasValidSession() async {
+    final epoch = AppConfig.connectionEpoch;
     final token = await getToken();
+    if (!isCurrentConnection(epoch)) return false;
     if (token == null) return false;
     if (LocalTokenClaims.isExpired(token)) {
       // 先静默续期; 只有判定性失败(refresh token 无效/撤销)才清凭证,
@@ -100,6 +103,7 @@ class SessionService {
         case RefreshOutcome.ok:
           return true;
         case RefreshOutcome.invalid:
+          if (!isCurrentConnection(epoch)) return false;
           await clearSessionStorage();
           return false;
         case RefreshOutcome.networkError:
@@ -114,7 +118,13 @@ class SessionService {
     return true;
   }
 
-  Future<void> clearSessionStorage() async {
+  Future<void> clearSessionStorage({bool connectionTransition = false}) {
+    if (connectionTransition) return _clearSessionStorage();
+    return withConnectionCredentials(
+        AppConfig.connectionEpoch, _clearSessionStorage);
+  }
+
+  Future<void> _clearSessionStorage() async {
     clearTenantIdentityPreview();
     await LocalAgentService.instance.beforeIdentityChange(null);
     try {
