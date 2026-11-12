@@ -107,7 +107,9 @@ decodeConnack(PacketHeader header, ReadData reader) {
   connAck.reasonCode = reader.readUint8();
   connAck.serverKey = reader.readString();
   connAck.salt = reader.readString();
-  if (connAck.serviceProtoVersion >= 4) {
+  // Authentication failures from v1.2.6 omit version/nodeId even when the
+  // client requested v4. Preserve the rejection instead of overreading it.
+  if (connAck.reasonCode == 1 && connAck.serviceProtoVersion >= 4) {
     connAck.nodeId = reader.readUint64().toInt();
   }
   return connAck;

@@ -156,30 +156,32 @@ ValueListenable<bool> get tenantSwitchInProgress => _tenantSwitchInProgress;
 ///
 /// 任一登录成功路径 (login/register/scope-switch) 都必须走这里, 保证 SharedPreferences
 /// 与 RequestInterceptor 静态缓存一致。dashboard_token 写空对象, 兼容老页面读取。
-Future<void> _persistLoginResult(AuthLoginResult res) async {
-  if (res.accessToken.isEmpty) {
-    throw Exception('登录失败，未获取到 accessToken');
-  }
-  if (!_tenantSwitchInProgress.value) clearTenantIdentityPreview();
-  await LocalAgentService.instance.beforeIdentityChange(res.accessToken);
-  final sp = await SharedPreferences.getInstance();
-  await _resetRealtimeBeforeIdentityChange(sp, res.accessToken);
-  await sp.setString(AppConfig.storageTokenKey, res.accessToken);
-  if (res.refreshToken.isNotEmpty) {
-    await sp.setString(AppConfig.storageRefreshTokenKey, res.refreshToken);
-  } else {
-    await sp.remove(AppConfig.storageRefreshTokenKey);
-  }
-  // 老页面 (recharge / wallet 等) 可能读 dashboard_token, 这里写空对象避免它们崩。
-  await sp.setString(AppConfig.storageDashboardTokenKey,
-      jsonEncode({'userToken': '', 'ssoToken': ''}));
-  if (res.account.isNotEmpty) {
-    await sp.setString(
-        AppConfig.storageAccountInfoKey, jsonEncode(res.account));
-  }
-  RequestInterceptor.clearTokenCache();
-  unawaited(sessionPushLifecycle.start());
-}
+Future<void> _persistLoginResult(AuthLoginResult res, {int? expectedEpoch}) =>
+    withConnectionCredentials(expectedEpoch ?? AppConfig.connectionEpoch,
+        () async {
+      if (res.accessToken.isEmpty) {
+        throw Exception('登录失败，未获取到 accessToken');
+      }
+      if (!_tenantSwitchInProgress.value) clearTenantIdentityPreview();
+      await LocalAgentService.instance.beforeIdentityChange(res.accessToken);
+      final sp = await SharedPreferences.getInstance();
+      await _resetRealtimeBeforeIdentityChange(sp, res.accessToken);
+      await sp.setString(AppConfig.storageTokenKey, res.accessToken);
+      if (res.refreshToken.isNotEmpty) {
+        await sp.setString(AppConfig.storageRefreshTokenKey, res.refreshToken);
+      } else {
+        await sp.remove(AppConfig.storageRefreshTokenKey);
+      }
+      // 老页面 (recharge / wallet 等) 可能读 dashboard_token, 这里写空对象避免它们崩。
+      await sp.setString(AppConfig.storageDashboardTokenKey,
+          jsonEncode({'userToken': '', 'ssoToken': ''}));
+      if (res.account.isNotEmpty) {
+        await sp.setString(
+            AppConfig.storageAccountInfoKey, jsonEncode(res.account));
+      }
+      RequestInterceptor.clearTokenCache();
+      unawaited(sessionPushLifecycle.start());
+    });
 
 Future<void> _resetRealtimeBeforeIdentityChange(
   SharedPreferences sp,
@@ -264,7 +266,9 @@ Future<AuthLoginResult> loginWithPasswordApi({
   required String identifier,
   required String password,
 }) async {
+  final epoch = AppConfig.connectionEpoch;
   final device = await collectLoginDeviceInfo();
+  if (!isCurrentConnection(epoch)) throw StateError('工作区已切换');
   final response = await request.post(
     '/auth/login/password',
     data: <String, dynamic>{
@@ -275,7 +279,7 @@ Future<AuthLoginResult> loginWithPasswordApi({
   );
   final result =
       AuthLoginResult.fromJson((response.data as Map).cast<String, dynamic>());
-  await _persistLoginResult(result);
+  await _persistLoginResult(result, expectedEpoch: epoch);
   return result;
 }
 
@@ -284,7 +288,9 @@ Future<AuthLoginResult> loginWithSmsApi({
   required String mobile,
   required String code,
 }) async {
+  final epoch = AppConfig.connectionEpoch;
   final device = await collectLoginDeviceInfo();
+  if (!isCurrentConnection(epoch)) throw StateError('工作区已切换');
   final response = await request.post(
     '/auth/login/sms',
     data: <String, dynamic>{
@@ -295,7 +301,7 @@ Future<AuthLoginResult> loginWithSmsApi({
   );
   final res =
       AuthLoginResult.fromJson((response.data as Map).cast<String, dynamic>());
-  await _persistLoginResult(res);
+  await _persistLoginResult(res, expectedEpoch: epoch);
   return res;
 }
 
@@ -304,7 +310,9 @@ Future<AuthLoginResult> registerWithSmsApi({
   required String mobile,
   required String code,
 }) async {
+  final epoch = AppConfig.connectionEpoch;
   final device = await collectLoginDeviceInfo();
+  if (!isCurrentConnection(epoch)) throw StateError('工作区已切换');
   final response = await request.post(
     '/auth/register/sms',
     data: <String, dynamic>{
@@ -315,7 +323,7 @@ Future<AuthLoginResult> registerWithSmsApi({
   );
   final res =
       AuthLoginResult.fromJson((response.data as Map).cast<String, dynamic>());
-  await _persistLoginResult(res);
+  await _persistLoginResult(res, expectedEpoch: epoch);
   return res;
 }
 
@@ -383,6 +391,7 @@ Future<QRLoginCreated> createQrApi() async {
 
 /// 桌面端轮询; status=confirmed 时把 login 持久化到本地, 与短信登录同形。
 Future<QRLoginStatus> qrStatusApi(String key) async {
+  final epoch = AppConfig.connectionEpoch;
   final resp = await request.get(
     '/auth/qr/status',
     queryParameters: <String, dynamic>{'key': key},
@@ -390,7 +399,7 @@ Future<QRLoginStatus> qrStatusApi(String key) async {
   );
   final s = QRLoginStatus.fromJson((resp.data as Map).cast<String, dynamic>());
   if (s.status == 'confirmed' && s.login != null) {
-    await _persistLoginResult(s.login!);
+    await _persistLoginResult(s.login!, expectedEpoch: epoch);
   }
   return s;
 }
@@ -417,6 +426,7 @@ Future<void> qrCancelApi(String key) async {
 
 /// 切换到指定租户; 返新 accessToken, 覆盖本地存储。
 Future<AuthLoginResult> switchToTenantApi(int tenantId) async {
+  final epoch = AppConfig.connectionEpoch;
   if (_tenantSwitchInProgress.value) {
     throw StateError('主体切换正在进行，请稍候');
   }
@@ -429,7 +439,7 @@ Future<AuthLoginResult> switchToTenantApi(int tenantId) async {
     );
     res = AuthLoginResult.fromJson(
         (response.data as Map).cast<String, dynamic>());
-    await _persistLoginResult(res);
+    await _persistLoginResult(res, expectedEpoch: epoch);
   } finally {
     _tenantSwitchInProgress.value = false;
   }

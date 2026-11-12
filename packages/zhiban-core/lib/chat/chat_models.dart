@@ -1490,13 +1490,13 @@ class AgentItem {
       // 真实绑定 (后端 hydrate 的 apps/knowledge_bases) 优先; 无则回退历史 metadata label。
       configuredAppLabels: () {
         final real = _readUuidNameMap(json['apps']);
-        return real.isNotEmpty
+        return json['apps'] is List
             ? real
             : _readStringMap(metadata['selected_app_labels']);
       }(),
       configuredKnowledgeBaseLabels: () {
         final real = _readUuidNameMap(json['knowledge_bases']);
-        return real.isNotEmpty
+        return json['knowledge_bases'] is List
             ? real
             : _readStringMap(metadata['selected_knowledge_base_labels']);
       }(),

@@ -69,6 +69,30 @@ void main() {
     expect(RequestInterceptor.cachedToken, 'next');
   });
 
+  test(
+    'connection changed during persistence never primes stale token',
+    () async {
+      var current = true;
+      final refresher = TokenRefresher(
+        apiUrl: () => 'https://bus.example',
+        isCurrent: () => current,
+        readRefreshToken: () async => 'refresh',
+        createDio: (options) => _client(
+          (_) => _json(200, {
+            'success': true,
+            'data': {'accessToken': 'stale'},
+          }),
+          options,
+        ),
+        persistTokens: (_, __) async {
+          current = false;
+        },
+      );
+      expect(await refresher.refresh(), RefreshOutcome.invalid);
+      expect(RequestInterceptor.cachedToken, isNull);
+    },
+  );
+
   test('401 retries once but never replays uploads or streams', () async {
     for (final (data, type, expectedRequests) in [
       (null, ResponseType.json, 2),

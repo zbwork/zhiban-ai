@@ -51,7 +51,7 @@ func (h *AgentHandlers) List(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]map[string]any, 0, len(list))
 	for _, e := range list {
-		view, err := h.view(r.Context(), e)
+		view, err := h.view(r.Context(), middleware.MustAccountID(r.Context()), e)
 		if err != nil {
 			encode.JSONError(w, err)
 			return
@@ -78,7 +78,7 @@ func (h *AgentHandlers) Get(w http.ResponseWriter, r *http.Request) {
 		encode.JSONError(w, apperr.ErrForbidden)
 		return
 	}
-	view, err := h.view(r.Context(), *e)
+	view, err := h.view(r.Context(), middleware.MustAccountID(r.Context()), *e)
 	if err != nil {
 		encode.JSONError(w, err)
 		return
@@ -94,8 +94,17 @@ func (h *AgentHandlers) Get(w http.ResponseWriter, r *http.Request) {
 	encode.JSON(w, map[string]any{"agent": view, "bindings": []any{}})
 }
 
-func (h *AgentHandlers) view(ctx context.Context, e domagent.DigitalEmployee) (map[string]any, error) {
+func (h *AgentHandlers) view(ctx context.Context, accountID int64, e domagent.DigitalEmployee) (map[string]any, error) {
 	out := agentView(e)
+	if h.Skills != nil {
+		ApplyAgentSkillBindingCapabilities(out, &e, accountID, "generic")
+		out["supports_model_selection"] = false
+		views, err := h.Skills.ListAgentBindings(ctx, e.TenantID, e.UUID)
+		if err != nil {
+			return nil, err
+		}
+		out["skills"] = AgentSkillBindingMaps(views, nil)
+	}
 	if h.Apps != nil {
 		apps, err := h.Apps.ListAgentApps(ctx, e.TenantID, e.ID)
 		if err != nil {

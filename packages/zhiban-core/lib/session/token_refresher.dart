@@ -19,6 +19,7 @@ class TokenRefresher {
     required this.readRefreshToken,
     required this.persistTokens,
     this.log,
+    this.isCurrent,
     Dio Function(BaseOptions)? createDio,
   }) : _createDio = createDio ?? Dio.new;
 
@@ -27,6 +28,7 @@ class TokenRefresher {
   final Future<void> Function(String accessToken, String? refreshToken)
   persistTokens;
   final void Function(String message)? log;
+  final bool Function()? isCurrent;
   final Dio Function(BaseOptions) _createDio;
   Future<RefreshOutcome>? _inflight;
 
@@ -36,6 +38,7 @@ class TokenRefresher {
 
   Future<RefreshOutcome> _doRefresh() async {
     final refreshToken = await readRefreshToken() ?? '';
+    if (isCurrent?.call() == false) return RefreshOutcome.invalid;
     if (refreshToken.isEmpty) return RefreshOutcome.invalid;
     try {
       final dio = _createDio(
@@ -64,6 +67,7 @@ class TokenRefresher {
           map['success'] == true &&
           access.isNotEmpty) {
         await persistTokens(access, newRefresh.isEmpty ? null : newRefresh);
+        if (isCurrent?.call() == false) return RefreshOutcome.invalid;
         RequestInterceptor.clearTokenCache();
         RequestInterceptor.primeToken(access);
         return RefreshOutcome.ok;

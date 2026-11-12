@@ -60,6 +60,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcron"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientknowledge"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientlocal"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientpositions"
 	httpsession "github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/session"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/wellknown"
 	"log"
@@ -160,7 +161,8 @@ func run(ctx context.Context, path string) error {
 	}()
 	handlers := busrouter.Handlers{Session: &httpsession.Handlers{Auth: auth}, Chat: &clientchat.Handlers{Chat: chatSvc}, Contacts: &clientcontacts.Handlers{Contacts: contactsSvc}, Local: &clientlocal.Handlers{Local: localService, Models: localModels, Sources: modelSources, Images: localImages, Search: localSearch, Outputs: localOutputs}}
 	handlers.Agents = &clientcatalog.AgentHandlers{Agents: agentrepo.New(pool), Personal: &personal.Personal{Agents: agentsvc.New(agentrepo.New(pool), nil, nil, pool, eventrepo.New(pool)), Environments: envrepo.New(pool)}}
-	handlers.Catalog = &clientcatalog.Handlers{Skill: communitychat.NewSkills(pool)}
+	handlers.Catalog = &clientcatalog.Handlers{Skill: communitychat.NewSkills(pool), SkillConvLookup: communitychat.SkillConversationLookup{Pool: pool}}
+	handlers.Positions = &clientpositions.Handlers{Positions: clientpositions.PgxPositionsPool{P: pool}}
 	handlers.Agents.Skills = handlers.Catalog.Skill
 	cronService := communitycron.Compose(ctx, pool, chatSvc, contactsSvc, communityim.DirectConversations(pool, cfg, contactsSvc))
 	handlers.Cron = &clientcron.Handlers{Cron: cronService}
@@ -178,6 +180,8 @@ func run(ctx context.Context, path string) error {
 	communitychat.WireKnowledge(chatSvc, pool, handlers.KnowledgeAPI.Knowledge)
 	if storage != nil {
 		handlers.Drive = communitydrive.Compose(pool, storage)
+		handlers.Files = communitydrive.ComposeFiles(pool, storage)
+		chatsvc.SetAttachmentBinderOnService(chatSvc, handlers.Files.ChatUpload)
 	}
 	mux := http.NewServeMux()
 	if cfg.AppIssuer != "" {

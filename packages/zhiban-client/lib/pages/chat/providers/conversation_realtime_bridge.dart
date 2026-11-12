@@ -637,6 +637,21 @@ class ConversationRealtimeBridge {
       await _ref
           .read(conversationsProvider.notifier)
           .refresh(showLoading: showLoading);
+      if (_disposed) return;
+      final currentIds = _currentConversationIds();
+      final items = _ref.read(conversationsProvider).asData?.value ??
+          const <ConversationItem>[];
+      for (final item in items) {
+        if (item.unreadCount > 0 && currentIds.contains(item.conversationId)) {
+          markConversationReadEverywhere(
+            ref: _ref,
+            wukongClient: _client,
+            conversationId: item.conversationId,
+            channelId: item.wukongChannelId,
+            channelType: item.wukongChannelType,
+          );
+        }
+      }
       unawaited(_scanUnreadMentionsOnce());
     } catch (e) {
       // 吞掉并记录, 不阻塞聊天 (gap refresh 失败下次重连/resume 再补)。
@@ -877,7 +892,9 @@ class ConversationRealtimeBridge {
     // 收到消息，会因为命中了"上次打开过的会话"而被误判成"正在看"，从而既不
     // 弹系统通知也不闪 dock/任务栏图标（跟 markConversationRead 同一类问题，
     // 2026-08-25 实测：停在自动任务页收不到系统通知，就是这里判成了 isCurrent）。
-    if (!_ref.read(isChatRouteActiveProvider)) return const <String>{};
+    if (_backgrounded || !_ref.read(isChatRouteActiveProvider)) {
+      return const <String>{};
+    }
     final currentIds = <String>{};
     final g = _ref.read(selectedGroupProvider)?.conversationId;
     if (g != null && g.isNotEmpty) currentIds.add(g);
@@ -903,11 +920,10 @@ class ConversationRealtimeBridge {
             c.wukongChannelType == m.channelType)
         .firstOrNull;
     if (conv == null) return;
-    if (conv.muted) return;
-
     final isCurrent = currentConversationIds.contains(conv.conversationId);
 
     if (!isCurrent) {
+      if (conv.muted) return;
       final title = m.notificationTitle.isNotEmpty
           ? m.notificationTitle
           : (conv.title.isNotEmpty ? conv.title : '知办AI');

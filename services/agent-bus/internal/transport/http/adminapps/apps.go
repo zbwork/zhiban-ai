@@ -41,6 +41,35 @@ func (h *Handlers) Register(mux *http.ServeMux, guard func(string, http.Handler)
 	}
 }
 
+// RegisterReadOnly exposes catalog reads even when OAuth issuing is unconfigured.
+// Issuer-dependent writes remain unavailable until AppIssuer is configured.
+func (h *Handlers) RegisterReadOnly(mux *http.ServeMux, tenantPerm, platformPerm func(string, http.Handler) http.Handler) {
+	for _, route := range []struct {
+		pattern string
+		handler http.HandlerFunc
+	}{
+		{"GET /api/admin/v1/tenant/apps", h.listApps},
+		{"GET /api/admin/v1/tenant/apps/{uuid}", h.getApp},
+		{"GET /api/admin/v1/tenant/app-categories", h.listAppCategories},
+	} {
+		mux.Handle(route.pattern, tenantPerm("tenant.app.read", route.handler))
+	}
+	h.RegisterPlatformReadOnly(mux, platformPerm)
+}
+
+func (h *Handlers) RegisterPlatformReadOnly(mux *http.ServeMux, platformPerm func(string, http.Handler) http.Handler) {
+	for _, route := range []struct {
+		pattern, permission string
+		handler             http.HandlerFunc
+	}{
+		{"GET /api/admin/v1/platform/apps", "platform.app.read", h.listPlatformApps},
+		{"GET /api/admin/v1/platform/apps/{uuid}", "platform.app.read", h.getPlatformApp},
+		{"GET /api/admin/v1/platform/app-categories", "platform.app_category.read", h.listPlatformAppCategories},
+	} {
+		mux.Handle(route.pattern, platformPerm(route.permission, route.handler))
+	}
+}
+
 // =====================================================
 // 创建应用
 // =====================================================
@@ -654,4 +683,31 @@ func toOAuthClientRespWithSecret(oc *domapp.OAuthClient, plaintext, tokenEndpoin
 		RefreshTokenTTLSeconds: oc.RefreshTokenTTLSeconds,
 		Status:                 oc.Status,
 	}
+}
+
+func (h *Handlers) RegisterPlatform(mux *http.ServeMux, platformPerm func(string, http.Handler) http.Handler) {
+	// 平台预置应用 / 分类：平台创建后可开放给租户，租户只做启用/通用/绑定配置。
+	mux.Handle("POST /api/admin/v1/platform/apps",
+		platformPerm("platform.app.create", http.HandlerFunc(h.createPlatformApp)))
+	mux.Handle("GET /api/admin/v1/platform/apps",
+		platformPerm("platform.app.read", http.HandlerFunc(h.listPlatformApps)))
+	mux.Handle("GET /api/admin/v1/platform/apps/{uuid}",
+		platformPerm("platform.app.read", http.HandlerFunc(h.getPlatformApp)))
+	mux.Handle("PATCH /api/admin/v1/platform/apps/{uuid}",
+		platformPerm("platform.app.update", http.HandlerFunc(h.patchPlatformApp)))
+	mux.Handle("DELETE /api/admin/v1/platform/apps/{uuid}",
+		platformPerm("platform.app.delete", http.HandlerFunc(h.deletePlatformApp)))
+	mux.Handle("POST /api/admin/v1/platform/apps/{uuid}/secret/rotate",
+		platformPerm("platform.app.rotate_secret", http.HandlerFunc(h.rotatePlatformAppSecret)))
+	mux.Handle("GET /api/admin/v1/platform/apps/{uuid}/launch-test",
+		platformPerm("platform.app.launch_test", http.HandlerFunc(h.launchTestPlatformApp)))
+	mux.Handle("GET /api/admin/v1/platform/app-categories",
+		platformPerm("platform.app_category.read", http.HandlerFunc(h.listPlatformAppCategories)))
+	mux.Handle("POST /api/admin/v1/platform/app-categories",
+		platformPerm("platform.app_category.create", http.HandlerFunc(h.createPlatformAppCategory)))
+	mux.Handle("PATCH /api/admin/v1/platform/app-categories/{uuid}",
+		platformPerm("platform.app_category.update", http.HandlerFunc(h.patchPlatformAppCategory)))
+	mux.Handle("DELETE /api/admin/v1/platform/app-categories/{uuid}",
+		platformPerm("platform.app_category.delete", http.HandlerFunc(h.deletePlatformAppCategory)))
+
 }

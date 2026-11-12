@@ -15,6 +15,7 @@ import (
 	svc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/drive"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/favorite"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientdrive"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientfiles"
 	"net/url"
 )
 
@@ -72,6 +73,16 @@ func Compose(pool *pgxpool.Pool, storage *Storage) *clientdrive.Handlers {
 }
 
 type accountLookup struct{ accounts *account.Repo }
+
+// ComposeFiles uses the same chat upload, binding and media authorization as Bus.
+func ComposeFiles(pool *pgxpool.Pool, storage *Storage) *clientfiles.Handlers {
+	spaces, files := repo.NewSpaceRepo(pool), repo.NewFileRepo(pool)
+	acl := svc.NewACLService(pool)
+	return &clientfiles.Handlers{
+		ChatUpload: svc.NewChatUploadSvc(pool, spaces, files, repo.NewTicketRepo(pool), repo.NewCMFRepo(pool), acl, storage),
+		ChatMedia:  svc.NewChatMediaSvc(pool, files, spaces, repo.NewChatMediaRefRepo(pool), acl, storage),
+	}
+}
 
 func (l accountLookup) ResolveByUUID(ctx context.Context, uuid string, tenantID int64) (int64, error) {
 	a, err := l.accounts.GetByUUID(ctx, uuid)

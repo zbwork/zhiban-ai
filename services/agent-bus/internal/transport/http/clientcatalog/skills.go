@@ -14,8 +14,9 @@ import (
 )
 
 type Handlers struct {
-	Skill        *svcskill.Service
-	ResolveMedia func(context.Context, []string) map[string]string
+	Skill           *svcskill.Service
+	SkillConvLookup ConversationToAgent
+	ResolveMedia    func(context.Context, []string) map[string]string
 }
 
 func (h *Handlers) resolveMediaURLMap(ctx context.Context, uris []string) map[string]string {

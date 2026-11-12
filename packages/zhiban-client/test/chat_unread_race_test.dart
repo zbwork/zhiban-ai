@@ -143,4 +143,18 @@ void main() {
     await later;
     expect(c.read(conversationsProvider).requireValue.single.unreadCount, 1);
   });
+  test('list started during read cannot restore unread after acknowledgement',
+      () async {
+    final n = c.read(conversationsProvider.notifier);
+    final ticket = n.beginRead('c');
+    final pending = n.refresh();
+    n.completeRead('c', ticket);
+    svc.requests.last.complete([item(3)]);
+    await pending;
+    expect(c.read(conversationsProvider).requireValue.single.unreadCount, 0);
+    final later = n.refresh();
+    svc.requests.last.complete([item(1)]);
+    await later;
+    expect(c.read(conversationsProvider).requireValue.single.unreadCount, 1);
+  });
 }

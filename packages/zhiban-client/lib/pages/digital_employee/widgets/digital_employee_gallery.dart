@@ -37,6 +37,10 @@ class OpenClawDigitalEmployeeGallery extends ConsumerStatefulWidget {
     this.onLocalEdit,
     this.onLocalDelete,
     this.onLocalOpen,
+    this.showCreateCard = true,
+    this.detailActionLabel = '去聊天',
+    this.publicTemplates = const [],
+    this.onAddPublicTemplate,
   });
 
   final Future<CreateAgentDraft?> Function(BuildContext context)
@@ -60,6 +64,10 @@ class OpenClawDigitalEmployeeGallery extends ConsumerStatefulWidget {
   final Future<void> Function(AgentItem)? onLocalEdit;
   final Future<void> Function(AgentItem)? onLocalDelete;
   final Future<void> Function(AgentItem)? onLocalOpen;
+  final bool showCreateCard;
+  final String detailActionLabel;
+  final List<AgentItem> publicTemplates;
+  final Future<void> Function(AgentItem)? onAddPublicTemplate;
 
   @override
   OpenClawDigitalEmployeeGalleryState createState() =>
@@ -510,6 +518,10 @@ class OpenClawDigitalEmployeeGalleryState
   }
 
   Future<void> _openAgentConversation(AgentItem agent) async {
+    if (_isPublicTemplate(agent)) {
+      await widget.onAddPublicTemplate?.call(agent);
+      return;
+    }
     if (widget.localCatalog != null) {
       await widget.onLocalOpen?.call(agent);
       return;
@@ -568,6 +580,9 @@ class OpenClawDigitalEmployeeGalleryState
     AgentItem agent,
     String sourceLabel,
   ) async {
+    // Capture the source while opening: a directory refresh may replace the
+    // template objects while its detail dialog is still visible.
+    final publicTemplate = _isPublicTemplate(agent);
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => UiDialogShell(
@@ -587,9 +602,15 @@ class OpenClawDigitalEmployeeGalleryState
               AgentDetailContent(
                 agent: agent,
                 sourceLabel: sourceLabel,
+                chatLabel:
+                    publicTemplate ? '添加到当前服务器' : widget.detailActionLabel,
                 onChat: () {
                   Navigator.of(dialogContext).pop();
-                  _openAgentConversation(agent);
+                  if (publicTemplate) {
+                    widget.onAddPublicTemplate?.call(agent);
+                  } else {
+                    _openAgentConversation(agent);
+                  }
                 },
               ),
             ],
@@ -598,6 +619,9 @@ class OpenClawDigitalEmployeeGalleryState
       ),
     );
   }
+
+  bool _isPublicTemplate(AgentItem agent) =>
+      widget.publicTemplates.any((template) => identical(template, agent));
 
   @override
   Widget build(BuildContext context) {
@@ -623,7 +647,37 @@ class OpenClawDigitalEmployeeGalleryState
     // 搜索/刷新触发的重载是「携带旧值的 Loading 态」：必须用 .value 拿旧
     // 数据继续渲染（asData 在 Loading 态恒为 null，会把整页替换成转圈、连带
     // 卸载过滤行里的搜索框导致输入文字丢失）。只有首载（无旧值）才显示 spinner。
-    final catalog = catalogAsync.value;
+    final serverCatalog = catalogAsync.value;
+    final catalog = widget.publicTemplates.isEmpty
+        ? serverCatalog
+        : DigitalEmployeeCatalog(
+            personal: serverCatalog?.personal ?? const [],
+            enterprise: serverCatalog?.enterprise ?? const [],
+            platform: [
+              ...?serverCatalog?.platform,
+              for (final template in widget.publicTemplates)
+                DigitalEmployeeCatalogItem(
+                  agent: template,
+                  source: DigitalEmployeeCatalogSource.platform,
+                ),
+            ],
+          );
+
+    if (catalog == null && catalogAsync.hasError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('数字员工加载失败，请检查服务器连接后重试'),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => ref.invalidate(digitalEmployeeCatalogProvider),
+              child: const Text('重试'),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (widget.mobile) {
       final filtered = widget.mobileFilterEnabled
@@ -650,9 +704,7 @@ class OpenClawDigitalEmployeeGalleryState
       return const DigitalEmployeeGallerySkeleton(mobile: false);
     }
 
-    final filtered = widget.localCatalog == null
-        ? ref.watch(filteredDigitalEmployeesProvider)
-        : catalog.itemsFor(ref.watch(digitalEmployeeFilterProvider));
+    final filtered = catalog.itemsFor(ref.watch(digitalEmployeeFilterProvider));
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
       child: Padding(
@@ -674,6 +726,24 @@ class OpenClawDigitalEmployeeGalleryState
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (catalogAsync.hasError)
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('服务器数字员工加载失败，请检查连接后重试'),
+                      ),
+                      TextButton(
+                        onPressed: () =>
+                            ref.invalidate(digitalEmployeeCatalogProvider),
+                        child: const Text('重试服务器目录'),
+                      ),
+                    ],
+                  ),
+                if (filtered.isEmpty && !widget.showCreateCard)
+                  const SizedBox(
+                    height: 180,
+                    child: Center(child: Text('暂无匹配的数字员工')),
+                  ),
                 Wrap(
                   spacing: _desktopAgentGridGap,
                   runSpacing: _desktopAgentGridGap,
@@ -691,10 +761,11 @@ class OpenClawDigitalEmployeeGalleryState
                           onDelete: () => _deleteAgent(entry.agent),
                         ),
                       ),
-                    SizedBox(
-                      width: cardWidth,
-                      child: _AddMoreCard(onTap: _createAgent),
-                    ),
+                    if (widget.showCreateCard)
+                      SizedBox(
+                        width: cardWidth,
+                        child: _AddMoreCard(onTap: _createAgent),
+                      ),
                   ],
                 ),
               ],

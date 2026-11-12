@@ -39,6 +39,18 @@ class _FakeSvc extends OpenClawChatService {
   final List<String> showCalls = [];
 
   @override
+  Future<List<ConversationItem>?> getCachedConversations() async => null;
+
+  @override
+  Future<List<ChatMessage>> getCachedHistory(String conversationId,
+          {String? clearedAt}) async =>
+      const [];
+
+  @override
+  Future<List<ChatMessage>> synchronizeHistory(String conversationId) =>
+      getHistory(conversationId: conversationId);
+
+  @override
   Future<List<ConversationItem>> listAllConversations({
     int page = 1,
     int pageSize = 40,
@@ -353,6 +365,7 @@ Future<ProviderContainer> _boot(_FakeSvc fake,
   final c = ProviderContainer(
     overrides: [
       chatServiceProvider.overrideWith((ref) => fake),
+      wukongImClientProvider.overrideWithValue(_FakeImClient()),
       contactsServiceProvider
           .overrideWithValue(_FakeContactsService(visibleAgents)),
       // selectedAgentOrFallbackProvider 现 watch catalog 补 skills/apps;测试里固定它,

@@ -14,20 +14,42 @@ import 'package:zhiban_client/pages/skills/providers/skills_providers.dart';
 import 'package:zhiban_client/pages/skills/widgets/skill_detail_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:zhiban_client/config/app_config.dart';
+import 'package:zhiban_client/pages/server_connection/community_skills_market.dart';
+import 'package:zhiban_ui/zhiban_ui.dart';
 import 'package:nexwork/widgets/page_header.dart';
 
 /// 技能广场页顶层视图：广场浏览 / 我的技能（F03 §1.5.4 闭环）。
 
-class SkillsPage extends StatelessWidget {
+class SkillsPage extends StatefulWidget {
   const SkillsPage({super.key});
 
   @override
+  State<SkillsPage> createState() => _SkillsPageState();
+}
+
+class _SkillsPageState extends State<SkillsPage> {
+  bool _public = AppConfig.communityEdition && AppConfig.serverWorkspace;
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final switcher = AppConfig.communityEdition && AppConfig.serverWorkspace
+        ? UiSegmentedTabs<bool>(
+            current: _public,
+            onChanged: (value) => setState(() => _public = value),
+            tabs: const [
+              UiSegmentedTab(value: true, label: '公共广场'),
+              UiSegmentedTab(value: false, label: '当前服务器'),
+            ],
+          )
+        : null;
+    return Scaffold(
       backgroundColor: ColorConfig.pageBackground,
       body: SafeArea(
         bottom: false,
-        child: SkillsPageBody(compact: false),
+        child: _public
+            ? CommunitySkillsMarket(headerTrailing: switcher)
+            : SkillsPageBody(compact: false, headerTrailing: switcher),
       ),
     );
   }
@@ -39,10 +61,12 @@ class SkillsPageBody extends ConsumerStatefulWidget {
     super.key,
     required this.compact,
     this.onSectionChanged,
+    this.headerTrailing,
   });
 
   final bool compact;
   final ValueChanged<String>? onSectionChanged;
+  final Widget? headerTrailing;
 
   @override
   ConsumerState<SkillsPageBody> createState() => _SkillsPageBodyState();
@@ -94,11 +118,18 @@ class _SkillsPageBodyState extends ConsumerState<SkillsPageBody> {
     final asyncState = ref.watch(skillsProvider);
     final notifier = ref.read(skillsProvider.notifier);
     final compact = widget.compact;
-    final tabSwitcher = SkillsTabSwitcher(
+    final skillTabs = SkillsTabSwitcher(
       tab: _tab,
       compact: compact,
       onChanged: _switchTab,
     );
+    final tabSwitcher = widget.headerTrailing == null
+        ? skillTabs
+        : Row(mainAxisSize: MainAxisSize.min, children: [
+            skillTabs,
+            const SizedBox(width: 12),
+            widget.headerTrailing!,
+          ]);
 
     return _tab == SkillsTab.mine
         ? _MySkillsTabBody(
@@ -121,7 +152,6 @@ class _SkillsPageBodyState extends ConsumerState<SkillsPageBody> {
               onSkillTap: (skill) => _showDetailDialog(context, skill),
               onSkillAdd: (skill) => _showInstallDialog(context, skill),
               onLoadMore: notifier.loadMore,
-              onRefresh: notifier.refresh,
             ),
             loading: () => _SkillsPageBody(
               state: const SkillsListState(
@@ -143,7 +173,6 @@ class _SkillsPageBodyState extends ConsumerState<SkillsPageBody> {
               onSkillTap: (skill) => _showDetailDialog(context, skill),
               onSkillAdd: (skill) => _showInstallDialog(context, skill),
               onLoadMore: notifier.loadMore,
-              onRefresh: notifier.refresh,
             ),
             error: (error, _) => SkillsError(
               message: error.toString(),
@@ -215,7 +244,6 @@ class _SkillsPageBody extends StatelessWidget {
     required this.onSkillTap,
     required this.onSkillAdd,
     required this.onLoadMore,
-    required this.onRefresh,
   });
 
   final SkillsListState state;
@@ -231,7 +259,6 @@ class _SkillsPageBody extends StatelessWidget {
   final ValueChanged<Skill> onSkillTap;
   final ValueChanged<Skill> onSkillAdd;
   final VoidCallback onLoadMore;
-  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -255,8 +282,6 @@ class _SkillsPageBody extends StatelessWidget {
           onSourceChanged: onSourceChanged,
           onSortChanged: onSortChanged,
           onCategoryChanged: onCategoryChanged,
-          onRefresh: onRefresh,
-          isRefreshing: state.isRefreshing,
         ),
         Expanded(
           child: SkillsContent(

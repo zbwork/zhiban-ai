@@ -16,6 +16,7 @@ import 'package:zhiban_client/routes/navigation_keys.dart';
 import 'package:zhiban_client/routes/route_paths.dart';
 import 'package:zhiban_client/services/analytics_service.dart';
 import 'package:zhiban_client/services/session_service.dart';
+import 'package:zhiban_client/services/session_runtime.dart';
 import 'package:zhiban_core/utils/error_utils.dart';
 import 'package:zhiban_ui/widgets/ui_dialog.dart';
 import 'package:zhiban_client/window/window_controller.dart';
@@ -196,10 +197,8 @@ class ResponseInterceptor extends Interceptor {
   }) {
     if (err.requestOptions.extra['apiFailureLogged'] == true) return;
     err.requestOptions.extra['apiFailureLogged'] = true;
-    debugPrint(diagnosticLine(
-      err,
-      traceId: traceId,
-      businessCode: businessCode),
+    debugPrint(
+      diagnosticLine(err, traceId: traceId, businessCode: businessCode),
     );
   }
 
@@ -337,15 +336,20 @@ class ResponseInterceptor extends Interceptor {
   static void _handleUnauthorizedStatic() {
     if (_handlingUnauthorized) return;
     _handlingUnauthorized = true;
+    final epoch = AppConfig.connectionEpoch;
     unawaited(() async {
       try {
         await const SessionService().clearSessionStorage();
+        if (!isCurrentConnection(epoch)) return;
         await WindowController.instance.showLoginWindow();
+        if (!isCurrentConnection(epoch)) return;
         final context = rootNavigatorKey.currentContext;
         if (context != null && context.mounted) {
           context.go(RoutePaths.login);
         }
         BotToast.showText(text: '登录已过期，请重新登录', align: Alignment.center);
+      } catch (_) {
+        if (isCurrentConnection(epoch)) rethrow;
       } finally {
         _handlingUnauthorized = false;
       }
@@ -355,10 +359,13 @@ class ResponseInterceptor extends Interceptor {
   void _handleMembershipInactive() {
     if (_handlingMembershipInactive) return;
     _handlingMembershipInactive = true;
+    final epoch = AppConfig.connectionEpoch;
     unawaited(() async {
       try {
         await const SessionService().clearSessionStorage();
+        if (!isCurrentConnection(epoch)) return;
         await WindowController.instance.showLoginWindow();
+        if (!isCurrentConnection(epoch)) return;
         final context = rootNavigatorKey.currentContext;
         if (context != null && context.mounted) {
           context.go(RoutePaths.login);
@@ -367,6 +374,8 @@ class ResponseInterceptor extends Interceptor {
           text: '您在当前企业的账号已被管理员暂停，请联系管理员或切换到其他企业',
           align: Alignment.center,
         );
+      } catch (_) {
+        if (isCurrentConnection(epoch)) rethrow;
       } finally {
         _handlingMembershipInactive = false;
       }

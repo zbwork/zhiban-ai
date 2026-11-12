@@ -138,7 +138,12 @@ func (h *AgentHandlers) save(w http.ResponseWriter, r *http.Request, uuid string
 		encode.JSONError(w, err)
 		return
 	}
-	encode.JSON(w, agentView(*e))
+	view, err := h.view(r.Context(), middleware.MustAccountID(r.Context()), *e)
+	if err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	encode.JSON(w, view)
 }
 func (h *AgentHandlers) Delete(w http.ResponseWriter, r *http.Request) {
 	if err := h.Personal.Delete(r.Context(), middleware.MustAccountID(r.Context()), middleware.MustTenantID(r.Context()), r.PathValue("uuid")); err != nil {

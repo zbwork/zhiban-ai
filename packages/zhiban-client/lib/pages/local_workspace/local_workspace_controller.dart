@@ -28,10 +28,11 @@ import '../../config/client_assets.dart';
 final localWorkspaceProvider =
     FutureProvider<LocalWorkspaceController>((ref) async {
   final store = await LocalWorkspaceStore.open();
+  if (!ref.mounted) throw StateError('本地工作区已关闭');
   final controller = LocalWorkspaceController(store);
   ref.onDispose(controller.dispose);
   await controller.refresh();
-  controller.startTasks();
+  if (ref.mounted) controller.startTasks();
   return controller;
 });
 

@@ -7,7 +7,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	runtime "github.com/zbwork/zhiban-ai/services/agent-bus/internal/adapter/runtime"
 	dom "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/skill"
+	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
 	agents "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agent"
+	conversations "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/conversation"
+	rooms "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/room"
 	skills "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/skill"
 	svc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/skill"
 	"path"
@@ -32,6 +35,60 @@ func (l SkillAgentLookup) GetAgentByUUID(ctx context.Context, uuid string) (*svc
 }
 func NewSkills(pool *pgxpool.Pool) *svc.Service {
 	return svc.NewWithAgents(skills.NewCommunity(pool), SkillAgentLookup{agents.New(pool)})
+}
+
+type SkillConversationLookup struct{ Pool *pgxpool.Pool }
+
+func (l SkillConversationLookup) AgentUUIDForConv(ctx context.Context, accountID, tenantID int64, uuid string) (string, error) {
+	convs := conversations.New(l.Pool)
+	allowed, err := convs.AccessibleByAccount(ctx, tenantID, accountID, uuid)
+	if err != nil {
+		return "", err
+	}
+	if !allowed {
+		return "", apperr.ErrForbidden
+	}
+	conv, err := convs.GetByUUID(ctx, uuid)
+	if err != nil {
+		return "", err
+	}
+	if conv == nil || conv.TenantID != tenantID {
+		return "", apperr.ErrNotFound
+	}
+	agentID := conv.DigitalEmployeeID
+	if agentID == nil && conv.RoomID != nil {
+		repo := rooms.New(l.Pool)
+		room, err := repo.GetByID(ctx, *conv.RoomID)
+		if err != nil {
+			return "", err
+		}
+		if room.TenantID != tenantID || room.Metadata["direct_room_kind"] != "human-agent" {
+			return "", apperr.ErrNotFound
+		}
+		participants, err := repo.ListParticipants(ctx, room.ID)
+		if err != nil {
+			return "", err
+		}
+		for _, p := range participants {
+			if p.AgentID != nil && p.LeftAt == nil {
+				if agentID != nil {
+					return "", apperr.ErrInvalidParams
+				}
+				agentID = p.AgentID
+			}
+		}
+	}
+	if agentID == nil {
+		return "", apperr.ErrNotFound
+	}
+	employee, err := agents.New(l.Pool).GetByID(ctx, *agentID)
+	if err != nil {
+		return "", err
+	}
+	if employee == nil || employee.TenantID != tenantID {
+		return "", apperr.ErrForbidden
+	}
+	return employee.UUID, nil
 }
 
 type skillReader interface {

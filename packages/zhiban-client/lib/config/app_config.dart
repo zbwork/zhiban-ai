@@ -6,11 +6,18 @@ class AppConfig {
   /// Public export selects the backend capability set at build time.
   static const bool communityEdition = true;
 
+  /// A connection is independent of the distribution's feature set.
+  static String? serverApiUrl;
+  static int connectionEpoch = 0;
+  static bool connectionChanging = false;
+  static bool get serverWorkspace => serverApiUrl != null;
+
   /// 社区版使用部署内运行环境；商业版沿用云端新建开关。
-  static const cloudAgentCreationEnabled = communityEdition || bool.fromEnvironment(
-    'CLOUD_AGENT_CREATION_ENABLED',
-    defaultValue: false,
-  );
+  static const cloudAgentCreationEnabled = communityEdition ||
+      bool.fromEnvironment(
+        'CLOUD_AGENT_CREATION_ENABLED',
+        defaultValue: false,
+      );
 
   /// 当前产品阶段只启动本地 Agent；云端 runtime 预热实现保留，显式开启后恢复。
   static const cloudRuntimePrewarmEnabled = bool.fromEnvironment(
@@ -57,6 +64,7 @@ class AppConfig {
   }
 
   static String apiUrl() {
+    if (serverApiUrl != null) return serverApiUrl!;
     switch (env) {
       case AppEnv.dev:
         return _devApiUrl;
@@ -85,6 +93,8 @@ class AppConfig {
   );
 
   static String adminWebUrl() {
+    // A user supplied Bus origin does not identify its administrator website.
+    if (serverWorkspace) return '';
     switch (env) {
       case AppEnv.dev:
         return _devAdminWebUrl;
@@ -132,9 +142,9 @@ class AppConfig {
   // 仍需 LOCAL_CODING_BRIDGE_EMBED=YES 一组签名参数（README「本地编程工具 Bridge」），
   // 缺 helper 时页面提示"本地连接组件不可用"。
   static const localCodingToolsEnabled = bool.fromEnvironment(
-        'LOCAL_CODING_TOOLS_ENABLED',
-        defaultValue: true,
-      );
+    'LOCAL_CODING_TOOLS_ENABLED',
+    defaultValue: true,
+  );
 
   // 两个 profile version 必须与 Bus 的 AGBUS_LOCAL_CODING_{CODEX,CLAUDE}_PROFILE_VERSION
   // 一致（测试 / 生产当前都是 2026.09.07.1）。默认值就是这个锁定值，常规构建不传

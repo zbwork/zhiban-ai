@@ -1,0 +1,1938 @@
+[
+  {
+    "scope": "tenant",
+    "path": "/dashboard",
+    "name": "概览",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/overview",
+        "status": 403
+      }
+    ],
+    "title": null
+  },
+  {
+    "scope": "tenant",
+    "path": "/billing/subscription",
+    "name": "订阅与配额",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/billing/subscription",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/billing/entitlements",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/billing/wallet",
+        "status": 404
+      }
+    ],
+    "title": "订阅与配额"
+  },
+  {
+    "scope": "tenant",
+    "path": "/billing/usage",
+    "name": "用量统计",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/billing/usage/summary?period=monthly&from=2026-06-01&to=2026-11-12",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/billing/usage/aggregates?period=monthly&from=2026-06-01&to=2026-11-12&limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "用量统计"
+  },
+  {
+    "scope": "tenant",
+    "path": "/agents",
+    "name": "数字员工列表",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/runtime-environments?limit=200&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/agents?limit=20&offset=0&source=platform",
+        "status": 200
+      }
+    ],
+    "title": "数字员工"
+  },
+  {
+    "scope": "tenant",
+    "path": "/runtime-environments",
+    "name": "智能体托管环境",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/runtime-environments?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "智能体托管环境"
+  },
+  {
+    "scope": "tenant",
+    "path": "/tenant-skills/platform",
+    "name": "平台技能",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/skill-categories?status=active&limit=200&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/skills?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "平台技能"
+  },
+  {
+    "scope": "tenant",
+    "path": "/tenant-skills/own",
+    "name": "企业技能",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/skill-categories?limit=200&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/skill-labels?limit=200&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/skills?limit=10&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "企业技能"
+  },
+  {
+    "scope": "tenant",
+    "path": "/apps",
+    "name": "应用栏配置",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/apps?limit=10&offset=0",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/app-categories?limit=200&offset=0",
+        "status": 200
+      }
+    ],
+    "title": "应用管理"
+  },
+  {
+    "scope": "tenant",
+    "path": "/workspace-apps",
+    "name": "工作台应用",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      }
+    ],
+    "title": "工作台应用"
+  },
+  {
+    "scope": "tenant",
+    "path": "/kb",
+    "name": "知识库管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/knowledge-bases?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "知识库管理"
+  },
+  {
+    "scope": "tenant",
+    "path": "/kb-documents",
+    "name": "文档管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/knowledge-bases?limit=200&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "文档管理"
+  },
+  {
+    "scope": "tenant",
+    "path": "/user-kb-inspect",
+    "name": "用户知识库审计",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      }
+    ],
+    "title": "用户私有知识库审计查询"
+  },
+  {
+    "scope": "tenant",
+    "path": "/drive",
+    "name": "企业云盘",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/drive/spaces",
+        "status": 403
+      }
+    ],
+    "title": "企业云盘"
+  },
+  {
+    "scope": "tenant",
+    "path": "/drive/quotas",
+    "name": "云盘配额",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/drive/quotas",
+        "status": 403
+      }
+    ],
+    "title": "云盘配额"
+  },
+  {
+    "scope": "tenant",
+    "path": "/drive/recycle",
+    "name": "云盘回收站",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/drive/recycle?limit=50",
+        "status": 403
+      }
+    ],
+    "title": "云盘回收站"
+  },
+  {
+    "scope": "tenant",
+    "path": "/drive/storage-override",
+    "name": "专属云盘存储",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/drive/storage-override",
+        "status": 403
+      }
+    ],
+    "title": "专属云盘存储"
+  },
+  {
+    "scope": "tenant",
+    "path": "/cron",
+    "name": "定时任务",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/cron-jobs",
+        "status": 200
+      }
+    ],
+    "title": "定时任务"
+  },
+  {
+    "scope": "tenant",
+    "path": "/cron-prompt-templates",
+    "name": "定时任务模板",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/cron-prompt-templates",
+        "status": 200
+      }
+    ],
+    "title": "定时任务模板"
+  },
+  {
+    "scope": "tenant",
+    "path": "/members",
+    "name": "成员",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/roles?q=&limit=200&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/positions?q=&limit=200&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/departments",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/members?department_id=0&q=&limit=20&offset=0",
+        "status": 200
+      }
+    ],
+    "title": "租户成员"
+  },
+  {
+    "scope": "tenant",
+    "path": "/departments",
+    "name": "部门",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/departments",
+        "status": 200
+      }
+    ],
+    "title": "部门管理"
+  },
+  {
+    "scope": "tenant",
+    "path": "/positions",
+    "name": "职位",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/positions?q=&limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "职位"
+  },
+  {
+    "scope": "tenant",
+    "path": "/org-sync",
+    "name": "组织同步",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/org-webhooks",
+        "status": 403
+      }
+    ],
+    "title": "组织同步"
+  },
+  {
+    "scope": "tenant",
+    "path": "/contacts",
+    "name": "通讯录配置",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/contact-policy",
+        "status": 200
+      }
+    ],
+    "title": "通讯录配置"
+  },
+  {
+    "scope": "tenant",
+    "path": "/rooms/a2a",
+    "name": "A2A 调用治理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/a2a/agents?from=2026-11-11T07%3A33%3A33.112Z",
+        "status": 500
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/a2a?from=2026-11-11T07%3A33%3A33.112Z&page=1&page_size=20",
+        "status": 500
+      }
+    ],
+    "title": "A2A 调用治理"
+  },
+  {
+    "scope": "tenant",
+    "path": "/rooms/orchestrations",
+    "name": "协作编排",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/orchestrations?from=2026-11-05T07%3A33%3A33.752Z&page=1&page_size=20",
+        "status": 500
+      }
+    ],
+    "title": "协作编排"
+  },
+  {
+    "scope": "tenant",
+    "path": "/rooms/speaker-policies",
+    "name": "Speaker 策略",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/speaker-policies?page=1&page_size=20",
+        "status": 500
+      }
+    ],
+    "title": "Speaker 策略"
+  },
+  {
+    "scope": "tenant",
+    "path": "/approvals",
+    "name": "审批",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/a2a/approvals?status=pending&limit=10&offset=0",
+        "status": 500
+      }
+    ],
+    "title": "协作审批"
+  },
+  {
+    "scope": "tenant",
+    "path": "/rooms",
+    "name": "群聊",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/rooms?room_kind=group&page=1&page_size=20",
+        "status": 200
+      }
+    ],
+    "title": "群聊"
+  },
+  {
+    "scope": "tenant",
+    "path": "/api-keys",
+    "name": "API Key 管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/api-keys?status=active&limit=10",
+        "status": 403
+      }
+    ],
+    "title": "API Keys"
+  },
+  {
+    "scope": "tenant",
+    "path": "/agent-sdk-credentials",
+    "name": "Agent SDK 凭证",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/agent-sdk-credentials",
+        "status": 403
+      }
+    ],
+    "title": "Agent SDK 凭证"
+  },
+  {
+    "scope": "tenant",
+    "path": "/sso-config",
+    "name": "单点登录 (SSO)",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/identity-providers",
+        "status": 403
+      }
+    ],
+    "title": "SSO 接入 (IdP 配置)"
+  },
+  {
+    "scope": "tenant",
+    "path": "/roles",
+    "name": "权限与角色",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/permissions?scope=tenant",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/roles?q=&limit=100&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me/menus",
+        "status": 200
+      }
+    ],
+    "title": "租户角色"
+  },
+  {
+    "scope": "tenant",
+    "path": "/alerts",
+    "name": "告警中心",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/alerts?status=firing&limit=10&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "告警中心"
+  },
+  {
+    "scope": "tenant",
+    "path": "/observability/agent-runs",
+    "name": "运行监测",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/observability/agent-runs/stats?from=2026-11-11T16%3A00%3A00.000Z&to=2026-11-12T07%3A33%3A39.567Z&group_by=day",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/observability/agent-runs?limit=20&offset=0&from=2026-11-11T16%3A00%3A00.000Z&to=2026-11-12T07%3A33%3A39.566Z",
+        "status": 403
+      }
+    ],
+    "title": "Agent 运行监测"
+  },
+  {
+    "scope": "tenant",
+    "path": "/observability/call-logs",
+    "name": "调用日志",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/observability/call-logs?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "调用日志"
+  },
+  {
+    "scope": "tenant",
+    "path": "/audit",
+    "name": "审计日志",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/audit-events?category=operation&limit=20&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/audit-summary",
+        "status": 403
+      }
+    ],
+    "title": "操作审计"
+  },
+  {
+    "scope": "tenant",
+    "path": "/observability/conversations",
+    "name": "会话检索",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/observability/conversations?limit=20&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/roles?q=&limit=200&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/departments",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/members?department_id=0&q=&limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "会话检索"
+  },
+  {
+    "scope": "platform",
+    "path": "/dashboard",
+    "name": "概览",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/tenant/positions?q=&limit=200&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/overview",
+        "status": 403
+      }
+    ],
+    "title": null
+  },
+  {
+    "scope": "platform",
+    "path": "/tenants",
+    "name": "租户管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/plans?is_active=true&limit=200&offset=0",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/tenants?status=&q=&limit=20&offset=0",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me/permissions",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      }
+    ],
+    "title": "租户管理"
+  },
+  {
+    "scope": "platform",
+    "path": "/startup-agent-cases",
+    "name": "企业注册申请",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/stats?kind=company_reg",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/cases?status=all&page=1&page_size=10",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me/permissions",
+        "status": 200
+      }
+    ],
+    "title": "企业注册申请"
+  },
+  {
+    "scope": "platform",
+    "path": "/bookkeeping-tickets",
+    "name": "代理记账工单",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/stats?kind=bookkeeping",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/cases?kind=bookkeeping&status=all&page=1&page_size=20",
+        "status": 404
+      }
+    ],
+    "title": "代理记账工单"
+  },
+  {
+    "scope": "platform",
+    "path": "/company-profiles",
+    "name": "企业档案",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/profiles?page=1&page_size=20",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me/permissions",
+        "status": 200
+      }
+    ],
+    "title": "企业档案"
+  },
+  {
+    "scope": "platform",
+    "path": "/web-leads",
+    "name": "创业助手咨询单",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/web/stats?days=30",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/leads?page=1&page_size=20",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me/permissions",
+        "status": 200
+      }
+    ],
+    "title": "创业助手咨询单"
+  },
+  {
+    "scope": "platform",
+    "path": "/web-funnel",
+    "name": "获客漏斗",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/web/quality?days=30",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/web/funnel?days=30",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/web/users?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "获客漏斗"
+  },
+  {
+    "scope": "platform",
+    "path": "/web-feedback",
+    "name": "回复反馈",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/web/feedback/stats?days=30",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/web/feedback?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "回复反馈"
+  },
+  {
+    "scope": "platform",
+    "path": "/provider-pricing",
+    "name": "服务商与定价",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/registration/handoff-routes",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/bookkeeping/pricing",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/startup-agent/web/city-pricing",
+        "status": 404
+      }
+    ],
+    "title": "服务商与定价"
+  },
+  {
+    "scope": "platform",
+    "path": "/plans",
+    "name": "套餐管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/plans?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "套餐管理"
+  },
+  {
+    "scope": "platform",
+    "path": "/billing/plans",
+    "name": "套餐管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/plans?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "套餐管理"
+  },
+  {
+    "scope": "platform",
+    "path": "/billing/features",
+    "name": "权益项",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/features?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "权益项"
+  },
+  {
+    "scope": "platform",
+    "path": "/billing/credits",
+    "name": "积分包配置",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/credit-packs?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "积分包配置"
+  },
+  {
+    "scope": "platform",
+    "path": "/billing/orders",
+    "name": "订单管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/orders?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "订单管理"
+  },
+  {
+    "scope": "platform",
+    "path": "/billing/config",
+    "name": "计费配置",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/config",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/beebridge-pricing?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "计费配置"
+  },
+  {
+    "scope": "platform",
+    "path": "/billing/usage",
+    "name": "用量统计",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/usage/aggregates?period=monthly&from=2026-06-01&to=2026-11-12&limit=10&offset=0",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/usage/summary?period=monthly&from=2026-06-01&to=2026-11-12",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/usage/tenants?period=monthly&from=2026-06-01&to=2026-11-12&limit=10",
+        "status": 404
+      }
+    ],
+    "title": "用量统计"
+  },
+  {
+    "scope": "platform",
+    "path": "/billing/overrides",
+    "name": "权益覆写",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/billing/entitlement-overrides?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "权益覆写"
+  },
+  {
+    "scope": "platform",
+    "path": "/runtimes",
+    "name": "运行环境",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/runtime-environments?include_disabled=true",
+        "status": 403
+      }
+    ],
+    "title": "运行环境"
+  },
+  {
+    "scope": "platform",
+    "path": "/mcp",
+    "name": "MCP 服务",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      }
+    ],
+    "title": "MCP 服务"
+  },
+  {
+    "scope": "platform",
+    "path": "/platform-types",
+    "name": "Agent 平台类型",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/runtime/platform-types",
+        "status": 200
+      }
+    ],
+    "title": "Agent 平台类型"
+  },
+  {
+    "scope": "platform",
+    "path": "/runtime-hosting",
+    "name": "平台托管配置",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/runtime-hosting-configs?limit=20&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "平台托管配置"
+  },
+  {
+    "scope": "platform",
+    "path": "/runtime-environments",
+    "name": "智能体托管环境",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/runtime-environments?include_disabled=true",
+        "status": 403
+      }
+    ],
+    "title": "Agent 平台环境（平台托管）"
+  },
+  {
+    "scope": "platform",
+    "path": "/preset-agents",
+    "name": "数字员工模版",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/runtime-hosting-configs?limit=100&offset=0",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/preset-agents?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "数字员工模版"
+  },
+  {
+    "scope": "platform",
+    "path": "/emp-blocks",
+    "name": "EMP 协议管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/emp-blocks",
+        "status": 403
+      }
+    ],
+    "title": "EMP 协议管理"
+  },
+  {
+    "scope": "platform",
+    "path": "/skills",
+    "name": "技能管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/skill-categories?limit=200&offset=0",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/skill-labels?limit=200&offset=0",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/skills?limit=10&offset=0",
+        "status": 200
+      }
+    ],
+    "title": "技能管理"
+  },
+  {
+    "scope": "platform",
+    "path": "/skill-categories",
+    "name": "技能分类",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/skill-categories?limit=10&offset=0",
+        "status": 200
+      }
+    ],
+    "title": "技能分类"
+  },
+  {
+    "scope": "platform",
+    "path": "/skill-labels",
+    "name": "技能标签",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/skill-labels?limit=10&offset=0",
+        "status": 200
+      }
+    ],
+    "title": "技能标签"
+  },
+  {
+    "scope": "platform",
+    "path": "/builtin-keys",
+    "name": "客户端能力注册表",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/builtin-skill-keys?limit=10&offset=0",
+        "status": 500
+      }
+    ],
+    "title": "客户端能力注册表"
+  },
+  {
+    "scope": "platform",
+    "path": "/apps",
+    "name": "应用管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/app-categories?limit=200&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/apps?limit=10&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "应用管理"
+  },
+  {
+    "scope": "platform",
+    "path": "/app-categories",
+    "name": "应用分类",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/app-categories?limit=10&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "应用分类"
+  },
+  {
+    "scope": "platform",
+    "path": "/kb-providers",
+    "name": "知识库服务配置",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/model-options?capability=rerank",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/model-options?capability=embedding",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/kb-providers",
+        "status": 404
+      }
+    ],
+    "title": "知识库服务配置"
+  },
+  {
+    "scope": "platform",
+    "path": "/platform-kb",
+    "name": "知识库管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/knowledge-bases?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "知识库管理"
+  },
+  {
+    "scope": "platform",
+    "path": "/ragflow-ops",
+    "name": "监控运维",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/kb-providers",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/ragflow-bindings?limit=10&offset=0",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/kb-outbox-events?limit=10&offset=0",
+        "status": 404
+      }
+    ],
+    "title": "监控运维"
+  },
+  {
+    "scope": "platform",
+    "path": "/drive/storage",
+    "name": "云盘存储配置",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/drive/storage-defaults",
+        "status": 403
+      }
+    ],
+    "title": "云盘存储配置"
+  },
+  {
+    "scope": "platform",
+    "path": "/drive/usage",
+    "name": "云盘用量",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/drive/usage?tenant_status=active&sort=usage_desc&limit=20",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/drive/usage/summary?tenant_status=active",
+        "status": 403
+      }
+    ],
+    "title": "云盘用量"
+  },
+  {
+    "scope": "platform",
+    "path": "/drive/workers",
+    "name": "云盘定时任务",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/drive/workers",
+        "status": 403
+      }
+    ],
+    "title": "云盘定时任务"
+  },
+  {
+    "scope": "platform",
+    "path": "/cron-dashboard",
+    "name": "统计看板",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/cron-jobs/overview",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/cron/capability-dry-run?limit=1000",
+        "status": 403
+      }
+    ],
+    "title": "统计看板"
+  },
+  {
+    "scope": "platform",
+    "path": "/cron-jobs",
+    "name": "定时任务列表",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/cron-jobs?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "定时任务列表"
+  },
+  {
+    "scope": "platform",
+    "path": "/cron-prompt-templates-ops",
+    "name": "定时任务模板",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/cron-prompt-templates",
+        "status": 403
+      }
+    ],
+    "title": "定时任务模板"
+  },
+  {
+    "scope": "platform",
+    "path": "/roles",
+    "name": "权限与角色",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/roles?q=&limit=100&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/permissions?scope=platform",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me/menus",
+        "status": 200
+      }
+    ],
+    "title": "平台角色"
+  },
+  {
+    "scope": "platform",
+    "path": "/menus",
+    "name": "菜单管理",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/menus?includeHidden=true",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/permissions?scope=",
+        "status": 403
+      }
+    ],
+    "title": "菜单管理"
+  },
+  {
+    "scope": "platform",
+    "path": "/sys-users",
+    "name": "系统用户",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/roles?q=&limit=100&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/sys-users?q=&limit=100&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "系统用户"
+  },
+  {
+    "scope": "platform",
+    "path": "/alerts",
+    "name": "告警中心",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/alerts?status=firing&limit=10&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "告警中心"
+  },
+  {
+    "scope": "platform",
+    "path": "/wukongim",
+    "name": "IM 运行监控",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/wukong/overview",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/wukong/connections?status=online&page=1&page_size=20",
+        "status": 403
+      }
+    ],
+    "title": "IM 运行监控"
+  },
+  {
+    "scope": "platform",
+    "path": "/observability/agent-runs",
+    "name": "运行监测",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/observability/agent-runs/stats?from=2026-11-11T16%3A00%3A00.000Z&to=2026-11-12T07%3A34%3A40.806Z&group_by=day",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/observability/agent-runs?limit=20&offset=0&from=2026-11-11T16%3A00%3A00.000Z&to=2026-11-12T07%3A34%3A40.806Z",
+        "status": 403
+      }
+    ],
+    "title": "Agent 运行监测"
+  },
+  {
+    "scope": "platform",
+    "path": "/observability/call-logs",
+    "name": "调用日志",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/observability/call-logs?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "调用日志"
+  },
+  {
+    "scope": "platform",
+    "path": "/audit",
+    "name": "审计日志",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/audit-summary",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/audit-events?category=operation&limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "操作审计"
+  },
+  {
+    "scope": "platform",
+    "path": "/observability/conversations",
+    "name": "会话检索",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/observability/conversations?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "会话检索"
+  },
+  {
+    "scope": "platform",
+    "path": "/support-feedback",
+    "name": "问题反馈",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/support-feedback?status=open&limit=10&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "问题反馈"
+  },
+  {
+    "scope": "platform",
+    "path": "/marketing-leads",
+    "name": "官网线索",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/marketing-leads?limit=10&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "官网线索"
+  },
+  {
+    "scope": "platform",
+    "path": "/download-channels",
+    "name": "下载渠道",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/download-channels/stats",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/download-channels?limit=20&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "下载渠道"
+  },
+  {
+    "scope": "platform",
+    "path": "/share-growth",
+    "name": "用户分享",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/share-growth?limit=20&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/share-growth/stats",
+        "status": 403
+      }
+    ],
+    "title": "用户分享增长"
+  },
+  {
+    "scope": "platform",
+    "path": "/client-versions",
+    "name": "客户端版本",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/client-build-jobs?platform=macos&limit=1",
+        "status": 404
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/client-versions?platform=macos&limit=10&offset=0",
+        "status": 403
+      }
+    ],
+    "title": "客户端版本"
+  },
+  {
+    "scope": "platform",
+    "path": "/local-coding-tool-versions",
+    "name": "本地编程工具版本",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/local-coding-tool-versions?platform=macos&limit=10&offset=0",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/local-coding-tool-auto-sync",
+        "status": 403
+      }
+    ],
+    "title": "本地开发工具版本"
+  },
+  {
+    "scope": "platform",
+    "path": "/client-analytics",
+    "name": "客户端分析",
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/admin/v1/platform/client-analytics/overview?days=30",
+        "status": 403
+      }
+    ],
+    "title": "客户端分析"
+  }
+]

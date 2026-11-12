@@ -112,10 +112,12 @@ class ContactsDirectoryStore {
 
   bool _diskLoadAttempted = false;
   Future<ContactsDirectorySnapshot>? _inFlight;
+  int _generation = 0;
 
   /// 需要数据时调用:有内存快照直接返回(同时后台刷新一次); 没有则先尝试磁盘
   /// 缓存(有则先用, 仍旧后台刷新); 磁盘也没有(真正冷启动/首次登录)才等网络。
   Future<ContactsDirectorySnapshot> ensureLoaded() async {
+    final generation = _generation;
     final mem = notifier.value;
     if (mem != null) {
       refreshInBackground();
@@ -124,6 +126,7 @@ class ContactsDirectoryStore {
     if (!_diskLoadAttempted) {
       _diskLoadAttempted = true;
       final cached = await _loadFromDisk();
+      if (generation != _generation) throw StateError('通讯录会话已变化');
       if (cached != null) {
         notifier.value = cached;
         refreshInBackground();
@@ -138,15 +141,20 @@ class ContactsDirectoryStore {
   Future<ContactsDirectorySnapshot> refresh() {
     final inFlight = _inFlight;
     if (inFlight != null) return inFlight;
-    final future = _doRefresh().whenComplete(() => _inFlight = null);
+    final generation = _generation;
+    final future = _doRefresh().whenComplete(() {
+      if (generation == _generation) _inFlight = null;
+    });
     _inFlight = future;
     return future;
   }
 
   void refreshInBackground() {
-    unawaited(refresh().then<void>((_) {}, onError: (Object error, StackTrace stack) {
+    unawaited(
+        refresh().then<void>((_) {}, onError: (Object error, StackTrace stack) {
       // HTTP failures have already been logged/reported by the interceptor.
-      debugPrint('[ContactsDirectory] background refresh failed: ${error.runtimeType}');
+      debugPrint(
+          '[ContactsDirectory] background refresh failed: ${error.runtimeType}');
     }));
   }
 
@@ -160,7 +168,18 @@ class ContactsDirectoryStore {
   /// 部门(tree 已经给了 humanCount/agentCount, 都是 0 的部门跳过, 不用挨个
   /// 打空请求), 有限并发(8 个)避免几百个部门瞬间打满连接。
   Future<ContactsDirectorySnapshot> _doRefresh() async {
+    final generation = _generation;
+    final connection = AppConfig.connectionEpoch;
+    void checkCurrent() {
+      if (generation != _generation ||
+          connection != AppConfig.connectionEpoch ||
+          AppConfig.connectionChanging) {
+        throw StateError('通讯录会话已变化');
+      }
+    }
+
     final depts = await _service.tree();
+    checkCurrent();
     final withMembers =
         depts.where((d) => d.humanCount > 0 || d.agentCount > 0).toList();
 
@@ -171,11 +190,13 @@ class ContactsDirectoryStore {
 
     Future<void> worker() async {
       while (index < withMembers.length) {
+        checkCurrent();
         final dept = withMembers[index++];
         final people = await _service.members(
           departmentId: dept.id,
           kind: 'all',
         );
+        checkCurrent();
         for (final p in people) {
           if (p.isAgent) {
             agents.add(p);
@@ -190,16 +211,16 @@ class ContactsDirectoryStore {
       sem.add(worker());
     }
     await Future.wait(sem);
+    checkCurrent();
 
     // agent 常无部门(独立数字员工), 上面按部门查不到——单独兜底拉一次不限部门
     // 的 kind=agent(数字员工总数通常远小于人数, 触发同一个 100 条上限的概率
     // 低很多; 真撞上限也只是"数字员工"分区显示不全, 不会像人员那样整个部门
     // 的人消失)。按 id 去重, 避免部门内已经拿到的重复加一遍。
     final noDeptAgents = await _service.members(kind: 'agent');
+    checkCurrent();
     final existingAgentIds = agents.map((a) => a.id).toSet();
-    agents.addAll(
-      noDeptAgents.where((a) => !existingAgentIds.contains(a.id))
-    );
+    agents.addAll(noDeptAgents.where((a) => !existingAgentIds.contains(a.id)));
 
     final fresh = ContactsDirectorySnapshot(
       departments: depts,
@@ -233,9 +254,11 @@ class ContactsDirectoryStore {
   }
 
   Future<void> _saveToDisk(ContactsDirectorySnapshot snapshot) async {
+    final generation = _generation;
     if (!_persistToDisk) return;
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (generation != _generation || AppConfig.connectionChanging) return;
       await prefs.setString(
         AppConfig.storageContactsDirectoryKey,
         jsonEncode(snapshot.toJson()),
@@ -247,6 +270,8 @@ class ContactsDirectoryStore {
 
   /// 登出清空:内存 + 磁盘都清, 避免下个账号登录后瞬间看到上个租户的通讯录残留。
   Future<void> clear() async {
+    _generation++;
+    _inFlight = null;
     notifier.value = null;
     _diskLoadAttempted = false;
     if (!_persistToDisk) return;

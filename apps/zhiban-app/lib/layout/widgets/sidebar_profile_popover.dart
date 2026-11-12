@@ -21,6 +21,8 @@ import 'package:zhiban_client/pages/chat/services/agent_conversation_launcher.da
 import 'package:zhiban_client/pages/chat/widgets/contact_profile_card.dart';
 import 'package:zhiban_client/pages/login/login_navigation.dart';
 import 'package:zhiban_client/pages/login/services/auth_api.dart';
+import 'package:zhiban_client/pages/server_connection/server_connection_dialog.dart';
+import 'package:zhiban_client/pages/server_connection/workspace_connection_scope.dart';
 import 'package:zhiban_client/routes/route_paths.dart';
 import 'package:zhiban_client/services/account_info_api.dart';
 import 'package:zhiban_client/services/app_update_service.dart';
@@ -268,6 +270,25 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
     host.go(RoutePaths.settings);
   }
 
+  Future<void> _changeWorkspace() async {
+    final host = widget.hostContext;
+    final connection = WorkspaceConnectionScope.maybeOf(host);
+    final local = widget.localWorkspace;
+    Navigator.of(context).pop();
+    if (!host.mounted || connection == null) return;
+    if (local) {
+      final address = await showServerConnectionDialog(host);
+      if (address != null && host.mounted) await connection.connect(address);
+    } else {
+      await connection.returnToLocal();
+    }
+  }
+
+  Future<void> _openConnectionGuide() async {
+    Navigator.of(context).pop();
+    await openServerConnectionGuide();
+  }
+
   Future<void> _checkForUpdates() async {
     Navigator.of(context).pop();
     if (!PlatformUtils.isDesktop) {
@@ -357,6 +378,35 @@ class _SidebarProfilePopoverState extends ConsumerState<SidebarProfilePopover> {
             onTap: _openProfileCard,
           ),
           const _PopoverDivider(),
+          if (WorkspaceConnectionScope.maybeOf(widget.hostContext) != null) ...[
+            if (!widget.localWorkspace && AppConfig.serverWorkspace)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                child: Text(
+                  '服务器 · ${Uri.parse(AppConfig.apiUrl()).authority}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            _ActionRow(
+              icon: widget.localWorkspace
+                  ? CupertinoIcons.cloud
+                  : CupertinoIcons.desktopcomputer,
+              label: widget.localWorkspace ? '连接服务器' : '返回本地',
+              onTap: _changeWorkspace,
+            ),
+            _ActionRow(
+              icon: CupertinoIcons.book,
+              label: '接入指南',
+              showExternalIcon: true,
+              onTap: _openConnectionGuide,
+            ),
+            const _PopoverDivider(),
+          ],
           if (!widget.localWorkspace)
             _ActionRow(
               icon: CupertinoIcons.question_circle,

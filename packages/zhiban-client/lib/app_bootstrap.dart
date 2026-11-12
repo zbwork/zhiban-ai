@@ -32,7 +32,7 @@ Future<void> _initializeConsentBoundServices({required bool hasToken}) async {
 }
 
 Future<void> startApp({
-  required GoRouter Function({required String initialLocation}) routerFactory ,
+  required GoRouter Function({required String initialLocation}) routerFactory,
   Future<void> Function()? initializePlatform,
   Future<bool> Function()? requiresPrivacyConsent,
   Widget Function(GoRouter router, Widget child)? sessionWrapper,
@@ -64,7 +64,8 @@ Future<void> startApp({
   debugPrint('[BOOT] env=${AppConfig.env.name} api=${AppConfig.apiUrl()}');
   if (!kIsWeb &&
       (Platform.isMacOS || Platform.isWindows) &&
-      AppConfig.localCodingToolsEnabled && !AppConfig.communityEdition) {
+      AppConfig.localCodingToolsEnabled &&
+      !AppConfig.communityEdition) {
     configureSessionLogoutCleanup(
       LocalCodingToolsService().removeAuthorizationOnLogout,
     );
@@ -107,7 +108,7 @@ class MyApp extends StatefulWidget {
     required this.initialLocation,
     required this.hasToken,
     this.requiresPrivacyConsent = false,
-    required this.routerFactory ,
+    required this.routerFactory,
     this.sessionWrapper,
     this.privacyGate,
   });
@@ -130,6 +131,12 @@ class _MyAppState extends State<MyApp> {
         : widget.initialLocation,
   );
   late bool _privacyAccepted = !widget.requiresPrivacyConsent;
+
+  @override
+  void dispose() {
+    _router.dispose();
+    super.dispose();
+  }
 
   void _acceptPrivacy() {
     if (!mounted || _privacyAccepted) return;
@@ -191,10 +198,7 @@ class _MyAppState extends State<MyApp> {
 }
 
 class _RootOverlayStack extends StatelessWidget {
-  const _RootOverlayStack({
-    required this.router,
-    required this.child
-  });
+  const _RootOverlayStack({required this.router, required this.child});
 
   final GoRouter router;
   final Widget child;

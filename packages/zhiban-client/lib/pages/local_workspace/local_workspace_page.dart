@@ -390,12 +390,8 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
         c.employees.firstWhere((e) => e['id'] == agent.agentId);
     return Column(children: [
       _header('数字员工', c.employeeCatalogError ?? '浏览官方员工，或管理你自己的数字员工。',
-          trailing: TextButton.icon(
-              onPressed: c.employeeCatalogRefreshing
-                  ? null
-                  : () => c.syncEmployeeCatalog(),
-              icon: const Icon(CupertinoIcons.refresh, size: 16),
-              label: Text(c.employeeCatalogRefreshing ? '刷新中' : '刷新'))),
+          trailing: c.employeeCatalogError == null ? null : TextButton(
+            onPressed: () => c.syncEmployeeCatalog(), child: const Text('重试'))),
       Expanded(
           child: SizedBox(
         width: double.infinity,
@@ -589,8 +585,7 @@ class _LocalWorkspacePageState extends ConsumerState<LocalWorkspacePage> {
           onSourceChanged: (_) {},
           onSortChanged: (v) => setState(() => _sort = v),
           onCategoryChanged: (v) => setState(() => _skillCategory = v),
-          onRefresh: () => c.syncSkillCatalog(),
-          isRefreshing: c.catalogRefreshing),
+      ),
       Expanded(
           child: SkillsContent(
               addLabel: (_) => '添加',

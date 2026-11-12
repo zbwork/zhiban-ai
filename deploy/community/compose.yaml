@@ -34,6 +34,7 @@ services:
     image: wukongim/wukongim:v1.2.6
     environment:
       WK_MODE: release
+      WK_TOKENAUTHON: "true"
       WK_EXTERNAL_IP: 127.0.0.1
       WK_WEBHOOK_HTTPADDR: http://bus:8080/api/agent-bus/v1/im/wukong/webhook?secret=${WUKONG_WEBHOOK_SECRET:?Set WUKONG_WEBHOOK_SECRET}
       HTTP_PROXY: ""
