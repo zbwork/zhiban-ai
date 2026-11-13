@@ -15,6 +15,23 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
+  test(
+      'community defaults refuse update without querying native or remote state',
+      () async {
+    var nativeCalls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+      nativeCalls++;
+      return {};
+    });
+    final coordinator = DesktopUpdateCoordinator();
+    expect(await coordinator.checkForUpdates(),
+        DesktopUpdateCheckResult.unavailable);
+    expect(await coordinator.installPendingUpdate(), isFalse);
+    expect((await coordinator.getUpdateState()).pendingInstall, isFalse);
+    expect(nativeCalls, 0);
+  });
+
   test('all install entrypoints share one native handoff', () async {
     final pending = Completer<bool>();
     var installs = 0;
@@ -24,7 +41,9 @@ void main() {
       installs++;
       return pending.future;
     });
-    final coordinator = DesktopUpdateCoordinator();
+    final coordinator = DesktopUpdateCoordinator(
+      updatesEnabled: true,
+    );
     final first = coordinator.installPendingUpdate();
     final second = coordinator.installUpdateInBackground();
     expect(identical(first, second), isTrue);
@@ -41,10 +60,12 @@ void main() {
       expect(call.method, 'getUpdateState');
       return {'pendingInstall': false, 'sessionInProgress': true};
     });
-    final coordinator = DesktopUpdateCoordinator(fetchInfo: () async {
-      fetches++;
-      return null;
-    });
+    final coordinator = DesktopUpdateCoordinator(
+        updatesEnabled: true,
+        fetchInfo: () async {
+          fetches++;
+          return null;
+        });
     expect(await coordinator.checkAndDownloadUpdate(), isTrue);
     expect(await coordinator.installUpdateInBackground(), isTrue);
     expect((await coordinator.getUpdateState()).nativeSessionActive, isTrue);
@@ -72,7 +93,8 @@ void main() {
       };
     });
 
-    final state = await DesktopUpdateService.getUpdateState();
+    final state =
+        await DesktopUpdateCoordinator(updatesEnabled: true).getUpdateState();
 
     expect(state.pendingInstall, isTrue);
     expect(state.canCheckForUpdates, isFalse);

@@ -1,5 +1,9 @@
 # 社区版文档
 
+- [本机两个里程碑 UI 验收（2026-11-13）](verification/community-local-milestones-2026-11-13.md)
+
+- [Mac 同步后本机验证与未通过项（2026-11-12）](verification/community-mac-sync-2026-11-12.md)
+
 - [客户端优先修复与验证（2026-11-12）](verification/client-priority-2026-11-12.md)
 
 - [完整后台 admincore 续修验证（2026-11-12）](verification/admincore-2026-11-12.md)

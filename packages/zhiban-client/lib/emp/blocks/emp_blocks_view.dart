@@ -30,6 +30,7 @@ library;
 import 'package:zhiban_core/emp/emp_attachment_links.dart';
 
 import 'package:zhiban_client/pages/chat/widgets/file_preview/chat_artifact_card.dart';
+import 'package:zhiban_client/pages/chat/widgets/file_preview/attachment_preview_loader.dart';
 import 'dart:async';
 import 'package:zhiban_client/pages/chat/widgets/file_preview/local_artifact_source.dart';
 import 'package:zhiban_client/pages/chat/widgets/file_preview/attachment_preview_target.dart';
@@ -165,6 +166,7 @@ class EmpBlocksView extends StatelessWidget {
     this.agentMessageUuid,
     this.conversationUuid,
     this.respondHandler,
+    this.attachmentLoaderFactory,
   });
 
   /// 终态 `message.completed.blocks` (或历史接口的 blocks)。
@@ -182,6 +184,7 @@ class EmpBlocksView extends StatelessWidget {
 
   /// HITL 提交回调集; null 时所有富组件保持只读 (B1+B2 旧行为)。
   final EmpBlocksRespondHandler? respondHandler;
+  final AttachmentPreviewLoader Function()? attachmentLoaderFactory;
 
   /// 4 条件 enable 守卫 (ADR §4.9): raw status='awaiting_user' + messageId 非空 +
   /// conversationUuid 非空 + respondHandler 非空。任一缺失 → 仍保持 disabled。
@@ -291,7 +294,10 @@ class EmpBlocksView extends StatelessWidget {
       return null;
     }
     return _MediaBlockView(
-            block: block, kind: type, conversation: conversationUuid ?? '')
+            block: block,
+            kind: type,
+            conversation: conversationUuid ?? '',
+            loaderFactory: attachmentLoaderFactory)
         .card();
   }
 
@@ -527,10 +533,7 @@ class _BlockCard extends StatelessWidget {
               Flexible(
                 child: Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: accent
-                  ),
+                  style: TextStyle(fontSize: 12, color: accent),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -840,10 +843,7 @@ class _ChartBlockView extends StatelessWidget {
               updatedAt.isNotEmpty ||
               tableInfo.hasContent) ...[
             const SizedBox(height: 8),
-            _ChartFooter(
-              source: source,
-              updatedAt: updatedAt
-            ),
+            _ChartFooter(source: source, updatedAt: updatedAt),
           ],
         ],
       ),
@@ -967,11 +967,7 @@ class _ChartHeaderMeta extends StatelessWidget {
       chips.add(_metaChip('单位 · $unit'));
     }
     if (chips.isEmpty) return const SizedBox.shrink();
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      children: chips
-    );
+    return Wrap(spacing: 6, runSpacing: 4, children: chips);
   }
 
   static Widget _metaChip(String text) => Container(
@@ -1183,9 +1179,7 @@ class _BarSeries {
 
   bool get isMulti => seriesList.length >= 2;
 
-  double get maxValue => _maxValue(
-        seriesList.expand((s) => s.values)
-      );
+  double get maxValue => _maxValue(seriesList.expand((s) => s.values));
 }
 
 class _BarSeriesData {
@@ -1435,10 +1429,8 @@ class _BarChart extends StatelessWidget {
               gridData: fl.FlGridData(
                 show: true,
                 drawVerticalLine: false,
-                getDrawingHorizontalLine: (_) => const fl.FlLine(
-                  color: Color(0xFFE2E8F0),
-                  strokeWidth: 1
-                ),
+                getDrawingHorizontalLine: (_) =>
+                    const fl.FlLine(color: Color(0xFFE2E8F0), strokeWidth: 1),
               ),
               borderData: fl.FlBorderData(show: false),
               titlesData: _cartesianTitles(series.labels, unit: unit),
@@ -1550,10 +1542,8 @@ class _LineChart extends StatelessWidget {
               gridData: fl.FlGridData(
                 show: true,
                 drawVerticalLine: false,
-                getDrawingHorizontalLine: (_) => const fl.FlLine(
-                  color: Color(0xFFE2E8F0),
-                  strokeWidth: 1
-                ),
+                getDrawingHorizontalLine: (_) =>
+                    const fl.FlLine(color: Color(0xFFE2E8F0), strokeWidth: 1),
               ),
               borderData: fl.FlBorderData(show: false),
               titlesData: _cartesianTitles([for (final e in entries) e.label],
@@ -1726,14 +1716,10 @@ class _ScatterChart extends StatelessWidget {
           gridData: fl.FlGridData(
             show: true,
             drawVerticalLine: true,
-            getDrawingHorizontalLine: (_) => const fl.FlLine(
-              color: Color(0xFFE2E8F0),
-              strokeWidth: 1
-            ),
-            getDrawingVerticalLine: (_) => const fl.FlLine(
-              color: Color(0xFFEFF6FF),
-              strokeWidth: 1
-            ),
+            getDrawingHorizontalLine: (_) =>
+                const fl.FlLine(color: Color(0xFFE2E8F0), strokeWidth: 1),
+            getDrawingVerticalLine: (_) =>
+                const fl.FlLine(color: Color(0xFFEFF6FF), strokeWidth: 1),
           ),
           borderData: fl.FlBorderData(show: false),
           titlesData: _cartesianTitles(labels, unit: unit),
@@ -1868,10 +1854,7 @@ class _UnsupportedChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _FallbackBanner(
-            reason: reason,
-            kindLabel: friendlyKind
-          ),
+          _FallbackBanner(reason: reason, kindLabel: friendlyKind),
           if (summary.isNotEmpty) ...[
             const SizedBox(height: 8),
             ChatSelectableSurface(
@@ -2015,9 +1998,7 @@ class _DataPreviewTable extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFFEFF6FF),
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE5E7EB))
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Row(
@@ -2148,7 +2129,11 @@ class _KpiCard extends StatelessWidget {
 /// - file → 文件类型图标 + 文件名 + size + mime + 预览/下载入口
 class _MediaBlockView extends StatelessWidget {
   const _MediaBlockView(
-      {required this.block, required this.kind, this.conversation = ''});
+      {required this.block,
+      required this.kind,
+      this.conversation = '',
+      this.loaderFactory});
+  final AttachmentPreviewLoader Function()? loaderFactory;
   final String conversation;
   final Map<String, dynamic> block;
   final String kind;
@@ -2204,6 +2189,7 @@ class _MediaBlockView extends StatelessWidget {
 
     final mediaPreviewUrl = kind == 'video' ? downloadUrl : previewUrl;
     return ChatArtifactCard(
+      loaderFactory: loaderFactory,
       key: ValueKey('artifact:${local?.url ?? mediaPreviewUrl}:$name'),
       target: AttachmentPreviewTarget(
           url: apiImageNeedsAuth(mediaPreviewUrl)
@@ -2582,11 +2568,8 @@ class _FormBlockViewState extends State<_FormBlockView> {
           (v is String && (v.isEmpty || v == formOtherSentinel)) ||
           (v is List && v.isEmpty);
       if (empty) {
-        missing.add(_firstNonEmpty([
-          _asString(f['label']),
-          _asString(f['name']),
-          key
-        ]));
+        missing.add(
+            _firstNonEmpty([_asString(f['label']), _asString(f['name']), key]));
       }
     }
     return missing;
@@ -2768,10 +2751,7 @@ class _FormBlockViewState extends State<_FormBlockView> {
         padding: const EdgeInsets.only(top: 4, bottom: 4),
         child: Text(
           '请先填写必填字段: ${_missingRequired.join('、')}',
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFFB91C1C)
-          ),
+          style: const TextStyle(fontSize: 12, color: Color(0xFFB91C1C)),
         ),
       );
 
@@ -2779,10 +2759,7 @@ class _FormBlockViewState extends State<_FormBlockView> {
         padding: const EdgeInsets.only(top: 4, bottom: 4),
         child: Text(
           _patternErrors.join('\n'),
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFFB91C1C)
-          ),
+          style: const TextStyle(fontSize: 12, color: Color(0xFFB91C1C)),
         ),
       );
 
@@ -2790,10 +2767,7 @@ class _FormBlockViewState extends State<_FormBlockView> {
         padding: EdgeInsets.only(top: 6),
         child: Text(
           '当前客户端版本暂不支持填写此表单，请升级后重试',
-          style: TextStyle(
-            fontSize: 12,
-            color: Color(0xFF6B7280)
-          ),
+          style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
         ),
       );
 

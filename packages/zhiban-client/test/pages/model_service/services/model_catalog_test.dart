@@ -16,7 +16,7 @@ void main() {
       expect(provider.id, 'beebridge');
       expect(provider.name, 'BeeBridge');
       expect(provider.endpointType, AiEndpointType.openaiCompatible);
-      expect(provider.baseUrl, 'https://api.beeaicloud.com/v1');
+      expect(provider.baseUrl, 'https://api.airick.cn/v1');
       expect(provider.defaultFirst, isTrue);
       expect(provider.iconAssetPath, 'assets/icons/providers/beebridge.svg');
       expect(catalog.modelsFor(provider.id), isEmpty);

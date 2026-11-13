@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:zhiban_client/pages/chat/widgets/file_preview/attachment_preview_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:zhiban_client/services/local_agent_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,20 +33,23 @@ void main() {
       (tester) async {
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
-            body: EmpBlocksView(conversationUuid: conversation, blocks: [
-      {
-        'type': 'markdown',
-        'text': '[重复入口](sandbox:/mnt/data/report.md)\n\n'
-            '[缺少附件](sandbox:/mnt/data/missing.md)\n\n'
-            '[参考网页](https://example.test/report.md)',
-      },
-      {
-        'type': 'file',
-        'name': 'report.md',
-        'mime': 'text/markdown',
-        'local_artifact': ref,
-      },
-    ]))));
+            body: EmpBlocksView(
+                attachmentLoaderFactory: _LayoutLoader.new,
+                conversationUuid: conversation,
+                blocks: [
+          {
+            'type': 'markdown',
+            'text': '[重复入口](sandbox:/mnt/data/report.md)\n\n'
+                '[缺少附件](sandbox:/mnt/data/missing.md)\n\n'
+                '[参考网页](https://example.test/report.md)',
+          },
+          {
+            'type': 'file',
+            'name': 'report.md',
+            'mime': 'text/markdown',
+            'local_artifact': ref,
+          },
+        ]))));
     expect(find.textContaining('重复入口'), findsNothing);
     expect(find.textContaining('缺少附件'), findsOneWidget);
     expect(find.textContaining('参考网页'), findsOneWidget);
@@ -56,16 +61,18 @@ void main() {
       const id = '55555555-5555-4555-8555-555555555555';
       await tester.pumpWidget(MaterialApp(
           home: Scaffold(
-              body: EmpBlocksView(blocks: [
-        {
-          'type': 'file',
-          'name': format.key,
-          'mime': format.value,
-          'file_id': id,
-          'preview_url': 'https://expired.test/old?Signature=expired',
-          'download_url': 'https://expired.test/old?Signature=expired',
-        }
-      ]))));
+              body: EmpBlocksView(
+                  attachmentLoaderFactory: _LayoutLoader.new,
+                  blocks: [
+            {
+              'type': 'file',
+              'name': format.key,
+              'mime': format.value,
+              'file_id': id,
+              'preview_url': 'https://expired.test/old?Signature=expired',
+              'download_url': 'https://expired.test/old?Signature=expired',
+            }
+          ]))));
       final card =
           tester.widget<ChatArtifactCard>(find.byType(ChatArtifactCard));
       expect(Uri.parse(card.target.url).path,
@@ -106,10 +113,14 @@ void main() {
                   child: AttachmentPreviewScope(
                       open: targets.add,
                       child: EmpBlocksView(
-                          blocks: blocks, conversationUuid: conversation))))));
+                          attachmentLoaderFactory: _LayoutLoader.new,
+                          blocks: blocks,
+                          conversationUuid: conversation))))));
       await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 100)));
-      await tester.pumpAndSettle();
+      // This layout/action test does not wait for unavailable remote images.
+      // Thumbnail loading and failures are verified by loader/lifecycle tests.
+      await tester.pump();
       expect(find.byType(ChatArtifactCard), findsNWidgets(2));
       expect(find.byTooltip('下载'), findsNWidgets(2));
       expect(find.text('在文件夹中显示'), findsNothing);
@@ -125,6 +136,10 @@ void main() {
       expect(LocalArtifactSource.parse(targets.last.url), isNotNull);
       expect(find.byType(Dialog), findsNothing);
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)));
+      await tester.pump();
     });
   }
   for (final brightness in Brightness.values) {
@@ -179,6 +194,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
             body: EmpBlocksView(
+                attachmentLoaderFactory: _LayoutLoader.new,
                 blocks: [...files, republished],
                 conversationUuid: conversation))));
     expect(find.byType(ChatArtifactGroup), findsOneWidget);
@@ -201,6 +217,7 @@ void main() {
         home: Scaffold(
             body: SingleChildScrollView(
                 child: EmpBlocksView(
+                    attachmentLoaderFactory: _LayoutLoader.new,
                     blocks: [files.first, republished, newer],
                     conversationUuid: conversation)))));
     expect(find.byType(ChatArtifactCard), findsNWidgets(2));
@@ -219,18 +236,20 @@ void main() {
           body: AttachmentPreviewScope(
               selectedUrl: selected,
               open: (target) => setState(() => selected = target.url),
-              child: EmpBlocksView(blocks: const [
-                {
-                  'type': 'file',
-                  'name': 'A.docx',
-                  'url': 'https://example.test/a.docx'
-                },
-                {
-                  'type': 'file',
-                  'name': 'B.docx',
-                  'url': 'https://example.test/b.docx'
-                },
-              ])));
+              child: EmpBlocksView(
+                  attachmentLoaderFactory: _LayoutLoader.new,
+                  blocks: const [
+                    {
+                      'type': 'file',
+                      'name': 'A.docx',
+                      'url': 'https://example.test/a.docx'
+                    },
+                    {
+                      'type': 'file',
+                      'name': 'B.docx',
+                      'url': 'https://example.test/b.docx'
+                    },
+                  ])));
     })));
     await tester.tap(find.text('A.docx'));
     await tester.pump();
@@ -274,9 +293,18 @@ void main() {
       'javascript:alert(1)',
       '../secret',
       // Synthetic userinfo must still be rejected by the preview policy.
-      'https://' 'user:secret@example.com/'
+      'https://'
+          'user:secret@example.com/'
     ]) {
       expect(isAllowedPreviewLink(link), false);
     }
   });
+}
+
+// Layout/action tests use controlled I/O; loader authentication/bytes have their own tests.
+class _LayoutLoader extends AttachmentPreviewLoader {
+  @override
+  Future<Uint8List> read(AttachmentPreviewTarget target, String format,
+          {int? maxBytes}) async =>
+      throw StateError('layout fixture has no thumbnail');
 }

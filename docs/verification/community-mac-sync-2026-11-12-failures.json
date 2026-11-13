@@ -1,0 +1,651 @@
+{
+  "main_commit": "2c3acec",
+  "baseline_commit": "64fe13d",
+  "note": "Existing Flutter failures, before the runtime repair. Both baseline and main timed out in the first widget test in chat_respond_notifier; the next widget test was pending when stopped. All other cases below reproduced on the baseline.",
+  "failures": [
+    {
+      "file": "desktop_update_service_test.dart",
+      "case": "all install entrypoints share one native handoff",
+      "diagnostic": "Expected: true Actual: <false>",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_service_test.dart",
+      "case": "active native session suppresses new downloads and handoffs",
+      "diagnostic": "Expected: true Actual: <false>",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_service_test.dart",
+      "case": "getUpdateState restores a pending native installation",
+      "diagnostic": "Expected: true Actual: <false>",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_task_page_test.dart",
+      "case": "original local task page creates, edits, runs, pauses, shows history and deletes without private API",
+      "diagnostic": "Test failed. See exception logs above. The test description was: original local task page creates, edits, runs, pauses, shows history and deletes without private API",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_check_feedback_test.dart",
+      "case": "about shows live progress while the check Future is pending",
+      "diagnostic": "Test failed. See exception logs above. The test description was: about shows live progress while the check Future is pending",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_check_feedback_test.dart",
+      "case": "about ends an up-to-date check with explicit feedback",
+      "diagnostic": "Test failed. See exception logs above. The test description was: about ends an up-to-date check with explicit feedback",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_check_feedback_test.dart",
+      "case": "profile menu reports start before query and result after completion",
+      "diagnostic": "Test failed. See exception logs above. The test description was: profile menu reports start before query and result after completion",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_check_feedback_test.dart",
+      "case": "typed concurrent checks share download and identify native outcomes",
+      "diagnostic": "Expected: DesktopUpdateCheckResult:<DesktopUpdateCheckResult.downloaded> Actual: DesktopUpdateCheckResult:<DesktopUpdateCheckResult.unavailable>",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_check_feedback_test.dart",
+      "case": "observer opened during a failing query receives a terminal event",
+      "diagnostic": "Expected: true Actual: <false>",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_check_feedback_test.dart",
+      "case": "query failure ends checking and a retry can return up-to-date",
+      "diagnostic": "Expected: DesktopUpdateCheckResult:<DesktopUpdateCheckResult.failed> Actual: DesktopUpdateCheckResult:<DesktopUpdateCheckResult.unavailable>",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "contacts_page_style_test.dart",
+      "case": "contacts page uses drive-style breadcrumb and full department path",
+      "diagnostic": "Test failed. See exception logs above. The test description was: contacts page uses drive-style breadcrumb and full department path",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "contacts_page_style_test.dart",
+      "case": "digital employee sidebar renders a tree and opens detail",
+      "diagnostic": "Test failed. See exception logs above. The test description was: digital employee sidebar renders a tree and opens detail",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_cache_test.dart",
+      "case": "macos check waits for preparation started by install and receives failure",
+      "diagnostic": "TimeoutException after 0:00:45.000000: Test timed out after 45 seconds.",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_cache_test.dart",
+      "case": "macos state logs distinguish native pending from usable Delta cache",
+      "diagnostic": "Expected: true Actual: <false>",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_cache_test.dart",
+      "case": "macos service entrypoints use restored feed while offline, cancellation restores ready",
+      "diagnostic": "Expected: '110' Actual: '' Which: is different. Both strings start the same, but the actual value is missing the following trailing characters: 110",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_cache_test.dart",
+      "case": "macos service shares preparation across manual and background requests",
+      "diagnostic": "Expected: [true, true, true] Actual: [false, false, false] Which: at location [0] is <false> instead of <true>",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_cache_test.dart",
+      "case": "windows check waits for preparation started by install and receives failure",
+      "diagnostic": "TimeoutException after 0:00:45.000000: Test timed out after 45 seconds.",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_cache_test.dart",
+      "case": "windows service entrypoints use restored feed while offline, cancellation restores ready",
+      "diagnostic": "Expected: '110' Actual: '' Which: is different. Both strings start the same, but the actual value is missing the following trailing characters: 110",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "desktop_update_cache_test.dart",
+      "case": "windows service shares preparation across manual and background requests",
+      "diagnostic": "Expected: [true, true, true] Actual: [false, false, false] Which: at location [0] is <false> instead of <true>",
+      "project": "app",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_provider_test.dart",
+      "case": "F31 §3.2.1 · connectTargets 未安装且环境开放:安装 → 写配置 → 验证,横幅\"接入完成\"",
+      "diagnostic": "Expected: '接入完成，Codex 已可以使用知办模型 API' Actual: '接入完成，Codex 已可以使用自定义模型 API' Which: is different. Expected: ... odex 已可以使用知办模型 API Actual: ... odex 已可以使用自定义模型 API ^ Differ at offset 16",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_provider_test.dart",
+      "case": "F31 §3.2.1 · connectTargets npm 旧版本:接管到目录版本 → 写配置 → 验证",
+      "diagnostic": "Expected: '接入完成，Codex 已可以使用知办模型 API' Actual: '接入完成，Codex 已可以使用自定义模型 API' Which: is different. Expected: ... odex 已可以使用知办模型 API Actual: ... odex 已可以使用自定义模型 API ^ Differ at offset 16",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "project launch uses picker bookmark and one initialized session",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "one click authorizes then configures only the selected target",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "one click rotates stale authorization before updating the profile",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "one click stops before planning when managed file is in conflict",
+      "diagnostic": "Expected: throws <Instance of 'LocalCodingToolsException'> with `code`: 'configuration_conflict' Actual: <Instance of 'Future<LocalCodingToolsSnapshot>'> Which: threw LocalCodingToolsException:<请更新本地连接组件后设置 API> ===== asynchronous gap ===========================",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "registers with prepare HTTP commit ordering in the same session",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "registration response is validated before credential commit",
+      "diagnostic": "Expected: throws <Instance of 'LocalCodingToolsException'> with `sanitized`: not contains 'secret-must-not-leak' and `requires re-registration`: true Actual: <Instance of 'Future<LocalCodingToolsSnapshot>'> Which: threw LocalCodingBridgeException:<请更新本地连接组件后设置 API> ===== asynchronous gap ===========================",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "commit failure is reported as requiring re-registration",
+      "diagnostic": "Expected: throws <Instance of 'LocalCodingToolsException'> with `requires re-registration`: true Actual: <Instance of 'Future<LocalCodingToolsSnapshot>'> Which: threw LocalCodingBridgeException:<请更新本地连接组件后设置 API> ===== asynchronous gap ===========================",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "remote revoke failure still clears local authorization and queues retry",
+      "diagnostic": "Expected: throws <Instance of 'LocalCodingToolsException'> with `remote retry pending`: true Actual: <Instance of 'Future<void>'> Which: emitted <null>",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "检测过程可视化 · inspect 按厂商逐项上报进度,Codex 读完配置时快照还没有 Claude",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "契约 §2.7 · 单个 target 的检测结果读不懂只把这张卡标为检测异常,其它照常读完",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "unsafe configuration keeps installation results and other targets",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "2026-09-16 · 服务端撤销欠账不再拦住重新接入,接入成功即结清",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "local clear failure stays pending and is retried before inspection",
+      "diagnostic": "Expected: throws <Instance of 'LocalCodingToolsException'> Actual: <Instance of 'Future<void>'> Which: emitted <null>",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "matching pending revoke retries before read-only inspection",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "missing profile versions allows inspect but blocks registration",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "契约 §2.7.4 · inspect 先拉目录交给 Bridge 验签;404 让 Bridge 清除;取不到或验签失败不影响快照",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "契约 §2.7.4 · Bus 没有目录(404)→ catalog.apply(null);目录暂时取不到 → 不下发,沿用 Bridge 落盘目录",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "verify: execute → get… reaches succeeded and closes session",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "verify(global) · 配置仍是知办但设备授权没了(退出过知办 / 切过环境 / 重装)时先重新接入再换票",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "switchToZhiban · 计划后配置被其他程序改动时另开会话重试,不把失败抛给用户",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "switchToZhiban · 一直被改动则把原因抛给用户,不无限重试",
+      "diagnostic": "Expected: throws <Instance of 'LocalCodingToolsException'> with `LCT code`: 'LCT-CODEX_CLI-CONFIG-PRECONDITION_CHANGED' Actual: <Instance of 'Future<LocalCodingToolsSnapshot>'> Which: threw LocalCodingToolsException:<请更新本地连接组件后设置 API> ===== asynchronous gap ===========================",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "switchToZhiban · Bridge 对共用配置的第二次 switch_global 回 action=none 视为已切换,不报计划无效",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "restoreOfficial · Bridge 回 CONFIG-NOT_SWITCHED(共用配置已被 CLI 恢复)按已恢复处理,已切换的正常恢复",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "restoreOfficial · NOT_SWITCHED 但文件仍指向知办(切换记录丢失)时报失败,不假报已恢复",
+      "diagnostic": "Expected: throws <Instance of 'LocalCodingToolsException'> with `code`: 'restore_not_switched' Actual: <Instance of 'Future<LocalCodingToolsSnapshot>'> Which: threw LocalCodingToolsException:<请更新本地连接组件后设置 API> ===== asynchronous gap ===========================",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "F31 · 重新登录后自动重新接入(2026-09-18) 接入成功记下是谁接入的;退出登录保留记录,主动移除清掉",
+      "diagnostic": "请更新本地连接组件后设置 API",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "F31 · 重新登录后自动重新接入(2026-09-18) 同一个人回来、授权没了、配置仍指向知办:静默重新接入,不读整份快照",
+      "diagnostic": "Expected: an object with length of <1> Actual: WhereIterable<String>:[] Which: has length of <0>",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "F31 · 重新登录后自动重新接入(2026-09-18) 后台与页面同时触发:合并为一次注册(服务端注册会顶掉旧凭证)",
+      "diagnostic": "Expected: an object with length of <1> Actual: WhereIterable<String>:[] Which: has length of <0>",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "F31 · 重新登录后自动重新接入(2026-09-18) 升级前接入的设备没有记录:退出登录时授权还在,按当前登录身份补记",
+      "diagnostic": "Expected: true Actual: <null>",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_service_test.dart",
+      "case": "F31 · 重新登录后自动重新接入(2026-09-18) 注册失败静默放弃,不抛错",
+      "diagnostic": "Expected: false Actual: <true>",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_tools_provider_test.dart",
+      "case": "F31 §3.2.1 · connectTargets 已切换且未漂移:不写配置,只重新验证",
+      "diagnostic": "Expected: '接入完成，Codex 已可以使用知办模型 API' Actual: '接入完成，Codex 已可以使用自定义模型 API' Which: is different. Expected: ... odex 已可以使用知办模型 API Actual: ... odex 已可以使用自定义模型 API ^ Differ at offset 16",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_artifact_pair_test.dart",
+      "case": "design pair has one preview and independent source action, reversed=false",
+      "diagnostic": "Test failed. See exception logs above. The test description was: design pair has one preview and independent source action, reversed=false",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_artifact_pair_test.dart",
+      "case": "design pair has one preview and independent source action, reversed=true",
+      "diagnostic": "Test failed. See exception logs above. The test description was: design pair has one preview and independent source action, reversed=true",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "chat_assistant_message_view_test.dart",
+      "case": "尚无进度帧时展示两阶段等待梯",
+      "diagnostic": "Test failed. See exception logs above. The test description was: 尚无进度帧时展示两阶段等待梯",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "chat_assistant_message_view_test.dart",
+      "case": "只有通用 thinking 占位时仍展示两阶段等待梯",
+      "diagnostic": "Test failed. See exception logs above. The test description was: 只有通用 thinking 占位时仍展示两阶段等待梯",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "chat_assistant_message_view_test.dart",
+      "case": "等待梯重建后按经过时间恢复到第二级，不回退重跑",
+      "diagnostic": "Test failed. See exception logs above. The test description was: 等待梯重建后按经过时间恢复到第二级，不回退重跑",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "chat_forward_picker_test.dart",
+      "case": "showChatForwardPickerDialog root Navigator 在 ProviderScope 上层时仍能读取 conversationsProvider",
+      "diagnostic": "Test failed. See exception logs above. The test description was: root Navigator 在 ProviderScope 上层时仍能读取 conversationsProvider",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "managed_catalog_refresh_test.dart",
+      "case": "manual chat refresh updates server catalog and local mirror; removed choice requires reselect",
+      "diagnostic": "Expected: { 'id': 'other', 'name': 'Other', 'baseUrl': '', 'enabled': false, 'models': [ { 'id': 'other-local',",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "im_chat_detail_interaction_test.dart",
+      "case": "desktop human entry, history, incoming and send focus",
+      "diagnostic": "Test failed. See exception logs above. The test description was: desktop human entry, history, incoming and send focus",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "im_chat_detail_interaction_test.dart",
+      "case": "desktop group entry, history, incoming and send focus",
+      "diagnostic": "Test failed. See exception logs above. The test description was: desktop group entry, history, incoming and send focus",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "im_chat_detail_interaction_test.dart",
+      "case": "mobile human entry, history, incoming and send focus",
+      "diagnostic": "Test failed. See exception logs above. The test description was: mobile human entry, history, incoming and send focus",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "im_chat_detail_interaction_test.dart",
+      "case": "mobile group entry, history, incoming and send focus",
+      "diagnostic": "Test failed. See exception logs above. The test description was: mobile group entry, history, incoming and send focus",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "emp/blocks/emp_blocks_view_test.dart",
+      "case": "EmpBlocksView form full demo (round-5) form controls have visible bordered input chrome",
+      "diagnostic": "Test failed. See exception logs above. The test description was: form controls have visible bordered input chrome",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "local_coding_models_test.dart",
+      "case": "2026-09-15 · 检测失败带中转站原话:解析 error_detail,按错误码归类并给出一句话原因",
+      "diagnostic": "Expected: '知办中转站暂时不可用（HTTP 503），不是本机问题，稍后再检测' Actual: '你配置的模型服务暂时不可用（HTTP 503），不是本机问题，稍后再检测' Which: is different. Expected: 知办中转站暂时不可用 ... Actual: 你配置的模型服务暂时 ... ^ Differ at offset 0",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "response_interceptor_test.dart",
+      "case": "5xx interceptor preserves a safe model reason instead of server busy",
+      "diagnostic": "Expected: '模型请求格式错误（HTTP 400）。' Actual: '模型请求格式错误（HTTP 400）。（model.request_invalid）' Which: is different. Both strings start the same, but the actual value also has the following trailing characters: （model.req ...",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "managed_catalog_refresh_test.dart",
+      "case": "model service refresh uses the same managed endpoint without requesting a model Key",
+      "diagnostic": "Test failed. See exception logs above. The test description was: model service refresh uses the same managed endpoint without requesting a model Key Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request will actually be made. Any test expecting a real network connection and status code will fail. To test code that needs an HttpClient, provide your own HttpClient implementation to the code under test, so that your test can consistently provide a testable response to the code under test.",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "agent_direct_cutover_send_test.dart",
+      "case": "cloud model selection retains room send transport and forwards model",
+      "diagnostic": "Expected: <1> Actual: <0>",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "agent_direct_cutover_send_test.dart",
+      "case": "agent-direct attach 返回前 stop，迟到 streamReady 只能停止不能复活",
+      "diagnostic": "Expected: false Actual: <true> [F16 RTC] native incoming hide failed (ignored): MissingPluginException(No implementation found for method hide on channel easyo/rtc/incoming_panel)",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "agent_direct_cutover_send_test.dart",
+      "case": "failed → 失败态,不调旧 /chat/send、不订阅",
+      "diagnostic": "Expected: an object with length of <1> Actual: [ Instance of 'ChatMessage', Instance of 'ChatMessage', Instance of 'ChatMessage' ] Which: has length of <3> 正式失败消息到达后应替换本地兜底，不能重复显示",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "unified_artifact_card_test.dart",
+      "case": "cloud/local 图片.png share cards, actions and preview host",
+      "diagnostic": "Test failed. See exception logs above. The test description was: cloud/local 图片.png share cards, actions and preview host",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "rtc/rtc_video_overlay_test.dart",
+      "case": "meeting：邀请打开 scaffold（分享 disabled）",
+      "diagnostic": "Test failed. See exception logs above. The test description was: meeting：邀请打开 scaffold（分享 disabled） Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request will actually be made. Any test expecting a real network connection and status code will fail. To test code that needs an HttpClient, provide your own HttpClient implementation to the code under test, so that your test can consistently provide a testable response to the code under test.",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "api_image_auth_test.dart",
+      "case": "api image auth helpers message-files paths require auth and resolve under agent-bus base",
+      "diagnostic": "Expected: 'http://127.0.0.1:8080/api/agent-bus/v1/message-files/file-1/preview' Actual: 'http://localhost:8080/api/agent-bus/v1/message-files/file-1/preview' Which: is different. Expected: http://127.0.0.1: ... Actual: http://localhost: ... ^ Differ at offset 7",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "api_image_auth_test.dart",
+      "case": "api image auth helpers knowledge document download paths require auth",
+      "diagnostic": "Expected: 'http://127.0.0.1:8080/api/agent-bus/v1/knowledge-bases/kb-1/documents/doc-1/download' Actual: 'http://localhost:8080/api/agent-bus/v1/knowledge-bases/kb-1/documents/doc-1/download' Which: is different. Expected: http://127.0.0.1: ... Actual: http://localhost: ... ^ Differ at offset 7",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "human_direct_media_url_test.dart",
+      "case": "resolveChatMediaUrl prefixes relative chat media paths with API base",
+      "diagnostic": "Expected: 'http://127.0.0.1:8080/api/agent-bus/v1/chat/media/ref-1/preview' Actual: 'http://localhost:8080/api/agent-bus/v1/chat/media/ref-1/preview' Which: is different. Expected: http://127.0.0.1: ... Actual: http://localhost: ... ^ Differ at offset 7",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "analytics_service_test.dart",
+      "case": "stackless layout errors surface the error-causing widget as first frame",
+      "diagnostic": "Actual: 'Column'",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "employee_model_service_selection_test.dart",
+      "case": "new employee defaults to member BeeBridge models without a source toggle or legacy request",
+      "diagnostic": "Test failed. See exception logs above. The test description was: new employee defaults to member BeeBridge models without a source toggle or legacy request",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "employee_model_service_selection_test.dart",
+      "case": "editing a BeeBridge employee returns only its model and no BYOK key",
+      "diagnostic": "Test failed. See exception logs above. The test description was: editing a BeeBridge employee returns only its model and no BYOK key",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "employee_model_service_selection_test.dart",
+      "case": "custom provider still submits its own key and model configuration",
+      "diagnostic": "Test failed. See exception logs above. The test description was: custom provider still submits its own key and model configuration",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "employee_model_service_selection_test.dart",
+      "case": "another tenant stale model cannot be retained or submitted",
+      "diagnostic": "Test failed. See exception logs above. The test description was: another tenant stale model cannot be retained or submitted",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "employee_model_service_selection_test.dart",
+      "case": "unavailable member catalogue never falls back to local BeeBridge models",
+      "diagnostic": "Test failed. See exception logs above. The test description was: unavailable member catalogue never falls back to local BeeBridge models",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "employee_model_service_selection_test.dart",
+      "case": "switching a custom employee to BeeBridge clears BYOK fields without reading its key",
+      "diagnostic": "Test failed. See exception logs above. The test description was: switching a custom employee to BeeBridge clears BYOK fields without reading its key",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "employee_model_service_selection_test.dart",
+      "case": "switching a BeeBridge employee to a custom provider uses that provider key",
+      "diagnostic": "Test failed. See exception logs above. The test description was: switching a BeeBridge employee to a custom provider uses that provider key",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "pages/model_service/services/model_catalog_test.dart",
+      "case": "bundled catalog features BeeBridge without hard-coded models",
+      "diagnostic": "Expected: 'https://api.beeaicloud.com/v1' Actual: 'https://api.airick.cn/v1' Which: is different. Expected: ... tps://api.beeaicloud ... Actual: ... tps://api.airick.cn/ ... ^ Differ at offset 12",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "pages/model_service/managed_model_service_test.dart",
+      "case": "BeeBridge复用原详情布局，真实密钥默认遮挡且眼睛可切换",
+      "diagnostic": "Test failed. See exception logs above. The test description was: BeeBridge复用原详情布局，真实密钥默认遮挡且眼睛可切换",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "pages/model_service/managed_model_service_test.dart",
+      "case": "检测不可用时仍展示已取得的成员 Key",
+      "diagnostic": "Test failed. See exception logs above. The test description was: 检测不可用时仍展示已取得的成员 Key",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "pages/model_service/managed_model_service_test.dart",
+      "case": "成员 Key 读取不等待模型初始化或检测",
+      "diagnostic": "Expected: 'existing-member-key' Actual: '' Which: is different. Both strings start the same, but the actual value is missing the following trailing characters: existing-m ...",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "chat_message_selection_suppression_test.dart",
+      "case": "不在任何消息 region 内:系统工具条照常弹出(独立展示场景行为不变) (variant: TargetPlatform.macOS)",
+      "diagnostic": "Test failed. See exception logs above. The test description was: 不在任何消息 region 内:系统工具条照常弹出(独立展示场景行为不变) (variant: TargetPlatform.macOS)",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "chat_message_selection_suppression_test.dart",
+      "case": "region 无选区右键:只弹自研菜单,「复制」走整条复制 (variant: TargetPlatform.macOS)",
+      "diagnostic": "Test failed. See exception logs above. The test description was: region 无选区右键:只弹自研菜单,「复制」走整条复制 (variant: TargetPlatform.macOS)",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "creation_form_validation_test.dart",
+      "case": "agent requires description and skills before returning draft (true)",
+      "diagnostic": "Test failed. See exception logs above. The test description was: agent requires description and skills before returning draft (true)",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "creation_form_validation_test.dart",
+      "case": "agent requires description and skills before returning draft (false)",
+      "diagnostic": "Test failed. See exception logs above. The test description was: agent requires description and skills before returning draft (false)",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "chat_respond_notifier_test.dart",
+      "case": "failure path: service 抛错 → 返 false, 旧 awaiting_user 气泡不动, 不追加 placeholder",
+      "diagnostic": "TimeoutException after 0:10:00.000000: Test timed out after 10 minutes.",
+      "project": "client",
+      "baseline_reproduced": true
+    },
+    {
+      "file": "chat_respond_notifier_test.dart",
+      "case": "empty stream_id 返回 → 视作失败, 不追加 placeholder, 返 false",
+      "diagnostic": "See local test log",
+      "project": "client",
+      "baseline_reproduced": true
+    }
+  ]
+}

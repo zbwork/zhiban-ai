@@ -46,9 +46,8 @@ void main() {
   }) {
     return MaterialApp(
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(
-          disableAnimations: disableAnimations
-        ),
+        data: MediaQuery.of(context)
+            .copyWith(disableAnimations: disableAnimations),
         child: child!,
       ),
       home: Scaffold(
@@ -149,7 +148,8 @@ void main() {
           .pumpWidget(wrap(ChatAssistantMessageViewData.fromMessage(message)));
       await tester.pump();
       expect(find.text('已保留文件'), findsOneWidget);
-      expect(find.text(status == 'complete' ? '文件已生成，后续模型处理失败' : '部分文件已生成，任务未完成'),
+      expect(
+          find.text(status == 'complete' ? '文件已生成，后续模型处理失败' : '部分文件已生成，任务未完成'),
           findsOneWidget);
       expect(find.textContaining('report.pptx'), findsOneWidget);
       expect(find.text('AI 生成'), findsOneWidget);
@@ -283,12 +283,12 @@ void main() {
     await tester.pumpWidget(wrap(item));
 
     expect(find.text('正在思考…'), findsOneWidget);
-    expect(find.text('等待模型响应…'), findsNothing);
+    expect(find.text('正在处理…'), findsNothing);
 
     await tester.pump(const Duration(milliseconds: 1600));
 
     expect(find.text('正在思考'), findsOneWidget);
-    expect(find.text('等待模型响应…'), findsOneWidget);
+    expect(find.text('正在处理…'), findsOneWidget);
     expect(find.byKey(const ValueKey('thinking-dot-0')), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -322,7 +322,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1600));
 
     expect(find.text('正在思考'), findsOneWidget);
-    expect(find.text('等待模型响应…'), findsOneWidget);
+    expect(find.text('正在处理…'), findsOneWidget);
     expect(find.text('思考中…'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -345,7 +345,7 @@ void main() {
 
     expect(find.text('正在思考…'), findsNothing);
     expect(find.text('正在思考'), findsOneWidget);
-    expect(find.text('等待模型响应…'), findsOneWidget);
+    expect(find.text('正在处理…'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });

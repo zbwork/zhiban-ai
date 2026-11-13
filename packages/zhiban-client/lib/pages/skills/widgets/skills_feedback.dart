@@ -1,3 +1,4 @@
+import 'package:zhiban_client/config/catalog_layout.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:zhiban_ui/config/skeleton_config.dart';
@@ -31,10 +32,7 @@ class SkillsInlineMessage extends StatelessWidget {
           Icon(icon, size: 18, color: textColor),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              text,
-              style: TextStyle(fontSize: 13, color: textColor)
-            ),
+            child: Text(text, style: TextStyle(fontSize: 13, color: textColor)),
           ),
         ],
       ),
@@ -66,8 +64,8 @@ class SkillsShimmerLoading extends StatelessWidget {
       itemCount: 10,
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 360,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 18,
+        mainAxisSpacing: desktopCatalogCardGap,
+        crossAxisSpacing: desktopCatalogCardGap,
         mainAxisExtent: 104,
       ),
       itemBuilder: (_, __) => const _SkillsSkeletonCard(mobile: false),

@@ -63,6 +63,20 @@ class ModelServiceStore {
     return (aid == null || aid.isEmpty) ? _anonymousScope : aid;
   }
 
+  Future<List<AiProviderConfig>> loadManagedProviders(
+      String expectedScope) async {
+    if (await managedScope() != expectedScope) return const [];
+    final prefs = await SharedPreferences.getInstance();
+    final raw =
+        prefs.getString(_prefsKeyPrefix + expectedScope.split(':').first);
+    if (raw == null || raw.isEmpty) return const [];
+    final decoded = jsonDecode(raw);
+    return (decoded as List)
+        .whereType<Map<String, dynamic>>()
+        .map(AiProviderConfig.fromJson)
+        .toList();
+  }
+
   Future<List<AiProviderConfig>> loadProviders() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_prefsKeyPrefix + await _scope());

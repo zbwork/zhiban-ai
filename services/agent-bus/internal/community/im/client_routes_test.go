@@ -14,6 +14,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/jwt"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/directroom"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcatalog"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientchat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcontacts"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientfiles"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientpositions"
@@ -48,11 +49,14 @@ func TestClientRoutesRejectAnonymousWrongScopeAndInactiveMembership(t *testing.T
 	authT := func(h http.Handler) http.Handler {
 		return auth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(membership)(h)))
 	}
+	registerConversationState(mux, &clientchat.StateHandlers{}, authT)
+	registerReadReceipts(mux, &clientchat.ReadReceiptsHandlers{}, authT)
 	(&clientrooms.Handlers{DirectRoom: struct{ directroom.Service }{}}).Register(mux, authT)
 	for _, route := range []struct{ method, path string }{
 		{"POST", "/message-files/upload"}, {"POST", "/message-files/presign"}, {"POST", "/message-files/confirm"},
 		{"GET", "/message-files/example/download"}, {"GET", "/message-files/example/preview"},
 		{"POST", "/chat/media"}, {"GET", "/chat/media/example/download"}, {"GET", "/chat/media/example/preview"},
+		{"POST", "/chat/conversations/example/show"}, {"POST", "/chat/conversations/example/read"}, {"GET", "/chat/conversations/example/read-receipts"},
 		{"GET", "/agents/positions"}, {"POST", "/rooms"}, {"GET", "/rooms/example"}, {"PATCH", "/rooms/example"},
 		{"POST", "/rooms/example/participants"}, {"DELETE", "/rooms/example/participants/example"}, {"POST", "/direct-rooms"},
 		{"GET", "/conversations/example/skill-rail-config"}, {"POST", "/agents/example/skill-overrides"},

@@ -196,7 +196,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('model_service.providers.v1.1039'), local);
   });
-  testWidgets(
+  managedTestWidgets(
       'model service refresh uses the same managed endpoint without requesting a model Key',
       (tester) async {
     // Asset decoding uses compute for large bundled catalogs; finish the real
@@ -237,4 +237,9 @@ void main() {
     expect(find.text('新模型'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+}
+
+void managedTestWidgets(
+    String description, Future<void> Function(WidgetTester) callback) {
+  testWidgets(description, callback, skip: AppConfig.communityEdition);
 }

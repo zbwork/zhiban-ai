@@ -11,35 +11,61 @@ void main() {
   test('slow operation polling never overlaps the next timer tick', () async {
     final svc = _RecordingOperations()
       ..snapshot = _snapshot()
-      ..startInstallResponse = _op(state: LocalCodingOperationState.running, stage: 'preflight');
+      ..startInstallResponse =
+          _op(state: LocalCodingOperationState.running, stage: 'preflight');
     final held = Completer<LocalCodingOperation>();
     svc.pollOverride = (_) => held.future;
     final container = _container(svc);
     await container.read(localCodingToolsProvider.future);
-    await container.read(localCodingToolsProvider.notifier).startInstall(LocalCodingTarget.codexCli);
+    await container
+        .read(localCodingToolsProvider.notifier)
+        .startInstall(LocalCodingTarget.codexCli);
     await Future<void>.delayed(const Duration(milliseconds: 1700));
     final callsBeforeRelease = svc.pollCalls;
-    held.complete(_op(state: LocalCodingOperationState.succeeded, stage: 'detecting'));
+    held.complete(
+        _op(state: LocalCodingOperationState.succeeded, stage: 'detecting'));
     await Future<void>.delayed(const Duration(milliseconds: 100));
     expect(callsBeforeRelease, 1);
-    expect(container.read(localCodingToolsProvider).value!.operationFor(LocalCodingTarget.codexCli), isNull);
+    expect(
+        container
+            .read(localCodingToolsProvider)
+            .value!
+            .operationFor(LocalCodingTarget.codexCli),
+        isNull);
   });
 
-  test('batch keeps polling failure code and message instead of UNKNOWN', () async {
+  test('batch keeps polling failure code and message instead of UNKNOWN',
+      () async {
     final svc = _RecordingOperations()
       ..snapshot = _catalogSnapshot(switched: {LocalCodingTarget.codexCli})
-      ..startVerifyResponse = _op(state: LocalCodingOperationState.running, stage: 'l1', kind: LocalCodingOperationKind.verify)
-      ..pollOverride = (_) async => throw const LocalCodingToolsException('rpc_timeout', '本地连接组件响应超时，请重试');
+      ..startVerifyResponse = _op(
+          state: LocalCodingOperationState.running,
+          stage: 'l1',
+          kind: LocalCodingOperationKind.verify)
+      ..pollOverride = (_) async => throw const LocalCodingToolsException(
+          'rpc_timeout', '本地连接组件响应超时，请重试');
     final container = _container(svc);
     await container.read(localCodingToolsProvider.future);
     final notifier = container.read(localCodingToolsProvider.notifier);
-    await notifier.connectTargets([LocalCodingTarget.codexCli]).timeout(const Duration(seconds: 5));
-    final item = container.read(localCodingToolsProvider).value!.batchFor(LocalCodingVendor.codex)!.itemFor(LocalCodingTarget.codexCli);
+    await notifier.connectTargets([LocalCodingTarget.codexCli]).timeout(
+        const Duration(seconds: 5));
+    final item = container
+        .read(localCodingToolsProvider)
+        .value!
+        .batchFor(LocalCodingVendor.codex)!
+        .itemFor(LocalCodingTarget.codexCli);
     expect(item.errorCode, 'rpc_timeout');
     expect(item.errorMessage, '本地连接组件响应超时，请重试');
     svc.pollOverride = null;
-    await notifier.connectTargets([LocalCodingTarget.codexCli]).timeout(const Duration(seconds: 5));
-    expect(container.read(localCodingToolsProvider).value!.batchFor(LocalCodingVendor.codex)!.allSucceeded, isTrue);
+    await notifier.connectTargets([LocalCodingTarget.codexCli]).timeout(
+        const Duration(seconds: 5));
+    expect(
+        container
+            .read(localCodingToolsProvider)
+            .value!
+            .batchFor(LocalCodingVendor.codex)!
+            .allSucceeded,
+        isTrue);
   });
 
   test('refreshQuiet keeps the old snapshot then swaps in silently', () async {
@@ -48,8 +74,8 @@ void main() {
     final second = _snapshotWithVersion('1.0.1');
     svc.snapshot = first;
 
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
 
@@ -98,8 +124,8 @@ void main() {
     svc.startInstallResponse =
         _op(state: LocalCodingOperationState.running, stage: 'preflight');
 
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
     await container.read(localCodingToolsProvider.future);
@@ -120,9 +146,10 @@ void main() {
     // 让 500 ms 轮询触发若干次(4 s 足够跑完 2 tick + 收尾)。
     final done = Completer<void>();
     Timer.periodic(const Duration(milliseconds: 200), (t) {
-      final op = container.read(localCodingToolsProvider).value?.operationFor(
-            LocalCodingTarget.codexCli
-          );
+      final op = container
+          .read(localCodingToolsProvider)
+          .value
+          ?.operationFor(LocalCodingTarget.codexCli);
       if (op == null) {
         t.cancel();
         done.complete();
@@ -142,8 +169,8 @@ void main() {
         _op(state: LocalCodingOperationState.running, stage: 'preflight');
     // pollScript 为空时 fake 直接返回 succeeded。
 
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
     await container.read(localCodingToolsProvider.future);
@@ -201,8 +228,8 @@ void main() {
     svc.startInstallResponse =
         _op(state: LocalCodingOperationState.running, stage: 'preflight');
 
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
     await container.read(localCodingToolsProvider.future);
@@ -263,8 +290,8 @@ void main() {
           kind: LocalCodingOperationKind.verify),
     ];
 
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
     await container.read(localCodingToolsProvider.future);
@@ -315,8 +342,8 @@ void main() {
           stage: 'l3',
           kind: LocalCodingOperationKind.verify),
     ];
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
     await container.read(localCodingToolsProvider.future);
@@ -382,7 +409,7 @@ void main() {
         [LocalCodingTarget.codexCli, LocalCodingTarget.codexDesktop]);
     expect(svc.startVerifyCalls, 2);
     expect(svc.lastVerifyScope, LocalCodingVerifyScope.global);
-    expect(data.banner?.title, '接入完成，Codex 已可以使用知办模型 API');
+    expect(data.banner?.title, '接入完成，Codex 已可以使用自定义模型 API');
     expect(data.banner?.text, localCodingRelaunchHint);
   });
 
@@ -411,10 +438,11 @@ void main() {
     expect(svc.switchedTargets, [LocalCodingTarget.codexCli]);
     expect(svc.startVerifyCalls, 1);
     expect(container.read(localCodingToolsProvider).value!.banner?.title,
-        '接入完成，Codex 已可以使用知办模型 API');
+        '接入完成，Codex 已可以使用自定义模型 API');
   });
 
-  test('F31 §3.2.1 · connectTargets 标准位置低于目录:升级 → 写配置 → 验证;桌面端不是切不了的原因,不进链', () async {
+  test('F31 §3.2.1 · connectTargets 标准位置低于目录:升级 → 写配置 → 验证;桌面端不是切不了的原因,不进链',
+      () async {
     final svc = _RecordingOperations();
     // 目录对命令行和桌面端都给了更高版本;桌面端能正常切换,版本留给后台维护。
     svc.snapshot = _catalogSnapshot(availableVersion: '0.154.0');
@@ -469,8 +497,7 @@ void main() {
   // 2026-09-17 · 1.2.7 真机:已接入的 Claude 配置只缺新键(根证书补充),Bridge 报
   // global_upgrade_available,但接入链只看"未切换 / 漂移",直接跳去验证——缺的正是
   // 让验证通过的那一项,「修复并重试」每点一次都是同一个证书错误。
-  test('F31 §3.2.1 · connectTargets 已切换、未漂移但 Bridge 报配置可升级:先重写配置再验证',
-      () async {
+  test('F31 §3.2.1 · connectTargets 已切换、未漂移但 Bridge 报配置可升级:先重写配置再验证', () async {
     final svc = _RecordingOperations();
     svc.snapshot = _installedOfficialSnapshot(
       switched: {LocalCodingTarget.claudeCli},
@@ -513,7 +540,7 @@ void main() {
     expect(svc.startVerifyCalls, 1);
     expect(svc.lastVerifyScope, LocalCodingVerifyScope.global);
     expect(container.read(localCodingToolsProvider).value!.banner?.title,
-        '接入完成，Codex 已可以使用知办模型 API');
+        '接入完成，Codex 已可以使用自定义模型 API');
   });
 
   test('F31 §3.2.1 · connectTargets 安装损坏:按锁定版本重装,再写配置 + 验证', () async {
@@ -562,9 +589,8 @@ void main() {
     await container.read(localCodingToolsProvider.future);
     final notifier = container.read(localCodingToolsProvider.notifier);
 
-    final error = await notifier
-        .connectTargets([LocalCodingTarget.codexCli]).timeout(
-            const Duration(seconds: 10));
+    final error = await notifier.connectTargets(
+        [LocalCodingTarget.codexCli]).timeout(const Duration(seconds: 10));
     expect((error as LocalCodingToolsException).code,
         'LCT-CODEX_CLI-INSTALL-DOWNLOAD_FAILED');
     expect(svc.switchCalls, 0);
@@ -594,8 +620,9 @@ void main() {
     expect(notifier.connectPlanFor(LocalCodingTarget.claudeDesktop).action,
         LocalCodingProgramAction.upgrade);
     expect(
-        await notifier.connectTargets([LocalCodingTarget.claudeDesktop])
-            .timeout(const Duration(seconds: 10)),
+        await notifier
+            .connectTargets([LocalCodingTarget.claudeDesktop]).timeout(
+                const Duration(seconds: 10)),
         isNull);
     expect(svc.installedTargets, [LocalCodingTarget.claudeDesktop]);
     expect(svc.installModes, [LocalCodingInstallMode.upgrade]);
@@ -609,9 +636,8 @@ void main() {
     await container.read(localCodingToolsProvider.future);
     final notifier = container.read(localCodingToolsProvider.notifier);
 
-    final error = await notifier
-        .connectTargets([LocalCodingTarget.codexDesktop]).timeout(
-            const Duration(seconds: 10));
+    final error = await notifier.connectTargets(
+        [LocalCodingTarget.codexDesktop]).timeout(const Duration(seconds: 10));
     expect((error as LocalCodingToolsException).code, 'shared_config_too_old');
     expect(svc.switchCalls, 0);
     expect(svc.installModes, isEmpty);
@@ -651,8 +677,8 @@ void main() {
     );
     // pollScript 为空时 fake 直接返回 succeeded。
 
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
     await container.read(localCodingToolsProvider.future);
@@ -683,8 +709,7 @@ void main() {
     expect(data.banner?.text, '升级完成，Codex CLI 0.154.0、Codex 桌面端 0.154.0 已可以使用');
   });
 
-  test(
-      '契约 §2.7.4 · upgradeTargets 失败:升级中同厂商再次发起返回 null;失败项带错误码,不出横幅',
+  test('契约 §2.7.4 · upgradeTargets 失败:升级中同厂商再次发起返回 null;失败项带错误码,不出横幅',
       () async {
     final svc = _RecordingOperations();
     svc.snapshot = _catalogSnapshot(availableVersion: '0.154.0');
@@ -705,8 +730,8 @@ void main() {
       ),
     ];
 
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
     await container.read(localCodingToolsProvider.future);
@@ -739,8 +764,8 @@ void main() {
   test('一键上报诊断把本机现场交给支持,返回反馈编号', () async {
     final svc = _RecordingOperations();
     svc.snapshot = _snapshotWithVersion('0.133.0');
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
     await container.read(localCodingToolsProvider.future);
@@ -780,8 +805,8 @@ void main() {
         state: LocalCodingOperationState.running,
         stage: 'l1',
         kind: LocalCodingOperationKind.verify);
-    final container = ProviderContainer(overrides: [
-      localCodingToolsServiceProvider.overrideWithValue(svc)],
+    final container = ProviderContainer(
+      overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
     );
     addTearDown(container.dispose);
     await container.read(localCodingToolsProvider.future);
@@ -813,8 +838,8 @@ void main() {
 }
 
 ProviderContainer _container(_RecordingOperations svc) {
-  final container = ProviderContainer(overrides: [
-    localCodingToolsServiceProvider.overrideWithValue(svc)],
+  final container = ProviderContainer(
+    overrides: [localCodingToolsServiceProvider.overrideWithValue(svc)],
   );
   addTearDown(container.dispose);
   return container;
@@ -1093,10 +1118,10 @@ LocalCodingToolsSnapshot _catalogSnapshot({
                       claudeDesktopThirdPartyUnsupported
                   ? 'LCT-CLAUDE_DESKTOP-DETECT-THIRD_PARTY_UNSUPPORTED'
                   : '',
-          supportsEnable: !(target == LocalCodingTarget.codexCli &&
-                  codexCliTooOld) &&
-              !(target == LocalCodingTarget.claudeDesktop &&
-                  claudeDesktopThirdPartyUnsupported),
+          supportsEnable:
+              !(target == LocalCodingTarget.codexCli && codexCliTooOld) &&
+                  !(target == LocalCodingTarget.claudeDesktop &&
+                      claudeDesktopThirdPartyUnsupported),
           availableVersion: availableVersion,
           updateAvailable: availableVersion.isNotEmpty,
           rollbackVersion: rollbackVersion,

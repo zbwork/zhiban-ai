@@ -137,21 +137,16 @@ void main() {
           options: Options(extra: {'silent': true}));
       fail('expected model error');
     } on DioException catch (error) {
-      expect(error.error, '模型请求格式错误（HTTP 400）。');
+      expect(error.error, '模型请求格式错误（HTTP 400）。（model.request_invalid）');
     } finally {
       dio.close();
     }
   });
 
   test('public auth requests do not trigger global re-login handling', () {
+    expect(isPublicAuthRequestPath('/auth/login/sms'), isTrue);
     expect(
-      isPublicAuthRequestPath('/auth/login/sms'),
-      isTrue
-    );
-    expect(
-      isPublicAuthRequestPath(
-        '/api/agent-bus/v1/auth/register/sms'
-      ),
+      isPublicAuthRequestPath('/api/agent-bus/v1/auth/register/sms'),
       isTrue,
     );
     expect(
@@ -165,14 +160,8 @@ void main() {
   test('session-bound auth requests still trigger global re-login handling',
       () {
     expect(isPublicAuthRequestPath('/auth/me'), isFalse);
-    expect(
-      isPublicAuthRequestPath('/auth/scope/switch'),
-      isFalse
-    );
-    expect(
-      isPublicAuthRequestPath('/chat/conversations'),
-      isFalse
-    );
+    expect(isPublicAuthRequestPath('/auth/scope/switch'), isFalse);
+    expect(isPublicAuthRequestPath('/chat/conversations'), isFalse);
   });
 
   test('204 response accepts the empty bodies Dio may expose', () {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/cupertino.dart';
@@ -81,7 +82,12 @@ class _ChatArtifactCardState extends State<ChatArtifactCard> {
     _thumbnail = null;
     if (!widget.compact && format == 'image' && widget.target.url.isNotEmpty) {
       _loader = widget.loaderFactory?.call() ?? AttachmentPreviewLoader();
-      _thumbnail = _loader!.read(widget.target, 'image');
+      final thumbnail = _loader!.read(widget.target, 'image');
+      // A grouped card can be replaced/disposed before FutureBuilder subscribes.
+      // Observe failures immediately while retaining the original future for UI.
+      unawaited(
+          thumbnail.then<void>((_) {}, onError: (Object _, StackTrace __) {}));
+      _thumbnail = thumbnail;
     }
   }
 

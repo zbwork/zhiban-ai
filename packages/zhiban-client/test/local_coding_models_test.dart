@@ -463,14 +463,14 @@ void main() {
     expect(
         localCodingRelayFailureSummary(
             LocalCodingRelayFailure.upstreamUnavailable, detail),
-        '知办中转站暂时不可用（HTTP 503），不是本机问题，稍后再检测');
+        '你配置的模型服务暂时不可用（HTTP 503），不是本机问题，稍后再检测');
     expect(
         localCodingRelayFailure('LCT-CLAUDE_CLI-GATEWAY-QUOTA_EXHAUSTED', ''),
         LocalCodingRelayFailure.quotaExhausted);
     expect(
         localCodingRelayFailureSummary(
             LocalCodingRelayFailure.quotaExhausted, ''),
-        '知办中转站拒绝了请求，可能是用量已用完或请求过于频繁，稍后再检测');
+        '你配置的模型服务拒绝了请求，可能是用量已用完或请求过于频繁，稍后再检测');
     // 协议不一致只有带着中转站回答时才算中转站的问题;网络、授权失败不算。
     expect(
         localCodingRelayFailure('LCT-CODEX_CLI-GATEWAY-PROTOCOL_MISMATCH', ''),
@@ -490,8 +490,8 @@ void main() {
   // 契约 §2.7 · GATEWAY-UNREACHABLE 的 error_detail(2026-09-17):命令行原话和
   // "探测超时"不是中转站说的,不能标成"中转站返回"。
   test('失败详情只有中转站的 HTTP 回答才标"中转站返回"', () {
-    expect(localCodingErrorDetailLabel('HTTP 503 · upstream overloaded'),
-        '中转站返回');
+    expect(
+        localCodingErrorDetailLabel('HTTP 503 · upstream overloaded'), '中转站返回');
     expect(
         localCodingErrorDetailLabel(
             'API Error: Unable to connect to API: SSL certificate verification failed. Check your proxy or corporate SSL certificates'),
@@ -545,7 +545,8 @@ void main() {
         'LCT-CLAUDE_CLI-GATEWAY-PROXY_DIVERTED', '探测超时（90 秒内没有任何回答）');
     expect(failure, LocalCodingRelayFailure.proxyDiverted);
     expect(localCodingRelayFailureSummary(failure!, ''), contains('代理软件'));
-    expect(localCodingRelayFailure('LCT-CODEX_CLI-GATEWAY-UNREACHABLE', ''), isNull);
+    expect(localCodingRelayFailure('LCT-CODEX_CLI-GATEWAY-UNREACHABLE', ''),
+        isNull);
   });
 
   test('2026-09-20 · 换票被拒要说真话:积分用完 / 模型服务停用不是"授权失效",也不劝人重新接入', () {
@@ -608,7 +609,9 @@ void main() {
       'next_actions': <String>[],
       'result': {
         'verification_level': 'l3',
-        'model_warning': {'error_code': 'LCT-CLAUDE_CLI-GATEWAY-UPSTREAM_UNAVAILABLE'},
+        'model_warning': {
+          'error_code': 'LCT-CLAUDE_CLI-GATEWAY-UPSTREAM_UNAVAILABLE'
+        },
       },
     });
     expect(plain.modelWarning, isNull);

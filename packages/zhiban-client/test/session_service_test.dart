@@ -8,11 +8,17 @@ import 'package:zhiban_client/pages/login/services/auth_api.dart';
 import 'package:zhiban_client/services/session_service.dart';
 import 'package:zhiban_client/services/session_runtime.dart';
 
-String _jwtWithIdentity({required int tenantId, required String accountUuid}) {
+String _jwtWithIdentity(
+    {required int tenantId,
+    required String accountUuid,
+    int aid = 1,
+    String sid = 'session-one'}) {
   String enc(Map<String, Object?> value) =>
       base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
   return '${enc({'alg': 'none'})}.${enc({
         'act_tid': tenantId,
+        'aid': aid,
+        'sid': sid,
         'sub': accountUuid
       })}.sig';
 }
@@ -40,6 +46,55 @@ void main() {
       null,
     );
   });
+
+  for (final mode in [
+    'scope',
+    'login',
+    'other-account',
+    'other-session',
+    'missing-session'
+  ]) {
+    test('refresh persistence boundary: $mode', () async {
+      final oldToken =
+          _jwtWithIdentity(tenantId: 1, accountUuid: 'account-one');
+      final nextToken = _jwtWithIdentity(
+          tenantId: 2,
+          accountUuid: 'account-one',
+          aid: mode == 'other-account' ? 2 : 1,
+          sid: mode == 'missing-session'
+              ? ''
+              : mode == 'other-session'
+                  ? 'another-session'
+                  : 'session-one');
+      SharedPreferences.setMockInitialValues({
+        AppConfig.storageTokenKey: oldToken,
+        AppConfig.storageRefreshTokenKey: 'retained-refresh',
+      });
+      debugAuthConnectedUidOverride = () => null;
+      debugAuthRealtimeLogoutOverride = () async {};
+      debugAuthClearImTokensOverride = () async {};
+      final result = AuthLoginResult(
+          accessToken: nextToken,
+          refreshToken: '',
+          account: const {},
+          actScope: const ScopeOption(kind: 'tenant', tenantId: 2));
+      final operation = persistLoginResultForTest(result,
+          preserveSessionRefresh: mode != 'login');
+      if ((mode.startsWith('other-') || mode == 'missing-session')) {
+        await expectLater(operation, throwsStateError);
+      } else {
+        await operation;
+      }
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(AppConfig.storageRefreshTokenKey),
+          mode == 'login' ? isNull : 'retained-refresh');
+      expect(
+          prefs.getString(AppConfig.storageTokenKey),
+          (mode.startsWith('other-') || mode == 'missing-session')
+              ? oldToken
+              : nextToken);
+    });
+  }
 
   test('clearSessionStorage logs out realtime IM state', () async {
     SharedPreferences.setMockInitialValues({

@@ -38,6 +38,8 @@ export interface ActiveLocalRun {
   attemptedFileDelivery?: boolean;
   attemptedOfficeCreation?: boolean;
   deliverables?: DeliverableRequirement[];
+  /** Host-only prerequisite, inherited from the final delivery gate. */
+  requireDeliveryDeclaration?: boolean;
   recovery: RecoveryState;
   /** Latest unrecovered model failure for this run; set only by the authenticated broker. */
   modelFailure?: ModelFailure;
@@ -95,7 +97,7 @@ export class LocalSupervisor {
     if (!result.fresh) return result;
     const run: ActiveLocalRun = {
       task: structuredClone(task), config: structuredClone(config), policy: new LocalPolicy(task.run, this.opts.onApproval),
-      credential: `sk-local-${randomBytes(32).toString('base64url')}`, controller: new AbortController(), done: Promise.resolve(), artifacts: [], recovery: recoveryState(),
+      credential: `sk-local-${randomBytes(32).toString('base64url')}`, controller: new AbortController(), done: Promise.resolve(), artifacts: [], recovery: recoveryState(), requireDeliveryDeclaration: this.opts.requireDeliveryDeclaration === true,
     };
     if (config.mode === 'ask') run.policy.setMode('ask');
     // Config is supplied exclusively by authenticated App preferences after local confirmation.

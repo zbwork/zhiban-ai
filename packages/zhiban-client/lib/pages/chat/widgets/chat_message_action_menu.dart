@@ -235,11 +235,7 @@ String chatForwardSubtitleOf(ImMessage msg) {
     case ChatMessageAction.copy:
       return (icon: CupertinoIcons.doc_on_doc, label: '复制', danger: false);
     case ChatMessageAction.reply:
-      return (
-        icon: CupertinoIcons.reply,
-        label: '引用',
-        danger: false
-      );
+      return (icon: CupertinoIcons.reply, label: '引用', danger: false);
     case ChatMessageAction.forward:
       return (
         icon: CupertinoIcons.arrowshape_turn_up_right,
@@ -267,11 +263,7 @@ String chatForwardSubtitleOf(ImMessage msg) {
         danger: false,
       );
     case ChatMessageAction.delete:
-      return (
-        icon: CupertinoIcons.trash,
-        label: '删除',
-        danger: true
-      );
+      return (icon: CupertinoIcons.trash, label: '删除', danger: true);
     case ChatMessageAction.cancelUpload:
       return (icon: CupertinoIcons.xmark, label: '取消上传', danger: false);
   }
@@ -458,7 +450,7 @@ class _ChatMessageActionRegionState extends State<ChatMessageActionRegion>
       globalPosition: globalPosition,
       msg: widget.msg,
       isMine: widget.isMine,
-      selectedTextProvider: () => selectionController.selectedText,
+      selectedTextProvider: () => menuSelectedText,
       groupId: menuGroupId,
       safeZone: menuSafeZone,
       menuVisible: menuVisible,

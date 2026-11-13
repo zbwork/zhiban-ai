@@ -31,6 +31,12 @@ class _FakeChatSvc extends OpenClawChatService {
   final List<ConversationItem> items;
 
   @override
+  Future<List<ConversationItem>?> getCachedConversations() async => null;
+
+  @override
+  Future<List<AgentItem>> listAgents() async => [];
+
+  @override
   Future<List<ConversationItem>> listAllConversations({
     int page = 1,
     int pageSize = 40,
@@ -42,59 +48,44 @@ class _FakeChatSvc extends OpenClawChatService {
 void main() {
   group('filterForwardTargets', () {
     test('排除 agent_direct (避免触发 Agent)', () {
-      final r = filterForwardTargets(
-        [
-          _conv(id: 'a', title: '同事 A'),
-          _conv(id: 'b', title: '数字员工 B', kind: 'agent_direct'),
-          _conv(id: 'g', title: '群 C', kind: 'group', channelType: 2),
-        ],
-        ''
-      );
+      final r = filterForwardTargets([
+        _conv(id: 'a', title: '同事 A'),
+        _conv(id: 'b', title: '数字员工 B', kind: 'agent_direct'),
+        _conv(id: 'g', title: '群 C', kind: 'group', channelType: 2),
+      ], '');
       expect(r.map((c) => c.title), ['同事 A', '群 C']);
     });
 
     test('排除无 wukongChannelId 的会话', () {
-      final r = filterForwardTargets(
-        [
-          _conv(id: 'a', title: 'A', channelId: ''),
-          _conv(id: 'b', title: 'B'),
-        ],
-        ''
-      );
+      final r = filterForwardTargets([
+        _conv(id: 'a', title: 'A', channelId: ''),
+        _conv(id: 'b', title: 'B'),
+      ], '');
       expect(r.map((c) => c.title), ['B']);
     });
 
     test('按 title 包含匹配 (大小写不敏感)', () {
-      final r = filterForwardTargets(
-        [
-          _conv(id: 'a', title: 'Alice'),
-          _conv(id: 'b', title: 'Bob'),
-          _conv(id: 'c', title: 'Charlie'),
-        ],
-        'lI'
-      );
+      final r = filterForwardTargets([
+        _conv(id: 'a', title: 'Alice'),
+        _conv(id: 'b', title: 'Bob'),
+        _conv(id: 'c', title: 'Charlie'),
+      ], 'lI');
       // 'lI' → 'li' 匹配 Alice 和 Charlie
       expect(r.map((c) => c.title).toList(), ['Alice', 'Charlie']);
     });
 
     test('空 query → 返回全部 (符合条件)', () {
-      final r = filterForwardTargets(
-        [
-          _conv(id: 'a', title: 'A'),
-          _conv(id: 'b', title: 'B'),
-        ],
-        '   '
-      );
+      final r = filterForwardTargets([
+        _conv(id: 'a', title: 'A'),
+        _conv(id: 'b', title: 'B'),
+      ], '   ');
       expect(r.length, 2);
     });
   });
 
   group('filteredVisibleSelection (CR-B3 多目标搜索保留选中)', () {
     test('全部可见时返回原集合', () {
-      final visible = [
-        _conv(id: 'a', title: 'A'),
-        _conv(id: 'b', title: 'B')
-      ];
+      final visible = [_conv(id: 'a', title: 'A'), _conv(id: 'b', title: 'B')];
       final r = filteredVisibleSelection({'a', 'b'}, visible);
       expect(r, {'a', 'b'});
     });

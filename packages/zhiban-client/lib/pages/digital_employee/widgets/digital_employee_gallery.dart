@@ -1,3 +1,4 @@
+import 'package:zhiban_client/config/catalog_layout.dart';
 import 'dart:async';
 
 import 'package:bot_toast/bot_toast.dart';
@@ -40,6 +41,7 @@ class OpenClawDigitalEmployeeGallery extends ConsumerStatefulWidget {
     this.showCreateCard = true,
     this.detailActionLabel = '去聊天',
     this.publicTemplates = const [],
+    this.publicTemplatesLoading = false,
     this.onAddPublicTemplate,
   });
 
@@ -67,6 +69,7 @@ class OpenClawDigitalEmployeeGallery extends ConsumerStatefulWidget {
   final bool showCreateCard;
   final String detailActionLabel;
   final List<AgentItem> publicTemplates;
+  final bool publicTemplatesLoading;
   final Future<void> Function(AgentItem)? onAddPublicTemplate;
 
   @override
@@ -704,7 +707,11 @@ class OpenClawDigitalEmployeeGalleryState
       return const DigitalEmployeeGallerySkeleton(mobile: false);
     }
 
-    final filtered = catalog.itemsFor(ref.watch(digitalEmployeeFilterProvider));
+    final filter = ref.watch(digitalEmployeeFilterProvider);
+    final filtered = catalog.itemsFor(filter);
+    final publicLoading = widget.publicTemplatesLoading &&
+        (filter == DigitalEmployeeCatalogFilter.all ||
+            filter == DigitalEmployeeCatalogFilter.platform);
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
       child: Padding(
@@ -739,7 +746,9 @@ class OpenClawDigitalEmployeeGalleryState
                       ),
                     ],
                   ),
-                if (filtered.isEmpty && !widget.showCreateCard)
+                if (filtered.isEmpty &&
+                    !widget.showCreateCard &&
+                    !publicLoading)
                   const SizedBox(
                     height: 180,
                     child: Center(child: Text('暂无匹配的数字员工')),
@@ -761,6 +770,12 @@ class OpenClawDigitalEmployeeGalleryState
                           onDelete: () => _deleteAgent(entry.agent),
                         ),
                       ),
+                    if (publicLoading)
+                      for (var i = 0; i < 4; i++)
+                        SizedBox(
+                          width: cardWidth,
+                          child: const AgentCardSkeleton(),
+                        ),
                     if (widget.showCreateCard)
                       SizedBox(
                         width: cardWidth,
@@ -993,7 +1008,7 @@ class _DigitalEmployeeFilterBar extends ConsumerWidget {
 // ============================ 网格布局 ============================
 
 const double _desktopAgentCardMinWidth = 292;
-const double _desktopAgentGridGap = 12;
+const double _desktopAgentGridGap = desktopCatalogCardGap;
 
 @visibleForTesting
 int debugResolveDesktopAgentColumnCount(double availableWidth) {

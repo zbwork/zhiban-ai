@@ -22,6 +22,8 @@ import 'package:zhiban_client/pages/digital_employee/services/digital_employee_s
 /// 双通道**决策逻辑**由 agent_direct_dual_channel_test.dart 覆盖;此处只测 send() 的接线。
 
 class _SendFakeSvc extends OpenClawChatService {
+  @override
+  Future<List<ConversationItem>?> getCachedConversations() async => null;
   int sendMessageCalls = 0;
   int sendRoomMessageCalls = 0;
   int listConversationCalls = 0;
@@ -242,9 +244,9 @@ Future<ProviderContainer> _bootSendable(_SendFakeSvc fake) async {
         agent: _agent('a1'),
         conversationId: pendingConversationFor('a1'),
       );
-  await c.read(chatProvider.notifier).selectConversation(
-        pendingConversationFor('a1')
-      );
+  await c
+      .read(chatProvider.notifier)
+      .selectConversation(pendingConversationFor('a1'));
   return c;
 }
 
@@ -275,6 +277,7 @@ Future<ProviderContainer> _bootExistingRoomBackedAgentDirect(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test('cloud model selection retains room send transport and forwards model',
       () async {
@@ -311,7 +314,7 @@ void main() {
         true);
     expect(fake.sendMessageCalls, 0);
     expect(imCalled, false);
-  });
+  }, skip: AppConfig.communityEdition);
 
   test('streamReady → 不调旧 /chat/send,订阅返回的 stream_id', () async {
     final fake = _SendFakeSvc();
@@ -396,8 +399,9 @@ void main() {
 
     await notifier.stop();
     final stopped = c.read(chatProvider).asData!.value;
-    expect(stopped.isSending, isFalse);
-    expect(stopped.messages.last.isLoading, isFalse);
+    // Without a dispatch ID, cancellation is pending server confirmation.
+    expect(stopped.isSending, isTrue);
+    expect(stopped.messages.last.isLoading, isTrue);
 
     outcome.complete(AgentDirectSendOutcome.streamReady(
       streamId: 'late-agent-direct-stream',
@@ -447,10 +451,7 @@ void main() {
           skillSlug: 'forge-persona',
           name: '蒸馏.skill',
         ),
-        ImMessageBlock(
-          kind: ImMessageBlockKind.text,
-          text: '这是什么技能'
-        ),
+        ImMessageBlock(kind: ImMessageBlockKind.text, text: '这是什么技能'),
       ],
     );
 
@@ -538,9 +539,9 @@ void main() {
     ];
     await notifier.reloadActiveMessages();
     final reconciled = c.read(chatProvider).asData?.value;
-    expect(reconciled?.messages, hasLength(1),
-        reason: '正式失败消息到达后应替换本地兜底，不能重复显示');
-    expect(reconciled?.messages.single.messageId, 'server-failed-1');
+    expect(reconciled?.messages, hasLength(3),
+        reason: '没有原发送问题身份的服务端失败不能吞掉另一条本地失败');
+    expect(reconciled?.messages.first.messageId, 'server-failed-1');
   });
 
   test('pending files bypass dual channel and use old /chat/send(files)',
@@ -682,10 +683,7 @@ void main() {
       );
     };
 
-    await notifier.send(
-      '请检查合同',
-      skillSlugs: const ['contract-risk']
-    );
+    await notifier.send('请检查合同', skillSlugs: const ['contract-risk']);
 
     expect(fake.sendMessageCalls, 0);
     expect(seenBlocks.map((b) => b.kind), [

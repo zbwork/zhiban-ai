@@ -77,6 +77,8 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 		mux.Handle("GET /api/agent-bus/v1/skill-categories", authT(http.HandlerFunc(h.Catalog.Categories)))
 	}
 	if h.Cron != nil {
+		mux.Handle("GET /api/agent-bus/v1/cron/prompt-templates", authT(http.HandlerFunc(h.Cron.ListPromptTemplates)))
+		mux.Handle("GET /api/agent-bus/v1/cron/prompt-templates/{uuid}/variables", authT(http.HandlerFunc(h.Cron.GetPromptTemplateVariables)))
 		mux.Handle("GET /api/agent-bus/v1/cron/jobs", authT(http.HandlerFunc(h.Cron.ListJobs)))
 		mux.Handle("POST /api/agent-bus/v1/cron/jobs", authT(http.HandlerFunc(h.Cron.CreateJob)))
 		mux.Handle("GET /api/agent-bus/v1/cron/jobs/{uuid}", authT(http.HandlerFunc(h.Cron.GetJob)))

@@ -59,8 +59,13 @@ StackTrace flutterErrorDetailsStack(FlutterErrorDetails details) {
   final lines = text.split('\n');
   final marker =
       lines.indexWhere((line) => line.contains('error-causing widget'));
-  final location =
-      marker >= 0 && marker + 1 < lines.length ? lines[marker + 1].trim() : '';
+  final locationLines = marker >= 0
+      ? lines.skip(marker + 1).take(6).map((line) => line.trim()).toList()
+      : const <String>[];
+  final sourceLine = locationLines
+      .where((line) => RegExp(r'\.dart:\d+:\d+').hasMatch(line))
+      .firstOrNull;
+  final location = sourceLine ?? (locationLines.firstOrNull ?? '');
   return StackTrace.fromString(location.isEmpty ? text : '$location\n$text');
 }
 
@@ -162,10 +167,10 @@ class AnalyticsEventSanitizer {
     final type = _truncate(error.runtimeType.toString(), 128);
     final safeMessage = _truncate(_redact(error.toString()), 512);
     final safeStack = _truncate(_redact(stack.toString()), 8192);
-    final firstFrame = safeStack.split('\n').first.replaceAll(
-          RegExp(r':[0-9]+:[0-9]+'),
-          ':#:#'
-        );
+    final firstFrame = safeStack
+        .split('\n')
+        .first
+        .replaceAll(RegExp(r':[0-9]+:[0-9]+'), ':#:#');
     final fingerprint =
         sha256.convert(utf8.encode('$type\n$firstFrame')).toString();
     return {

@@ -44,6 +44,29 @@ test('broker normalizes only the default Responses tool choice before BYOK forwa
   } finally { await broker.close(); }
 });
 
+test('file prerequisite refuses before side effects, permits reads and resumes after explicit declaration', async () => {
+  let executed = 0;
+  const run = { task: { run: 'delivery-prerequisite' }, requireDeliveryDeclaration: true, controller: new AbortController(),
+    policy: { execute: async (_request, call, signal) => { executed++; return call(signal); } } };
+  const tools = [
+    { name: 'write_file', description: '', operation: 'write', schema: z.object({path:z.string(),text:z.string()}).strict(), inputSchema: {}, call: async () => ({ok:true}) },
+    { name: 'read_file', description: '', operation: 'read', schema: z.object({path:z.string()}).strict(), inputSchema: {}, call: async () => ({text:'read-only'}) },
+    { name: 'declare_deliverables', description: '', operation: 'read', schema: z.object({files:z.array(z.object({name:z.string()}))}), inputSchema: {}, call: async (_run,args) => { run.deliverables=args.files; return {ok:true}; } },
+  ];
+  const broker = new DesktopBroker({supervisor:()=>({authorize:()=>run}),tools,model:async()=>{throw new Error('unexpected model call');}});
+  const base=await broker.listen();
+  const call=async(name,args)=>(await fetch(base+'/worker/tools/call',{method:'POST',headers:{authorization:'Bearer fixture','content-type':'application/json'},body:JSON.stringify({name,arguments:args})})).json();
+  try {
+    const refused=await call('write_file',{path:'result.txt',text:'verified'});
+    assert.equal(refused.isError,true);assert.match(refused.content[0].text,/local.delivery_declaration_required/);assert.equal(executed,0);
+    assert.equal((await call('read_file',{path:'input.txt'})).isError,false);assert.equal(executed,1);
+    await call('declare_deliverables',{files:[{name:'result.txt'}]});
+    assert.equal((await call('write_file',{path:'result.txt',text:'verified'})).isError,false);assert.equal(executed,3);
+    run.deliverables=undefined;run.requireDeliveryDeclaration=false;
+    assert.equal((await call('write_file',{path:'legacy.txt',text:'legacy'})).isError,false);assert.equal(executed,4);
+  } finally {await broker.close();}
+});
+
 test('Responses final ID is inherited only from an unambiguous identity on this stream', async () => {
   const { normalizeResponsesTools } = await import(pathToFileURL(join(packageRoot, 'dist/desktop/responses-tools.js')));
   const stream = events => new Response(events.map(e => 'data: ' + JSON.stringify(e) + '\n\n').join(''), {headers:{'content-type':'text/event-stream'}});
@@ -184,7 +207,7 @@ test('model proxy rejects redirects, nonlocal HTTP, model mismatch and protocol 
   } finally { server.closeAllConnections(); server.close(); }
 });
 
-for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'codex-missing-response-id', 'codex-home-parent', 'ask', 'full', 'full-unconfirmed', 'codex-ask', 'codex-full']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
+for (const mode of ['allow', 'no-declaration', 'legacy-official', 'deny', 'cancel', 'codex', 'codex-missing-response-id', 'codex-home-parent', 'ask', 'full', 'full-unconfirmed', 'codex-ask', 'codex-full']) test('real engine file/shell policy: ' + mode, { timeout: 120000 }, async () => {
   // Exercise user-profile ancestry without reading or changing real config.
   const root = await realpath(await mkdtemp(join(mode === 'codex-home-parent' ? homedir() : tmpdir(), 'community-runtime-test-')));
   let calls = 0;
@@ -227,6 +250,10 @@ for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'code
       ['read_file', { path: 'hello.txt' }],
       ['local_shell', { command: process.platform === 'win32' ? `[IO.File]::WriteAllText('shell-result.txt','shell-ok'); Write-Output 'shell-ok'` : 'printf shell-ok > shell-result.txt; printf shell-ok', timeout_ms: 10000 }],
     ];
+    if (mode === 'no-declaration') {
+      steps.splice(5, 1);
+      steps[5] = ['local_shell', { command: process.platform === 'win32' ? "[IO.File]::WriteAllText('hello.txt','community-ok')" : 'printf community-ok > hello.txt', timeout_ms: 10000 }];
+    }
     const step = steps[calls++];
     if (mode.startsWith('codex')) {
       assert.notEqual(body.tool_choice, 'auto');
@@ -269,7 +296,7 @@ for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'code
       if (event.type === 'approval') {
         approved = true;
         const path = mode === 'cancel' ? '/app/runs/' + run + '/cancel' : '/app/runs/' + run + '/approvals/' + event.id;
-        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'legacy-official', 'codex', 'codex-missing-response-id', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode), scope: 'once' }) }).catch(reject);
+        fetch(broker + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(mode === 'cancel' ? { fence: 1 } : { revision: event.revision, approved: ['allow', 'no-declaration', 'legacy-official', 'codex', 'codex-missing-response-id', 'codex-home-parent', 'ask', 'full', 'codex-ask', 'codex-full'].includes(mode), scope: 'once' }) }).catch(reject);
       }
       if (event.type === 'error') { if (mode === 'full-unconfirmed') resolve(event); else reject(new Error(event.code)); }
       if (event.type === 'result') resolve(event);
@@ -283,6 +310,12 @@ for (const mode of ['allow', 'legacy-official', 'deny', 'cancel', 'codex', 'code
       assert.equal(result.code, 'local.full_confirmation_required');
       assert.equal(calls, 0);
       await assert.rejects(readFile(join(customWorkspace, 'hello.txt')));
+      return;
+    }
+    if (mode === 'no-declaration') {
+      assert.equal(result.frame.event, 'message.failed');
+      assert.equal(result.frame.data.error_code, 'zap.deliverable_verification_failed');
+      assert.equal(await readFile(join(workspace, 'hello.txt'), 'utf8'), 'community-ok');
       return;
     }
     assert.equal(result.frame.event, mode === 'cancel' ? 'message.cancelled' : 'message.completed', JSON.stringify(result));

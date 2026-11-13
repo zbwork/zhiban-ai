@@ -16,6 +16,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(RichMessageClipboard.clear);
 
+  testWidgets('community server composer hides the removed AI disclaimer',
+      (tester) async {
+    final controller = RichPromptController();
+    final focus = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focus.dispose);
+    await tester.pumpWidget(_host(controller: controller, focusNode: focus));
+    expect(find.text('内容由AI生成，请仔细甄别'), findsNothing);
+  });
+
   testWidgets('local toolbar hides server tools and retains local tools',
       (tester) async {
     final controller = RichPromptController();

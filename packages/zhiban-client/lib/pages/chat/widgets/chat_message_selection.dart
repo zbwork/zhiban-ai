@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show AdaptiveTextSelectionToolbar;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart' show RenderBox, SelectedContent;
@@ -212,6 +213,9 @@ class _ChatSelectableSurfaceState extends State<ChatSelectableSurface> {
         focusNode: _standaloneFocusNode!,
         selectionControls: _chatTextSelectionHandleControls,
         onSelectionChanged: widget.onSelectionChanged,
+        contextMenuBuilder: (context, region) =>
+            AdaptiveTextSelectionToolbar.selectableRegion(
+                selectableRegionState: region),
         child: widget.child,
       );
     }
@@ -246,6 +250,9 @@ class _ChatSelectableSurfaceState extends State<ChatSelectableSurface> {
 /// 由这里触发,不存在两条手势路径互相竞争的问题。
 mixin ChatSelectionGestureMixin<T extends StatefulWidget> on State<T> {
   final ChatSelectionController selectionController = ChatSelectionController();
+  String? _secondarySelectionText;
+  String get menuSelectedText =>
+      _secondarySelectionText ?? selectionController.selectedText;
 
   /// 传给气泡自己的 [TapRegion] 和 [showChatFeishuMenu] 的 `groupId`,让两者
   /// 算同一个 tap region 组——选区手柄画在 Overlay 里,不是气泡子树的一部分,
@@ -320,6 +327,7 @@ mixin ChatSelectionGestureMixin<T extends StatefulWidget> on State<T> {
       selectionController.onSelectionActivity = _handleSelectionActivity;
     }
     await showMenu(globalPosition, menuVisible: menuVisible);
+    _secondarySelectionText = null;
     selectionController.onSelectionActivity = null;
     _dragSettleTimer?.cancel();
     _menuVisible = null;
@@ -346,6 +354,7 @@ mixin ChatSelectionGestureMixin<T extends StatefulWidget> on State<T> {
 
   void _onSecondaryPointerDown(Offset globalPosition) {
     if (!hasAnyAction) return;
+    _secondarySelectionText = selectionController.selectedText;
     unawaited(_open(globalPosition));
   }
 
@@ -460,7 +469,7 @@ class _ChatLocalMessageActionRegionState
     }
     final item = widget.items[index];
     // 点「复制」这一刻现读——弹菜单之后用户还能拖手柄改选区。
-    final liveText = selectionController.selectedText;
+    final liveText = menuSelectedText;
     if (item.isCopy && liveText.isNotEmpty) {
       unawaited(copyChatMessageText(liveText));
     } else {

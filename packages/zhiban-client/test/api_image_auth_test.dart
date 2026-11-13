@@ -1,7 +1,11 @@
+import 'package:zhiban_client/config/app_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zhiban_client/network/api_image_auth.dart';
 
 void main() {
+  setUp(
+      () => AppConfig.serverApiUrl = 'http://127.0.0.1:8080/api/agent-bus/v1');
+  tearDown(() => AppConfig.serverApiUrl = null);
   group('api image auth helpers', () {
     test('message-files paths require auth and resolve under agent-bus base',
         () {

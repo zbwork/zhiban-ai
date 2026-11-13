@@ -55,7 +55,7 @@ class ConversationModelSources {
     }
     final catalog = await const ModelCatalogLoader().load();
     final entry = catalog.providers.firstWhere((p) => p.id == 'beebridge');
-    final current = await store.loadProviders();
+    final current = await store.loadManagedProviders(scope);
     final existing =
         current.where((p) => p.catalogId == 'beebridge').firstOrNull;
     final provider = existing ??
@@ -239,8 +239,8 @@ class ConversationModelSources {
 /// capability uses sub (account UUID). Never mix their preference partitions.
 String? modelConfigurationAccount(String token) {
   try {
-    final payload = jsonDecode(utf8.decode(
-      base64Url.decode(base64Url.normalize(token.split('.')[1]))),
+    final payload = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(token.split('.')[1]))),
     );
     final aid = payload is Map ? payload['aid'] : null;
     if (aid is int && aid > 0) return '$aid';

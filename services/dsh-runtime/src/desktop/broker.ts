@@ -111,6 +111,10 @@ export class DesktopBroker {
         ? 'local.invalid_tool_arguments: Office 参数无效，尚未进入审批，未写入文件。生成 Word 必须传 kind="docx"、相对文件名 path、标题 title 和正文段落数组 paragraphs；请补齐参数后重新调用。'
         : `local.invalid_tool_arguments: ${toolArgumentIssues(parsed.error, tool.inputSchema)}。尚未进入审批或执行，请修正这些字段后重试。` }], isError: true };
       const args = parsed.data;
+      if (run.requireDeliveryDeclaration && run.deliverables === undefined
+        && ['write_file', 'edit_file', 'publish_artifact'].includes(tool.name)) {
+        return { isError: true, content: [{ type: 'text', text: 'local.delivery_declaration_required: 尚未执行本次文件操作。请先调用 declare_deliverables 声明本轮完整结果清单，单个文件也需要声明；再继续本次操作。不要重做已经成功的文件操作。' }] };
+      }
       if (['write', 'overwrite', 'shell'].includes(tool.operation)) run.attemptedFileDelivery = true;
       if (tool.name === 'office_create') run.attemptedOfficeCreation = true;
       if (input.name === 'list_files') {

@@ -177,12 +177,15 @@ void main() {
         )
         .evaluate()
         .isNotEmpty;
-    expect(sidebarAgentText, isTrue);
+    expect(sidebarAgentText, isFalse);
 
-    expect(_styleOf(tester, find.text('组织架构')).fontSize, 15);
+    expect(_styleOf(tester, find.text('组织架构')).fontSize,
+        contactsSidebarSectionLabelTextSize);
     expect(_styleOf(tester, find.text('科技中心')).fontSize, 15);
 
-    await tester.tap(find.byIcon(CupertinoIcons.chevron_right).first);
+    await tester.tap(find.text('科技中心').first);
+    await tester.pump();
+    await tester.tap(find.text('研发部').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
@@ -192,8 +195,8 @@ void main() {
 
     expect(find.text('通讯录'), findsNothing);
     expect(
-      _stylesOf(tester, find.text('组织架构'))
-          .every((style) => style?.fontSize == 15),
+      _stylesOf(tester, find.text('组织架构')).any(
+          (style) => style?.fontSize == contactsSidebarSectionLabelTextSize),
       isTrue,
     );
     expect(find.text('共 2 项'), findsNothing);
@@ -249,8 +252,8 @@ void main() {
     expect(
       _stylesOf(tester, find.text('企业创建的')).any(
         (style) =>
-            style?.color == const Color(0xFF165DFF) &&
-            style?.fontWeight == FontWeight.w900,
+            style?.color == contactsSidebarAccentColor &&
+            style?.fontWeight == FontWeight.w600,
       ),
       isTrue,
     );

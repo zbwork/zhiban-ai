@@ -1,3 +1,4 @@
+import 'package:zhiban_client/config/catalog_layout.dart';
 import 'package:zhiban_client/pages/skills/widgets/skills_feedback.dart';
 import 'package:zhiban_client/pages/skills/models/skill_models.dart';
 import 'package:zhiban_client/pages/skills/providers/skills_providers.dart';
@@ -66,8 +67,8 @@ class SkillsContent extends StatelessWidget {
           itemCount: state.skills.length,
           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
             maxCrossAxisExtent: 360,
-            mainAxisSpacing: 14,
-            crossAxisSpacing: 18,
+            mainAxisSpacing: desktopCatalogCardGap,
+            crossAxisSpacing: desktopCatalogCardGap,
             // 设计稿版式：30(上下padding) + 56(icon 头行) + 12
             // + ≤39(2行描述) + 10 + 36(在用/添加行) + 23(分隔) + ≤38(2行示例) ≈ 244。
             mainAxisExtent: 246,

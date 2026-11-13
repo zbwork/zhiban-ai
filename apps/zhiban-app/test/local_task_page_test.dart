@@ -123,7 +123,7 @@ void main() {
                   }))));
       await settle(tester);
       expect(find.text('任务列表'), findsOneWidget);
-      expect(find.textContaining('关闭后暂停'), findsOneWidget);
+      expect(find.textContaining('关闭后暂停'), findsNothing);
       await tester.tap(find.text('新建'));
       await settle(tester);
       expect(find.byType(TaskEditorDialog), findsOneWidget);

@@ -124,6 +124,7 @@ void main() {
         final query = Completer<AppUpdateInfo?>();
         var fetches = 0;
         final coordinator = DesktopUpdateCoordinator(
+            updatesEnabled: true,
             cache: cache(),
             fetchInfo: () {
               fetches++;

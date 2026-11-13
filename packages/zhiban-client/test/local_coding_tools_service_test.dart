@@ -9,10 +9,7 @@ void main() {
   const credentialId = '22222222-2222-4222-8222-222222222222';
   const deviceCredential = 'lctd.$credentialId.'
       'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV';
-  const profiles = {
-    'codex_cli': 'codex-v1',
-    'claude_cli': 'claude-v1'
-  };
+  const profiles = {'codex_cli': 'codex-v1', 'claude_cli': 'claude-v1'};
 
   test('project launch uses picker bookmark and one initialized session',
       () async {
@@ -21,6 +18,7 @@ void main() {
       ..configuredTargets.add(LocalCodingTarget.claudeCli)
       ..configurationProfileVersions[LocalCodingTarget.claudeCli] = 'claude-v1';
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -67,6 +65,7 @@ void main() {
   test('cancelled project picker does not open bridge', () async {
     final events = <String>[];
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(_FakeSession(events: events), events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -94,6 +93,7 @@ void main() {
     final events = <String>[];
     final session = _FakeSession(events: events, authorizationPresent: false);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(
         events: events,
@@ -153,6 +153,7 @@ void main() {
         'codex-old';
     session.authorizationProfileVersions['codex_cli'] = 'codex-old';
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(
         events: events,
@@ -193,11 +194,10 @@ void main() {
   test('one click stops before planning when managed file is in conflict',
       () async {
     final events = <String>[];
-    final session = _FakeSession(
-      events: events,
-      authorizationPresent: false
-    )..conflictTargets.add(LocalCodingTarget.codexCli);
+    final session = _FakeSession(events: events, authorizationPresent: false)
+      ..conflictTargets.add(LocalCodingTarget.codexCli);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -220,12 +220,7 @@ void main() {
       )),
     );
 
-    expect(events, [
-      'open',
-      'status',
-      'config.status.codex_cli',
-      'close'
-    ]);
+    expect(events, ['open', 'status', 'config.status.codex_cli', 'close']);
   });
 
   test('registers with prepare HTTP commit ordering in the same session',
@@ -233,6 +228,7 @@ void main() {
     final events = <String>[];
     final session = _FakeSession(events: events);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(
         events: events,
@@ -280,6 +276,7 @@ void main() {
     final events = <String>[];
     final session = _FakeSession(events: events);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(
         events: events,
@@ -322,6 +319,7 @@ void main() {
     final events = <String>[];
     final session = _FakeSession(events: events, failCommit: true);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(
         events: events,
@@ -359,6 +357,7 @@ void main() {
     final pendingStore = _MemoryPendingRevocationStore();
     final session = _FakeSession(events: events);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events, failRevoke: true),
       deviceIdLoader: () async => deviceId,
@@ -400,6 +399,7 @@ void main() {
         'network.proxy_status'
       };
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -445,6 +445,7 @@ void main() {
     final session = _FakeSession(events: events)
       ..unreadableTargets.add(LocalCodingTarget.codexCli);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -483,6 +484,7 @@ void main() {
     final session = _FakeSession(events: events)
       ..unsafeTargets.add(LocalCodingTarget.codexCli);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -524,6 +526,7 @@ void main() {
       );
     final session = _FakeSession(events: events);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(
         events: events,
@@ -557,6 +560,7 @@ void main() {
     final pendingStore = _MemoryPendingRevocationStore();
     final session = _FakeSession(events: events, failClear: true);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -612,6 +616,7 @@ void main() {
       );
     final session = _FakeSession(events: events);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -635,6 +640,7 @@ void main() {
       () async {
     final events = <String>[];
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(
         _FakeSession(events: events),
         events,
@@ -672,6 +678,7 @@ void main() {
     );
     final catalogApi = _FakeCatalogApi(events: events, catalog: signed);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       catalogApi: catalogApi,
@@ -713,6 +720,7 @@ void main() {
     // 老 Bridge 不支持 catalog.apply:既不拉目录也不下发。
     final legacy = _FakeSession(events: events);
     final legacyService = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(legacy, events),
       api: _FakeApi(events: events),
       catalogApi: _FakeCatalogApi(events: events, catalog: signed),
@@ -741,6 +749,7 @@ void main() {
       ..supported = {..._FakeSession(events: []).supported, 'catalog.apply'};
     final catalogApi = _FakeCatalogApi(events: events, catalog: null);
     LocalCodingToolsService build() => LocalCodingToolsService(
+          communityConfiguration: false,
           bridgeFactory: _FakeSessionFactory(session, events),
           api: _FakeApi(events: events),
           catalogApi: catalogApi,
@@ -803,6 +812,7 @@ void main() {
       ),
     ];
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -862,6 +872,7 @@ void main() {
       ),
     ];
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -900,6 +911,7 @@ void main() {
         kind: LocalCodingOperationKind.verify,
       );
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(
         events: events,
@@ -972,6 +984,7 @@ void main() {
         errorCode: 'LCT-CODEX_CLI-INSTALL-SYSTEM_CANCELLED',
       );
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -998,6 +1011,7 @@ void main() {
     final session = _FakeSession(events: events)
       ..nextInstallPlanError = 'LCT-CODEX_CLI-INSTALL-ALREADY_INSTALLED';
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -1027,6 +1041,7 @@ void main() {
     final events = <String>[];
     final session = _FakeSession(events: events)..failSwitchExecuteTimes = 1;
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -1057,6 +1072,7 @@ void main() {
     final events = <String>[];
     final session = _FakeSession(events: events)..failSwitchExecuteTimes = 5;
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -1088,6 +1104,7 @@ void main() {
     final events = <String>[];
     final session = _FakeSession(events: events);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -1130,6 +1147,7 @@ void main() {
     final events = <String>[];
     final session = _FakeSession(events: events);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -1173,6 +1191,7 @@ void main() {
     final events = <String>[];
     final session = _FakeSession(events: events);
     final service = LocalCodingToolsService(
+      communityConfiguration: false,
       bridgeFactory: _FakeSessionFactory(session, events),
       api: _FakeApi(events: events),
       deviceIdLoader: () async => deviceId,
@@ -1208,10 +1227,11 @@ void main() {
       _MemoryReconnectStore? store,
     }) {
       final events = <String>[];
-      final session =
-          _FakeSession(events: events, authorizationPresent: authorizationPresent);
+      final session = _FakeSession(
+          events: events, authorizationPresent: authorizationPresent);
       final reconnectStore = store ?? _MemoryReconnectStore();
       final service = LocalCodingToolsService(
+        communityConfiguration: false,
         bridgeFactory: _FakeSessionFactory(session, events),
         api: _FakeApi(
           events: events,
@@ -1268,7 +1288,8 @@ void main() {
 
       expect(await t.service.reconnectIfSameIdentity(), isTrue);
       expect(t.events.where((e) => e == 'http.register'), hasLength(1));
-      expect(t.events, containsAllInOrder(['prepare', 'http.register', 'commit']));
+      expect(
+          t.events, containsAllInOrder(['prepare', 'http.register', 'commit']));
       expect(t.events.where((e) => e.startsWith('detect.')), isEmpty);
     });
 
@@ -1348,6 +1369,7 @@ void main() {
       final session = _FakeSession(events: events, authorizationPresent: false)
         ..switchedGlobalTargets.add(LocalCodingTarget.codexCli);
       final service = LocalCodingToolsService(
+        communityConfiguration: false,
         bridgeFactory: _FakeSessionFactory(session, events),
         // registration 为空:registerDevice 会抛。
         api: _FakeApi(events: events),

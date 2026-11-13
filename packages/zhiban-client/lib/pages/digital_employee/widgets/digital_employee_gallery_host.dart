@@ -24,6 +24,7 @@ class DigitalEmployeeGalleryHost extends ConsumerStatefulWidget {
     this.filterTrailing,
     this.refreshCatalogOnMount = true,
     this.publicTemplates = const [],
+    this.publicTemplatesLoading = false,
     this.onAddPublicTemplate,
   });
 
@@ -32,6 +33,7 @@ class DigitalEmployeeGalleryHost extends ConsumerStatefulWidget {
   final Widget? filterTrailing;
   final bool refreshCatalogOnMount;
   final List<AgentItem> publicTemplates;
+  final bool publicTemplatesLoading;
   final Future<void> Function(AgentItem)? onAddPublicTemplate;
 
   @override
@@ -74,6 +76,7 @@ class DigitalEmployeeGalleryHostState
       mobileFilterEnabled: widget.mobileFilterEnabled,
       filterTrailing: widget.filterTrailing,
       publicTemplates: widget.publicTemplates,
+      publicTemplatesLoading: widget.publicTemplatesLoading,
       onAddPublicTemplate: widget.onAddPublicTemplate,
       requestCreateAgentDraft: (ctx) => widget.mobile
           ? ctx.push<CreateAgentDraft>(

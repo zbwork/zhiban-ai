@@ -121,7 +121,7 @@ void main() {
     });
 
     testWidgets(
-        'agent requires description and skills before returning draft ($compact)',
+        'agent requires description and allows optional skills ($compact)',
         (tester) async {
       CreateAgentDraft? result;
       await _mount(
@@ -152,12 +152,12 @@ void main() {
       expect(result, isNull);
       expect(find.byType(CreateAgentEditor), findsOneWidget);
       expect(find.text('请输入主要职责'), findsOneWidget);
-      expect(find.text('请至少选择一项核心技能'), findsOneWidget);
+      expect(find.text('请至少选择一项核心技能'), findsNothing);
       await _enter(tester, '例如：帮助处理招聘流程与候选人答疑', '   ');
       expect(find.text('请输入主要职责'), findsOneWidget);
       await _enter(tester, '例如：帮助处理招聘流程与候选人答疑', '汇总日报');
       expect(find.text('请输入主要职责'), findsNothing);
-      expect(find.text('请至少选择一项核心技能'), findsOneWidget);
+      expect(find.text('请至少选择一项核心技能'), findsNothing);
       // Complete the real picker flow, then remove/reselect to revalidate.
       Future<void> pickSkill() async {
         await tester.ensureVisible(find.text('选择技能'));
@@ -173,7 +173,7 @@ void main() {
       await tester.ensureVisible(find.byIcon(Icons.close_rounded));
       await tester.tap(find.byIcon(Icons.close_rounded));
       await tester.pumpAndSettle();
-      expect(find.text('请至少选择一项核心技能'), findsOneWidget);
+      expect(find.text('请至少选择一项核心技能'), findsNothing);
       await pickSkill();
       await tester.tap(find.text('创建数字员工').last);
       await tester.pumpAndSettle();

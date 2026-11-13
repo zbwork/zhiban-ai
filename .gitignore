@@ -5,7 +5,11 @@
 __pycache__/
 *.py[cod]
 
+# Generated Dart package metadata and caches
+.dart_tool/
+
 # Web dependencies and generated community bundles
 node_modules/
 /apps/agent-bus-admin/dist/
 /apps/agent-bus-admin/dist-community/
+/services/dsh-runtime/dist/

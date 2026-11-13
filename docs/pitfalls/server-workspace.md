@@ -87,6 +87,37 @@
 
 - 本地工具目录新接线使用上游 howett.net/plist v1.0.1，公开模块遗漏时 go 可能先尝试读取无关 difflib.mod 并超时。先检查新增 import 与上游依赖，补同版本 require/checksum 和导出 overlay；用 GOPROXY=off 验证已有缓存，不改业务逻辑规避解析库。
 
+
+## 本机 Docker 软件源 HTTP 不通（2026-11-12）
+
+当前主机 curl HTTPS Debian Release 成功，HTTP 超时，Docker apt 对 deb.debian.org:80 的请求无法连接到解析出的 198.18 地址，导致文档解析依赖安装失败。构建使用官方 Go 基础层中的 CA bundle，引导 Debian slim 通过 HTTPS 源安装标准证书包及原解析依赖；保持 TLS 校验，不删 Office/PDF/OCR，不用 --allow-unauthenticated 或 Verify-Peer=false。首次新部署须实测构建，不能用另一台电脑的镜像结果替代。
+
+本机后续构建证据：HTTPS 软件源可访问后，Go 模块 zip 和 Corepack/Node 下载仍在 Docker bridge 直连时遇到 unexpected EOF/UND_ERR_SOCKET；使用 Docker Desktop 已有 http.docker.internal:3128 代理的独立 BuildKit curl 探针返回 200。仅本机 build 命令传标准 HTTP(S)_PROXY build args，Node 构建下载显式 NODE_USE_ENV_PROXY=1；不将代理写入运行容器配置、不关闭 TLS 或 Go 校验和。
+
+### UI 新建任务仍可能失败，不能仅测 POST /cron/jobs
+
+2026-11-13 实测 UI 创建任务先读取 /cron/prompt-templates；即使直接创建和执行成功，漏接模板路由仍会弹 404。应从原弹窗依赖开始验收，接回原处理器及其原表约束，不将模板读取失败吞成空列表。社区免责声明开关也必须覆盖服务器聊天宿主，不能只在免登录本地入口关闭。
+
+### 本机 UI 验证后保留活动会话
+
+Flutter integration_test 完成会卸载 Widget 树并退出测试应用；不能将之后重开即回本地的窗口当作“保持服务器登录”。此次用 opt-in LiveWidgetController 驱动真实 CommunityWorkspaceApp，所有步骤完成后保留 Widget 树和会话，再恢复磁盘上的正常 main 构建入口。默认 FlutterDriver 帧同步会等待常驻动画而阻塞，不能把驱动等待当业务失败或放宽 UI 断言。
+
+### 多来源目录已有数据不等于全部加载完成（2026-11-13）
+
+公共目录与服务器组织目录是独立异步请求。只用合并后列表是否为空来判断 loading，会在组织先返回时隐藏公共目录的等待状态。加载态应按来源保留：已有卡片继续显示，当前分类所需的未完成来源追加同款骨架；完成和错误都移除占位。回归必须覆盖“组织先成功、公共仍等待”、分类切换、公共成功/失败，不能只测全空首屏。
+
+### 人际单聊 UI 装配与本机宿主休眠（2026-11-13）
+
+只有 direct-room 创建/SDK 发送通过还不够：通讯录进入还调用 conversation show，发后需要本人消息回执和已读临时信号。缺失路由会在能发消息时仍弹 404；复用原 StateHandlers、messagereceipts 及 sender/成员校验，不吞错为空。真实两客户端 UI 与访问拒绝均需验证。
+
+本机 Docker 后端随 Mac 合盖休眠暂停；任务只能在宿主获得 CPU 时调度。此次运行/pmset 时间对齐证明多次维护唤醒及一次流失败重合，未保留底层异常时不能精确归因为网关或休眠。临时验证账户额外 HTTP 登录也可能替换 UI 会话，不要将其制造的回登录页误报为 UI 产品故障。
+
+### 切租户不能删除未轮换的续期凭据（2026-11-13）
+
+原 SwitchScope 只重签 access，保留服务端同一 sid 的 refresh hash，因此响应没有 refreshToken。通用登录保存函数把缺字段误当注销，导致每次登录后自动选租户也丢续期能力：15 分钟后 401，TokenRefresher 因本地 refresh 为空判 invalid，未发续期请求便退登录。修复：仅 scope switch 显式保留当前 refresh，并核对前后 aid/sid；普通登录不携带 refresh 仍清旧值。不能全局采用“缺字段就保留”，否则会跨账号/会话沿用凭据。
+
+真实 Flutter test 默认拦截所有 HTTP，实联用独立 HttpOverrides 的基类真实客户端，不能把测试绑定返回的 400 当服务端问题。正式 UI 验证使用独立账号和独立 bundle，通过一次请求头失效注入触发原后端真实 401，不伪造服务端成功。不得在同一管理员账号上重复登录来测试续期。
+
 ### 静态官方资源迁移（2026-11-13）
 
 只替换目录主机不够：旧技能下载为 POST 动态 export，须改为静态 GET + 清单 SHA-256，静态包仅允许配置站点 packages/ 路径（包括重定向）；相对地址必须基于含仓库路径的完整根 URL 解析，不能丢掉 /skills/ 或 /agents/ 或拼出端口后缺斜杠的非法 URL。旧员工/会话存储的图片须在统一图像组件按摘要改址，且不能带原 Bus token。

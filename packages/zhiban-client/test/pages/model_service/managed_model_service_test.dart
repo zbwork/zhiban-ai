@@ -1,3 +1,4 @@
+import 'package:zhiban_client/config/app_config.dart';
 import 'package:dio/dio.dart';
 import 'package:zhiban_client/network/network.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,8 +16,39 @@ import 'package:zhiban_client/pages/model_service/services/model_catalog_loader.
 import 'package:zhiban_ui/widgets/ui_switch.dart';
 
 void main() {
+  testWidgets(
+      'community BeeBridge settings are editable and do not consume managed credentials',
+      (tester) async {
+    var managedReads = 0;
+    const bee = CatalogProviderEntry(
+        id: 'beebridge',
+        name: 'BeeBridge',
+        endpointType: AiEndpointType.openaiCompatible,
+        baseUrl: 'https://example.test/v1');
+    await tester.pumpWidget(ProviderScope(
+        overrides: [
+          modelCatalogProvider.overrideWith((ref) async =>
+              const ModelCatalog(providers: [bee], modelsByProviderId: {})),
+          managedModelKeyProvider.overrideWith((ref) async {
+            managedReads++;
+            return 'not-for-community';
+          }),
+        ],
+        child: MaterialApp(
+            home: Scaffold(
+                body: ProviderDetailPanel.draft(
+                    catalogEntry: bee, onMaterialized: (_) {})))));
+    await tester.pumpAndSettle();
+    final fields =
+        tester.widgetList<TextField>(find.byType(TextField)).toList();
+    expect(fields, hasLength(2));
+    expect(fields.every((f) => !f.readOnly), isTrue);
+    expect(fields.first.obscureText, isTrue);
+    expect(fields.first.controller?.text, isEmpty);
+    expect(managedReads, 0);
+  });
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  testWidgets('BeeBridge复用原详情布局，真实密钥默认遮挡且眼睛可切换', (tester) async {
+  managedTestWidgets('BeeBridge复用原详情布局，真实密钥默认遮挡且眼睛可切换', (tester) async {
     var calls = 0;
     final keyReady = Completer<String>();
     const bee = CatalogProviderEntry(
@@ -92,31 +124,59 @@ void main() {
     expect(calls, 2);
   });
 
-  testWidgets('检测不可用时仍展示已取得的成员 Key', (tester) async {
-    const bee = CatalogProviderEntry(id: 'beebridge', name: 'BeeBridge',
-      endpointType: AiEndpointType.openaiCompatible, baseUrl: 'https://example.test/v1');
-    await tester.pumpWidget(ProviderScope(overrides: [
-      modelCatalogProvider.overrideWith((ref) async => const ModelCatalog(providers: [bee], modelsByProviderId: {})),
-      managedModelServiceProvider.overrideWith((ref) async => const ManagedModelService(
-        status: 'unavailable', keyReady: true, models: [], message: '模型服务连接失败')),
-      managedModelKeyProvider.overrideWith((ref) async => 'existing-member-key'),
-    ], child: MaterialApp(builder: BotToastInit(), home: Scaffold(body:
-      ProviderDetailPanel.draft(catalogEntry: bee, onMaterialized: (_) {})))));
+  managedTestWidgets('检测不可用时仍展示已取得的成员 Key', (tester) async {
+    const bee = CatalogProviderEntry(
+        id: 'beebridge',
+        name: 'BeeBridge',
+        endpointType: AiEndpointType.openaiCompatible,
+        baseUrl: 'https://example.test/v1');
+    await tester.pumpWidget(ProviderScope(
+        overrides: [
+          modelCatalogProvider.overrideWith((ref) async =>
+              const ModelCatalog(providers: [bee], modelsByProviderId: {})),
+          managedModelServiceProvider.overrideWith((ref) async =>
+              const ManagedModelService(
+                  status: 'unavailable',
+                  keyReady: true,
+                  models: [],
+                  message: '模型服务连接失败')),
+          managedModelKeyProvider
+              .overrideWith((ref) async => 'existing-member-key'),
+        ],
+        child: MaterialApp(
+            builder: BotToastInit(),
+            home: Scaffold(
+                body: ProviderDetailPanel.draft(
+                    catalogEntry: bee, onMaterialized: (_) {})))));
     await tester.pumpAndSettle();
-    expect(tester.widgetList<TextField>(find.byType(TextField)).first.controller?.text, 'existing-member-key');
+    expect(
+        tester
+            .widgetList<TextField>(find.byType(TextField))
+            .first
+            .controller
+            ?.text,
+        'existing-member-key');
     await tester.tap(find.text('检测'));
     await tester.pumpAndSettle();
     expect(find.text('检测失败：模型服务连接失败'), findsOneWidget);
-    expect(tester.widgetList<TextField>(find.byType(TextField)).first.controller?.text, 'existing-member-key');
+    expect(
+        tester
+            .widgetList<TextField>(find.byType(TextField))
+            .first
+            .controller
+            ?.text,
+        'existing-member-key');
     expect(find.text('检测成功，密钥可用'), findsNothing);
   });
 
-  test('成员 Key 读取不等待模型初始化或检测', () async {
+  managedTest('成员 Key 读取不等待模型初始化或检测', () async {
     var statusReads = 0;
     final interceptor = InterceptorsWrapper(onRequest: (options, handler) {
       expect(options.path, '/model-service/key');
-      handler.resolve(Response(requestOptions: options, statusCode: 200,
-        data: {'api_key': 'existing-member-key'}));
+      handler.resolve(Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {'api_key': 'existing-member-key'}));
     });
     sensitiveRequest.interceptors.insert(0, interceptor);
     addTearDown(() => sensitiveRequest.interceptors.remove(interceptor));
@@ -127,7 +187,8 @@ void main() {
       }),
     ]);
     addTearDown(container.dispose);
-    expect(await container.read(managedModelKeyProvider.future), 'existing-member-key');
+    expect(await container.read(managedModelKeyProvider.future),
+        'existing-member-key');
     expect(statusReads, 0);
   });
 
@@ -153,4 +214,13 @@ void main() {
     expect(state.keyReady, isFalse);
     expect(state.models, isEmpty);
   });
+}
+
+void managedTestWidgets(
+    String description, Future<void> Function(WidgetTester) callback) {
+  testWidgets(description, callback, skip: AppConfig.communityEdition);
+}
+
+void managedTest(String description, Future<void> Function() callback) {
+  test(description, callback, skip: AppConfig.communityEdition);
 }

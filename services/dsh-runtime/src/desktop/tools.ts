@@ -53,7 +53,7 @@ export function localTools(opts: LocalToolOptions): DesktopTool[] {
   const prelude = "const fs=require('node:fs'); const crypto=require('node:crypto'); const path=require('node:path'); const a=JSON.parse(process.argv[1]??fs.readFileSync(0,'utf8')); const out=v=>process.stdout.write(JSON.stringify(v));";
   return [
     {
-      name: 'declare_deliverables', description: '生成多文件前声明本轮完整清单（只填文件名，不填目录）。后一次非空清单替换旧清单，修正另存时更新完整清单，仍列出用户要求的全部结果。纯问答无需调用，已有非空清单不能改为空。Office/生图工具自动发布，不必重复 publish_artifact；其他文件完成后再发布。text_contains 是必须实际写入可读正文的内容要求；已有文件不满足时返回 delivery_issues，先修正再结束，不用于排版或公式验收。', operation: 'read',
+      name: 'declare_deliverables', description: '生成结果文件前（单个文件也包括）声明本轮完整清单（只填文件名，不填目录）。后一次非空清单替换旧清单，修正另存时更新完整清单，仍列出用户要求的全部结果。纯问答无需调用，已有非空清单不能改为空。Office/生图工具自动发布，不必重复 publish_artifact；其他文件完成后再发布。text_contains 是必须实际写入可读正文的内容要求；已有文件不满足时返回 delivery_issues，先修正再结束，不用于排版或公式验收。', operation: 'read',
       schema: deliveryDeclaration, inputSchema: schemaFor(deliveryDeclaration),
       call: async (run, args, signal) => {
         signal.throwIfAborted();

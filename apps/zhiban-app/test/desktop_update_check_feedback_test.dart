@@ -195,6 +195,7 @@ void main() {
       () async {
     var fetches = 0;
     final coordinator = DesktopUpdateCoordinator(
+        updatesEnabled: true,
         cache: cache,
         fetchInfo: () async {
           fetches++;
@@ -248,8 +249,8 @@ void main() {
   test('observer opened during a failing query receives a terminal event',
       () async {
     final query = Completer<AppUpdateInfo?>();
-    final coordinator =
-        DesktopUpdateCoordinator(cache: cache, fetchInfo: () => query.future);
+    final coordinator = DesktopUpdateCoordinator(
+        updatesEnabled: true, cache: cache, fetchInfo: () => query.future);
     final feedback = DesktopUpdateCheckFeedback();
     final subscription = coordinator.updateEvents.listen(feedback.accept);
     addTearDown(subscription.cancel);
@@ -271,7 +272,9 @@ void main() {
       () async {
     var fail = true;
     final coordinator = DesktopUpdateCoordinator(
-        cache: cache, fetchInfo: () async => fail ? null : _current);
+        updatesEnabled: true,
+        cache: cache,
+        fetchInfo: () async => fail ? null : _current);
     final feedback = DesktopUpdateCheckFeedback();
     var revision = feedback.begin();
     final failed = await coordinator.checkForUpdates();

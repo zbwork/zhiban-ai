@@ -59,10 +59,14 @@ class DesktopUpdateState {
 class DesktopUpdateCoordinator {
   DesktopUpdateCoordinator(
       {DesktopUpdateCache? cache,
-      Future<AppUpdateInfo?> Function()? fetchInfo}) {
+      bool updatesEnabled = !AppConfig.communityEdition,
+      Future<AppUpdateInfo?> Function()? fetchInfo})
+      : _updatesEnabled = updatesEnabled {
     if (cache != null) _cache = cache;
     if (fetchInfo != null) _fetchInfo = fetchInfo;
   }
+
+  bool _updatesEnabled;
 
   Future<DesktopUpdateCheckResult>? _checkOperation;
   Future<bool>? _installOperation;
@@ -85,6 +89,7 @@ class DesktopUpdateCoordinator {
     required Future<AppUpdateInfo?> Function() fetchInfo,
   }) async {
     await _cache.close();
+    _updatesEnabled = true;
     _cache = cache;
     _fetchInfo = fetchInfo;
     _preparation = null;
@@ -106,7 +111,7 @@ class DesktopUpdateCoordinator {
 
   /// 桌面侧栏挂载时调用一次，注册 Swift→Dart 事件接收。
   void registerUpdateEventHandler() {
-    if (AppConfig.communityEdition) return;
+    if (!_updatesEnabled) return;
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'updateEvent') {
         final args = Map<String, dynamic>.from(call.arguments as Map);
@@ -244,7 +249,9 @@ class DesktopUpdateCoordinator {
   /// check. It never opens Sparkle's own check window.
   Future<bool> checkAndDownloadUpdate({String? feedUrl}) async =>
       switch (await checkForUpdates(feedUrl: feedUrl)) {
-        DesktopUpdateCheckResult.failed || DesktopUpdateCheckResult.unavailable => false,
+        DesktopUpdateCheckResult.failed ||
+        DesktopUpdateCheckResult.unavailable =>
+          false,
         _ => true,
       };
 
@@ -254,7 +261,7 @@ class DesktopUpdateCoordinator {
           .whenComplete(() => _checkOperation = null);
 
   Future<DesktopUpdateCheckResult> _checkAndDownload({String? feedUrl}) async {
-    if (AppConfig.communityEdition) return DesktopUpdateCheckResult.unavailable;
+    if (!_updatesEnabled) return DesktopUpdateCheckResult.unavailable;
     if (!PlatformUtils.isDesktop) return DesktopUpdateCheckResult.failed;
     _log('manual check requested');
     try {
@@ -293,7 +300,7 @@ class DesktopUpdateCoordinator {
           .whenComplete(() => _installOperation = null);
 
   Future<bool> _install({required bool prepare, String? feedUrl}) async {
-    if (AppConfig.communityEdition || !PlatformUtils.isDesktop) return false;
+    if (!_updatesEnabled || !PlatformUtils.isDesktop) return false;
     try {
       final native = await _nativeState();
       if (native.pendingInstall) {
@@ -342,7 +349,7 @@ class DesktopUpdateCoordinator {
   }
 
   Future<DesktopUpdateState> getUpdateState() async {
-    if (AppConfig.communityEdition || !PlatformUtils.isDesktop) {
+    if (!_updatesEnabled || !PlatformUtils.isDesktop) {
       return const DesktopUpdateState.unavailable();
     }
     final native = await _nativeState();
@@ -393,7 +400,7 @@ class DesktopUpdateCoordinator {
   }
 
   Future<String?> updateFeedUrl() async {
-    if (AppConfig.communityEdition || !PlatformUtils.isDesktop) {
+    if (!_updatesEnabled || !PlatformUtils.isDesktop) {
       return null;
     }
 

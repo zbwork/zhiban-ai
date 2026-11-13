@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 // chat_respond_notifier_test.dart — ADR-0028 §4.9 / Plan 16 §J HITL 客户端
 //
 // ChatNotifier.respondToAgentMessage 接线测试. 用最小 fake OpenClawChatService
@@ -258,7 +259,29 @@ Future<ProviderContainer> _bootWithAwaitingMessage(_RespondFakeSvc fake) async {
 void main() {
   // BotToast.showText 依赖 SemanticsBinding (动画 reverse), 失败 / empty 路径会调.
   // 单元测试不渲染真实 UI 也不能让 toast 弹出, 但要避免它 throw "Binding not initialized".
-  TestWidgetsFlutterBinding.ensureInitialized();
+  final binding = TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() {
+    for (final name in [
+      'easyo/rtc/incoming_panel',
+      'easyo/rtc/meeting',
+      'easyo/rtc/incoming_panel/events',
+      'easyo/rtc/meeting/events'
+    ]) {
+      binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(MethodChannel(name), (_) async => null);
+    }
+  });
+  tearDown(() {
+    for (final name in [
+      'easyo/rtc/incoming_panel',
+      'easyo/rtc/meeting',
+      'easyo/rtc/incoming_panel/events',
+      'easyo/rtc/meeting/events'
+    ]) {
+      binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(MethodChannel(name), null);
+    }
+  });
 
   test(
       'success path: service 调用透传 4 字段; 旧 awaiting_user 切 final + 新 placeholder 追加 + 订阅新 stream; 返 true',
@@ -340,7 +363,7 @@ void main() {
     ));
 
     final fake = _RespondFakeSvc()..respondThrowError = StateError('boom');
-    final c = await _bootWithAwaitingMessage(fake);
+    final c = (await tester.runAsync(() => _bootWithAwaitingMessage(fake)))!;
     final notifier = c.read(chatProvider.notifier);
 
     final stBefore = c.read(chatProvider).asData!.value;
@@ -384,7 +407,7 @@ void main() {
         conversationUuid: _convUuid,
         newAgentMessageUuid: '',
       );
-    final c = await _bootWithAwaitingMessage(fake);
+    final c = (await tester.runAsync(() => _bootWithAwaitingMessage(fake)))!;
     final notifier = c.read(chatProvider.notifier);
 
     final lenBefore = c.read(chatProvider).asData!.value.messages.length;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:zhiban_client/config/app_config.dart';
 
 import 'package:zhiban_client/pages/apps/widgets/apps_plaza_sheet.dart';
 import 'package:zhiban_core/chat/chat_models.dart';
@@ -743,7 +744,7 @@ class PromptInputState extends State<PromptInput> {
                 ),
               ),
             ),
-            if (widget.showAiDisclaimer) ...[
+            if (widget.showAiDisclaimer && !AppConfig.communityEdition) ...[
               const SizedBox(height: 1),
               Text(
                 '内容由AI生成，请仔细甄别',

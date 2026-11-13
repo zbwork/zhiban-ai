@@ -51,8 +51,7 @@ class _ChatHistoryListState extends State<ChatHistoryList> {
   void didUpdateWidget(covariant ChatHistoryList oldWidget) {
     super.didUpdateWidget(oldWidget);
     final request = ++_anchorRequest;
-    if (!usesChatPullToRefresh(context) ||
-        oldWidget.itemIds.isEmpty ||
+    if (oldWidget.itemIds.isEmpty ||
         widget.itemIds.indexOf(oldWidget.itemIds.first) <= 0 ||
         !widget.scrollController.hasClients) {
       return;
@@ -70,7 +69,8 @@ class _ChatHistoryListState extends State<ChatHistoryList> {
         continue;
       }
       final y = box.localToGlobal(Offset.zero).dy;
-      if (y + box.size.height <= top || y >= bottom) continue;
+      final anchorBottom = y + box.size.height;
+      if (anchorBottom <= top || y >= bottom) continue;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
             request != _anchorRequest ||
@@ -81,7 +81,9 @@ class _ChatHistoryListState extends State<ChatHistoryList> {
             _rowKeys[id]?.currentContext?.findRenderObject() as RenderBox?;
         if (current == null || !current.hasSize) return;
         final position = widget.scrollController.position;
-        final delta = current.localToGlobal(Offset.zero).dy - y;
+        final delta = current.localToGlobal(Offset.zero).dy +
+            current.size.height -
+            anchorBottom;
         if (delta.abs() > 0.5) {
           widget.scrollController.jumpTo((position.pixels + delta)
               .clamp(position.minScrollExtent, position.maxScrollExtent));
@@ -358,14 +360,11 @@ class ChatMessageScrollbar extends StatelessWidget {
 
     final theme = Theme.of(context);
     final scrollbarTheme = theme.scrollbarTheme;
-    final thumbColor = scrollbarTheme.thumbColor?.resolve(
-          const <WidgetState>{}
-        ) ??
-        theme.colorScheme.onSurface.withValues(alpha: 0.42);
-    final thickness = scrollbarTheme.thickness?.resolve(
-          const <WidgetState>{}
-        ) ??
-        6;
+    final thumbColor =
+        scrollbarTheme.thumbColor?.resolve(const <WidgetState>{}) ??
+            theme.colorScheme.onSurface.withValues(alpha: 0.42);
+    final thickness =
+        scrollbarTheme.thickness?.resolve(const <WidgetState>{}) ?? 6;
     final radius = scrollbarTheme.radius ?? const Radius.circular(999);
     final safeBottom = bottomObstruction.clamp(0.0, double.infinity);
 

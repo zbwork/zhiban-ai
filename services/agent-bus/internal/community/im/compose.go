@@ -23,6 +23,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/chat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/contacts"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/directroom"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/messagereceipts"
 	roomsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/room"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/wukongagent"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientchat"
@@ -99,6 +100,8 @@ func decode(w http.ResponseWriter, r *http.Request, out any) error {
 	return nil
 }
 func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc chat.Service, visibility contacts.Service, auth func(http.Handler) http.Handler) {
+	state := &clientchat.StateHandlers{ConvState: convstate.New(pool), ConvAccess: conversation.New(pool)}
+	registerConversationState(mux, state, auth)
 	list := &clientchat.ListHandler{Chat: chatSvc}
 	mux.Handle("GET /api/agent-bus/v1/chat/conversations", auth(http.HandlerFunc(list.List)))
 	if c.WuKong.URL == "" {
@@ -116,6 +119,9 @@ func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc c
 	trigger := wukongagent.New(pool, chatSvc, visibility, adapter.Client())
 	syncProxy := wukong.NewMessageSyncProxy(adapter.Client(), lookup)
 	syncProxy.SetMembershipChecker(strictMembership{rooms})
+	receiptLookup := messageReceiptsConvLookup{convs: conversation.New(pool), rooms: rooms, accts: account.New(pool)}
+	state.ReadReceiptSignals = messagereceipts.NewReadReceiptNotifier(receiptLookup, adapter.Client())
+	registerReadReceipts(mux, &clientchat.ReadReceiptsHandlers{ReadReceipts: messagereceipts.New(pool, receiptLookup, syncProxy)}, auth)
 	list.WuKongMsgSync = syncProxy
 	list.WuKongConvSync = wukong.NewConversationSyncProxy(adapter.Client(), lookup)
 	credential := &clientim.Handlers{WuKongCred: wukong.NewCredentialIssuer(adapter, lookup)}

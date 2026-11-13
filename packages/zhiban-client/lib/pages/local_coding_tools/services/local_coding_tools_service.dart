@@ -410,6 +410,7 @@ abstract interface class LocalCodingToolsOperations {
 
 class LocalCodingToolsService implements LocalCodingToolsOperations {
   LocalCodingToolsService({
+    bool communityConfiguration = AppConfig.communityEdition,
     LocalCodingBridgeSessionFactory? bridgeFactory,
     LocalCodingToolsApi? api,
     LocalCodingCatalogApi? catalogApi,
@@ -424,7 +425,8 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     LocalCodingProjectDirectoryPicker? projectDirectoryPicker,
     LocalCodingProjectBookmarkCreator? projectBookmarkCreator,
     Duration? configWriteRetryDelay,
-  })  : _configWriteRetryDelay =
+  })  : _communityConfiguration = communityConfiguration,
+        _configWriteRetryDelay =
             configWriteRetryDelay ?? const Duration(milliseconds: 400),
         _bridgeFactory =
             bridgeFactory ?? ProcessLocalCodingBridgeSessionFactory(),
@@ -440,13 +442,14 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
         _identityLoader = identityLoader ?? _loadSessionIdentity,
         _pendingRevocationStore = pendingRevocationStore ??
             const SharedPreferencesLocalCodingPendingRevocationStore(),
-        _reconnectStore =
-            reconnectStore ?? const SharedPreferencesLocalCodingReconnectStore(),
+        _reconnectStore = reconnectStore ??
+            const SharedPreferencesLocalCodingReconnectStore(),
         _projectDirectoryPicker =
             projectDirectoryPicker ?? pickLocalCodingProjectDirectory,
         _projectBookmarkCreator =
             projectBookmarkCreator ?? createLocalCodingProjectBookmark;
 
+  final bool _communityConfiguration;
   final LocalCodingBridgeSessionFactory _bridgeFactory;
   final LocalCodingToolsApi _api;
   final LocalCodingCatalogApi _catalogApi;
@@ -532,7 +535,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
   /// 暂时取不到 → Bridge 沿用自己落盘的目录;Bus 明确没有目录 → 让 Bridge 清除;
   /// Bridge 验签拒绝 → 忽略,detect 里就没有升级项。
   Future<void> _applyCatalog(LocalCodingBridgeSession session) async {
-    if (AppConfig.communityEdition) return;
+    if (_communityConfiguration) return;
     if (!session.supportedMethods.contains('catalog.apply')) return;
     final runtime = _catalogRuntime;
     if (runtime == null) return;
@@ -574,10 +577,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
       );
     }
     final deviceId = await _requireDeviceId();
-    await _retryPendingRevocation(
-      deviceId,
-      requireRemoteCompletion: true
-    );
+    await _retryPendingRevocation(deviceId, requireRemoteCompletion: true);
     final session = await _bridgeFactory.open();
     try {
       await _registerInSession(session, deviceId);
@@ -714,10 +714,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
       );
     }
     final deviceId = await _requireDeviceId();
-    await _retryPendingRevocation(
-      deviceId,
-      requireRemoteCompletion: true
-    );
+    await _retryPendingRevocation(deviceId, requireRemoteCompletion: true);
     final session = await _bridgeFactory.open();
     try {
       await _requireCommunitySettings(session, target);
@@ -730,8 +727,8 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
         );
       }
       final expectedProfile = await _expectedProfile(session, target);
-      final needsConfiguration = !current.configured ||
-          current.profileVersion != expectedProfile;
+      final needsConfiguration =
+          !current.configured || current.profileVersion != expectedProfile;
       LocalCodingToolState? installation;
       String? effectiveInstallationId;
       if (needsConfiguration) {
@@ -825,15 +822,12 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
       }
       final bookmark = await _projectBookmarkCreator(projectPath);
       final deviceId = await _requireDeviceId();
-      await _retryPendingRevocation(
-        deviceId,
-        requireRemoteCompletion: true
-      );
+      await _retryPendingRevocation(deviceId, requireRemoteCompletion: true);
       final session = await _bridgeFactory.open();
       try {
         final credential = await session.credentialStatus();
         if (mode == LocalCodingLaunchMode.managed &&
-            !AppConfig.communityEdition &&
+            !_communityConfiguration &&
             !_authorizationConnected(credential, deviceId)) {
           throw const LocalCodingToolsException(
             'authorization_not_current',
@@ -916,10 +910,11 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
   /// 退出登录时的清理:与 [removeAuthorization] 同样撤销服务端授权、清本机凭证,
   /// 但保留接入记录,同一个人回来时凭它静默重新接入([reconnectIfSameIdentity])。
   /// 升级到带接入记录的版本之前接入的设备没有记录:本机授权仍在时按当前登录身份补记。
-  Future<void> removeAuthorizationOnLogout() => _removeAuthorization(logout: true);
+  Future<void> removeAuthorizationOnLogout() =>
+      _removeAuthorization(logout: true);
 
   Future<void> _removeAuthorization({required bool logout}) async {
-    if (AppConfig.communityEdition) return;
+    if (_communityConfiguration) return;
     final deviceId = await _requireDeviceId();
     final identity = await _identityLoader();
     // 主动移除(含恢复官方配置后顺带撤销):先清记录,后面哪一步失败都不会被自动接回。
@@ -975,11 +970,14 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     _InspectTracker? tracker,
   }) async {
     final status = await session.credentialStatus();
-    final revocationPending = !AppConfig.communityEdition && await _hasMatchingPendingRevocation(deviceId);
+    final revocationPending = !_communityConfiguration &&
+        await _hasMatchingPendingRevocation(deviceId);
     final expectedProfiles = <LocalCodingTarget, String>{};
     for (final vendor in LocalCodingVendor.values) {
       final version = await _expectedProfile(session, vendor.cliTarget);
-      for (final target in vendor.targets) { expectedProfiles[target] = version; }
+      for (final target in vendor.targets) {
+        expectedProfiles[target] = version;
+      }
     }
     // M3 · 四个 target(两厂商 × CLI / 桌面端)各自检测;桌面端的配置视图由
     // Bridge 负责映射(Codex 共用 CLI 配置,Claude 走 3P 配置库)。
@@ -1064,8 +1062,11 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     }
   }
 
-  Future<String> _expectedProfile(LocalCodingBridgeSession session, LocalCodingTarget target) async {
-    if (!AppConfig.communityEdition) return _profileVersions[target.scopeTarget.id] ?? '';
+  Future<String> _expectedProfile(
+      LocalCodingBridgeSession session, LocalCodingTarget target) async {
+    if (!_communityConfiguration) {
+      return _profileVersions[target.scopeTarget.id] ?? '';
+    }
     final settings = await session.byokSettings(target: target);
     return settings['profile_version'] as String? ?? '';
   }
@@ -1074,7 +1075,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     LocalCodingBridgeSession session,
     LocalCodingTarget target,
   ) async {
-    if (!AppConfig.communityEdition) return;
+    if (!_communityConfiguration) return;
     final settings = await session.byokSettings(target: target);
     if (settings['key_configured'] != true) {
       throw const LocalCodingToolsException(
@@ -1088,7 +1089,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     LocalCodingBridgeSession session,
     String deviceId,
   ) async {
-    if (AppConfig.communityEdition) return;
+    if (_communityConfiguration) return;
     var serverRotated = false;
     try {
       final prepared = await session.prepareRegistration(
@@ -1174,7 +1175,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     String deviceId, {
     bool requireRemoteCompletion = false,
   }) async {
-    if (AppConfig.communityEdition) return;
+    if (_communityConfiguration) return;
     final matching = await _matchingPendingRevocation(deviceId);
     if (matching == null) return;
     var pending = matching;
@@ -1278,10 +1279,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
         '当前登录身份无效，请重新登录',
       );
     }
-    return LocalCodingSessionIdentity(
-      accountId: accountId,
-      tenantId: tenantId
-    );
+    return LocalCodingSessionIdentity(accountId: accountId, tenantId: tenantId);
   }
 
   // ─── M1G · 长操作(install / verify)的会话租借 ─────────────────────────
@@ -1365,10 +1363,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     String? deviceId;
     if (ensureAuthorization) {
       deviceId = await _requireDeviceId();
-      await _retryPendingRevocation(
-        deviceId,
-        requireRemoteCompletion: true
-      );
+      await _retryPendingRevocation(deviceId, requireRemoteCompletion: true);
     }
     final session = await _bridgeFactory.open();
     try {
@@ -1535,10 +1530,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
       final installation = await session.detect(target);
       final repairInstallationId = installation.installationId;
       if (repairInstallationId.isEmpty) {
-        throw const LocalCodingToolsException(
-          'tool_unsupported',
-          '当前安装暂不支持修复'
-        );
+        throw const LocalCodingToolsException('tool_unsupported', '当前安装暂不支持修复');
       }
       final plan = await session.planConfiguration(
         target: target,
@@ -1582,10 +1574,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
       );
     }
     final deviceId = await _requireDeviceId();
-    await _retryPendingRevocation(
-      deviceId,
-      requireRemoteCompletion: true
-    );
+    await _retryPendingRevocation(deviceId, requireRemoteCompletion: true);
     return _retryConfigWrite(() => _switchToZhibanInSession(target, deviceId));
   }
 
@@ -1805,7 +1794,7 @@ class LocalCodingToolsService implements LocalCodingToolsOperations {
     required Map<String, dynamic> clientInfo,
   }) async {
     final info = await PackageInfo.fromPlatform();
-    if (AppConfig.communityEdition) return null;
+    if (_communityConfiguration) return null;
     final payload = <String, dynamic>{
       ...clientInfo,
       'app_version': '${info.version}+${info.buildNumber}',

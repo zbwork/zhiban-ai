@@ -28,8 +28,6 @@ import (
 	agentrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agent"
 	agentkbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agentkb"
 	audit "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/authaudit"
-	convrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/conversation"
-	staterepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/convstate"
 	driverepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/drive"
 	eventrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/event"
 	kbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/knowledge"
@@ -220,8 +218,6 @@ func run(ctx context.Context, path string) error {
 		encode.JSON(w, map[string]any{"tenant_enabled": items})
 	})))))
 	accountStream := clientchat.NewAccountStreamMiddleware(chatSvc, clientchat.AccountStreamConfig{})
-	state := &clientchat.StateHandlers{ConvState: staterepo.New(pool), ConvAccess: convrepo.New(pool)}
-	mux.Handle("POST /api/agent-bus/v1/chat/conversations/{uuid}/read", middleware.Auth(issuer, auth, false)(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(http.HandlerFunc(state.MarkConversationRead)))))
 	pages := &clientchat.PageHandlers{Messages: msgrepo.New(pool)}
 	for suffix, handler := range map[string]http.HandlerFunc{"around": pages.Around, "newer": pages.Newer} {
 		mux.Handle("GET /api/agent-bus/v1/chat/conversations/{uuid}/messages/"+suffix, middleware.Auth(issuer, auth, false)(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(handler))))

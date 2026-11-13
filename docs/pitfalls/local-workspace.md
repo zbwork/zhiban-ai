@@ -53,3 +53,15 @@ Xcode目标级PRODUCT_BUNDLE_IDENTIFIER高于AppInfo.xcconfig，归档后必须�
 LocalAttachment 不应硬编码 ChatFileType.file；复用 ChatFileItem 的统一扩展名分类，历史附件也能获得图片缩略图。助手交付附件应在正文之后，不要为截图另建消息 UI。Widget 测试中的真实文件 IO 和图片预缓存须进入 tester.runAsync，避免 fake-async 下等待真实 IO 而挂起；图片夹具应能真实解码。
 
 README 图片资源写入或替换后，文件存在及系统解码成功仍不等于 Markdown Webview 已加载。VS Code 曾保留失败显示，未改文件执行 Markdown: Refresh Preview 后恢复；交付前需在实际预览中逐图确认，不能只做路径检查。
+
+
+模型工具说明不能把全量交付门禁表述成“多文件”专属规则。2026-11-12 实测单文件 write_file/read_file 成功，但模型漏 declare_deliverables，导致最终拒绝；须统一单/多文件说明并保留缺声明拒绝，不能以放宽门禁冒充修复。验证工具时间线应在 send 返回后重新读库，时间线在 finally 中写入，返回值是写入前的行快照。
+
+迁移后验收先记录 git branch/show HEAD，并核对其包含双方提交；当前目录可能已被切到构建机原分支。原分支启动成功不能证明已合并 main 的本地修复仍有效。
+
+单靠提示词仍可能遗漏声明，不能重复调整提示并把偶然成功当作根因已修复。前置依赖应在副作用前以结构化工具错误反馈，供现有模型工具循环修正；最终门禁仍覆盖未走该工具的 shell 等路径。
+
+
+### 提交前运行时检查的环境边界（2026-11-13）
+
+社区运行时打包目录只有生产依赖时，不能直接把 npm build 缺少 @types/node 归因于源码错误。使用已有隔离开发依赖编译，并核对候选源文件与工作区一致。macOS 隔离检查须使用正式随包 Node；Homebrew Node 的外部动态库依赖可能导致隔离探测失败，不能通过关闭隔离让测试通过。生成的 .dart_tool 与 services/dsh-runtime/dist 不应进入源码提交。

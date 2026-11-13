@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zhiban_client/pages/chat/services/chat_service.dart';
+import 'package:zhiban_client/pages/chat/widgets/chat_scroll.dart';
 import 'package:zhiban_core/im/im_client.dart';
 import 'package:zhiban_client/im/human_direct_im_controller.dart';
 import 'package:zhiban_core/chat/chat_models.dart';
@@ -47,6 +49,7 @@ void main() {
         await tester.pumpWidget(ProviderScope(
             overrides: [
               wukongImClientProvider.overrideWithValue(client),
+              chatServiceProvider.overrideWithValue(_ReceiptService()),
               conversationsProvider.overrideWith(_EmptyConversations.new),
             ],
             child: MaterialApp(
@@ -60,19 +63,21 @@ void main() {
                             channelId: 'channel',
                             channelType: 2,
                             title: 'group',
-                            conversationUuid: '',
+                            conversationUuid: 'test-conversation',
                             showHeader: false)
                         : const HumanDirectChatPane(
-                            channelId: 'channel', showHeader: false)))));
+                            channelId: 'channel',
+                            conversationUuid: 'test-conversation',
+                            showHeader: false)))));
         await tester.pumpAndSettle();
         final list = find.byType(CustomScrollView).first;
         final scrollable =
             find.descendant(of: list, matching: find.byType(Scrollable)).first;
         final position = tester.state<ScrollableState>(scrollable).position;
-        expect(position.pixels, closeTo(position.minScrollExtent, 1));
+        expect(position.pixels, closeTo(chatLatestScrollOffset(position), 1));
         // Visiting the oldest rows resolves lazy variable-height estimates.
         for (var i = 0; i < 5; i++) {
-          position.jumpTo(position.maxScrollExtent - 60);
+          position.jumpTo(position.minScrollExtent + 60);
           await tester.pump();
         }
         await tester.drag(scrollable, Offset(0, mobile ? 250 : 65));
@@ -101,7 +106,13 @@ void main() {
                 .focusNode!
                 .hasFocus,
             isTrue);
-        expect(position.pixels, closeTo(position.minScrollExtent, 1));
+        // SmartRefresher replaces the ScrollPosition after focus/layout changes.
+        final sentPosition = tester
+            .widget<ChatHistoryList>(find.byType(ChatHistoryList))
+            .scrollController
+            .position;
+        expect(sentPosition.pixels,
+            closeTo(chatLatestScrollOffset(sentPosition), 1));
         // Keeping focus also permits edits while the previous send is pending.
         client.sendPending = Completer<void>();
         await tester.enterText(find.byType(TextField), 'in flight');
@@ -192,3 +203,14 @@ ImMessage _message(int i, {String? text, String from = 'peer'}) => ImMessage(
     timestamp: 100000 + i * 1000,
     messageSeq: i,
     text: text ?? 'message-$i\n${'line\n' * (i % 5)}');
+
+class _ReceiptService extends OpenClawChatService {
+  @override
+  Future<void> markConversationRead(String conversationId,
+      {int lastReadMessageSeq = 0}) async {}
+  @override
+  Future<List<Map<String, dynamic>>> getReadReceipts(
+          {required String conversationId,
+          required List<int> messageSeqs}) async =>
+      [];
+}

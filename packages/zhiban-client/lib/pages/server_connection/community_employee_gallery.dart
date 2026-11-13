@@ -1,15 +1,16 @@
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zhiban_client/config/app_config.dart';
 import 'package:zhiban_client/pages/chat/providers/chat_providers.dart';
 import 'package:zhiban_client/pages/digital_employee/widgets/digital_employee_gallery_host.dart';
+import 'package:zhiban_client/pages/digital_employee/widgets/digital_employee_gallery.dart';
 import 'package:zhiban_client/pages/digital_employee/providers/digital_employee_providers.dart';
 import 'package:zhiban_core/chat/chat_models.dart';
 import 'package:zhiban_ui/zhiban_ui.dart';
 
 import 'community_market_providers.dart';
+import '../digital_employee/services/digital_employee_service.dart';
 
 class CommunityEmployeeGallery extends ConsumerWidget {
   const CommunityEmployeeGallery({
@@ -71,19 +72,18 @@ class CommunityEmployeeGallery extends ConsumerWidget {
             .contains(keyword))
           agent,
     ];
+    final serverCatalog = ref.watch(digitalEmployeeCatalogProvider).value;
+    final filter = ref.watch(digitalEmployeeFilterProvider);
+    final needsPublic = filter == DigitalEmployeeCatalogFilter.all ||
+        filter == DigitalEmployeeCatalogFilter.platform;
+    if (catalog.isLoading &&
+        !catalog.hasValue &&
+        needsPublic &&
+        (serverCatalog?.all.isEmpty ?? true)) {
+      return const DigitalEmployeeGallerySkeleton(mobile: false);
+    }
     return Column(
       children: [
-        if (catalog.isLoading && !catalog.hasValue)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              children: [
-                CupertinoActivityIndicator(radius: 8),
-                SizedBox(width: 8),
-                Text('公共数字员工加载中…'),
-              ],
-            ),
-          ),
         if (catalog.hasError)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -103,6 +103,7 @@ class CommunityEmployeeGallery extends ConsumerWidget {
             mobile: false,
             filterTrailing: filterTrailing,
             publicTemplates: templates,
+            publicTemplatesLoading: catalog.isLoading,
             onAddPublicTemplate: (agent) => _add(context, ref, agent),
           ),
         ),

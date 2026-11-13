@@ -117,11 +117,7 @@ void main() {
 
     testWidgets('approval 渲染: 同意/拒绝按钮都 disabled, 不触发任何回调', (tester) async {
       await tester.pumpWidget(_wrap(EmpBlocksView(blocks: const [
-        {
-          'type': 'approval',
-          'title': '差旅 3500',
-          'summary': '请审批本次差旅费用'
-        },
+        {'type': 'approval', 'title': '差旅 3500', 'summary': '请审批本次差旅费用'},
       ])));
       // 同意 + 拒绝 button 都 disabled
       final outlined =
@@ -250,16 +246,8 @@ void main() {
           'title': '坏 action',
           'actions': {'oops': 'should be list'},
         },
-        {
-          'type': 'form',
-          'title': '坏 form',
-          'fields': 'not-a-list'
-        },
-        {
-          'type': 'plan',
-          'title': '坏 plan',
-          'steps': 'invalid'
-        },
+        {'type': 'form', 'title': '坏 form', 'fields': 'not-a-list'},
+        {'type': 'plan', 'title': '坏 plan', 'steps': 'invalid'},
         {'type': 'markdown', 'text': '尾部 markdown 仍可见'},
       ])));
       // 4 个 block 都不应该让 pump 抛异常; 末尾 markdown 必须可见
@@ -443,17 +431,19 @@ void main() {
     testWidgets('approval reject 两阶段: 用户在 reason 输入区点"取消"回到第一阶段 (不提交)',
         (tester) async {
       var callCount = 0;
-      await tester.pumpWidget(_wrap(EmpBlocksView(
-        blocks: const [
-          {'type': 'approval', 'title': 'A'},
-        ],
-        agentMessageStatus: 'awaiting_user',
-        agentMessageUuid: 'm-1',
-        conversationUuid: 'c-1',
-        respondHandler: fakeHandler(
-          onApprovalCall: (_, __) => callCount++),
+      await tester.pumpWidget(
+        _wrap(
+          EmpBlocksView(
+            blocks: const [
+              {'type': 'approval', 'title': 'A'},
+            ],
+            agentMessageStatus: 'awaiting_user',
+            agentMessageUuid: 'm-1',
+            conversationUuid: 'c-1',
+            respondHandler: fakeHandler(onApprovalCall: (_, __) => callCount++),
+          ),
         ),
-      ),);
+      );
       await tester.tap(find.widgetWithText(OutlinedButton, '拒绝'));
       await tester.pump();
       expect(find.widgetWithText(ElevatedButton, '确认拒绝'), findsOneWidget);
@@ -638,25 +628,27 @@ void main() {
     testWidgets('action >2 项 → 竖排选项列表 (序号徽标), 点击回调收到 action_id',
         (tester) async {
       String? capturedId;
-      await tester.pumpWidget(_wrap(EmpBlocksView(
-        blocks: const [
-          {
-            'type': 'action',
-            'actions': [
-              {'id': 'a1', 'label': '注册公司（全程代办）'},
-              {'id': 'a2', 'label': '代理记账'},
-              {'id': 'a3', 'label': '其他创业帮助'},
-              {'id': 'a4', 'label': '自主办理指南（免费）'},
+      await tester.pumpWidget(
+        _wrap(
+          EmpBlocksView(
+            blocks: const [
+              {
+                'type': 'action',
+                'actions': [
+                  {'id': 'a1', 'label': '注册公司（全程代办）'},
+                  {'id': 'a2', 'label': '代理记账'},
+                  {'id': 'a3', 'label': '其他创业帮助'},
+                  {'id': 'a4', 'label': '自主办理指南（免费）'},
+                ],
+              },
             ],
-          },
-        ],
-        agentMessageStatus: 'awaiting_user',
-        agentMessageUuid: 'm-1',
-        conversationUuid: 'c-1',
-        respondHandler: fakeHandler(
-          onActionCall: (id) => capturedId = id),
+            agentMessageStatus: 'awaiting_user',
+            agentMessageUuid: 'm-1',
+            conversationUuid: 'c-1',
+            respondHandler: fakeHandler(onActionCall: (id) => capturedId = id),
+          ),
         ),
-      ),);
+      );
       // 序号徽标 1-4 都在（列表模式）
       for (final n in ['1', '2', '3', '4']) {
         expect(find.text(n), findsOneWidget);
@@ -695,25 +687,27 @@ void main() {
     testWidgets('form: 简单字段填写 (text/number/checkbox) → 提交 payload 携带 fields',
         (tester) async {
       Map<String, dynamic>? captured;
-      await tester.pumpWidget(_wrap(EmpBlocksView(
-        blocks: const [
-          {
-            'type': 'form',
-            'submit_label': '提交资料',
-            'fields': [
-              {'name': 'who', 'type': 'text', 'label': '姓名'},
-              {'name': 'count', 'type': 'number', 'label': '数量'},
-              {'name': 'agree', 'type': 'checkbox', 'placeholder': '同意条款'},
+      await tester.pumpWidget(
+        _wrap(
+          EmpBlocksView(
+            blocks: const [
+              {
+                'type': 'form',
+                'submit_label': '提交资料',
+                'fields': [
+                  {'name': 'who', 'type': 'text', 'label': '姓名'},
+                  {'name': 'count', 'type': 'number', 'label': '数量'},
+                  {'name': 'agree', 'type': 'checkbox', 'placeholder': '同意条款'},
+                ],
+              },
             ],
-          },
-        ],
-        agentMessageStatus: 'awaiting_user',
-        agentMessageUuid: 'm-1',
-        conversationUuid: 'c-1',
-        respondHandler: fakeHandler(
-          onFormCall: (f) => captured = f),
+            agentMessageStatus: 'awaiting_user',
+            agentMessageUuid: 'm-1',
+            conversationUuid: 'c-1',
+            respondHandler: fakeHandler(onFormCall: (f) => captured = f),
+          ),
         ),
-      ),);
+      );
       // 填 text 字段
       await tester.enterText(find.byType(TextField).at(0), 'Alice');
       // 填 number 字段
@@ -758,24 +752,26 @@ void main() {
 
     testWidgets('action: 点击 action 按钮 → handler 收到 action_id', (tester) async {
       String? capturedId;
-      await tester.pumpWidget(_wrap(EmpBlocksView(
-        blocks: const [
-          {
-            'type': 'action',
-            'title': '后续操作',
-            'actions': [
-              {'id': 'restart', 'label': '重启'},
-              {'id': 'cancel', 'label': '取消'},
+      await tester.pumpWidget(
+        _wrap(
+          EmpBlocksView(
+            blocks: const [
+              {
+                'type': 'action',
+                'title': '后续操作',
+                'actions': [
+                  {'id': 'restart', 'label': '重启'},
+                  {'id': 'cancel', 'label': '取消'},
+                ],
+              },
             ],
-          },
-        ],
-        agentMessageStatus: 'awaiting_user',
-        agentMessageUuid: 'm-1',
-        conversationUuid: 'c-1',
-        respondHandler: fakeHandler(
-          onActionCall: (id) => capturedId = id),
+            agentMessageStatus: 'awaiting_user',
+            agentMessageUuid: 'm-1',
+            conversationUuid: 'c-1',
+            respondHandler: fakeHandler(onActionCall: (id) => capturedId = id),
+          ),
         ),
-      ),);
+      );
       await tester.tap(find.widgetWithText(TextButton, '重启'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 30));
@@ -955,17 +951,13 @@ void main() {
         (tester) async {
       await tester.pumpWidget(fullFormView(handler: formHandler()));
 
-      final firstTextField =
-          tester.widget<TextField>(find.byType(TextField).first);
+      // Fixed-height UiInputField owns its border in the outer decorator.
+      final bordered = tester
+          .widgetList<InputDecorator>(find.byType(InputDecorator))
+          .where((w) => w.decoration.enabledBorder is OutlineInputBorder);
+      expect(bordered, isNotEmpty);
       expect(
-          firstTextField.decoration?.enabledBorder, isA<OutlineInputBorder>());
-      expect(
-          firstTextField.decoration?.focusedBorder, isA<OutlineInputBorder>());
-
-      final selectDecorator =
-          tester.widget<InputDecorator>(find.byType(InputDecorator).first);
-      expect(
-          selectDecorator.decoration.enabledBorder, isA<OutlineInputBorder>());
+          bordered.first.decoration.focusedBorder, isA<OutlineInputBorder>());
 
       // date/time/datetime picker use the shared bordered picker chrome. Flutter
       // renders OutlinedButton.icon as a private subtype in this SDK, so assert

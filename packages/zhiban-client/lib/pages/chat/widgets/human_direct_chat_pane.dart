@@ -342,8 +342,13 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
     }
     // 移动端由下拉刷新控件在释放手势后触发，桌面用顶部滚轮/触控板。
     if (usesChatPullToRefresh(context) || _loadingOlder) return;
-    if (_scroll.position.userScrollDirection != ScrollDirection.reverse) return;
-    if (_scroll.position.extentAfter > 80) return;
+    final position = _scroll.position;
+    final reversed = position.axisDirection == AxisDirection.up;
+    if (position.userScrollDirection !=
+        (reversed ? ScrollDirection.reverse : ScrollDirection.forward)) {
+      return;
+    }
+    if ((reversed ? position.extentAfter : position.extentBefore) > 80) return;
     unawaited(_loadOlder());
   }
 
@@ -362,9 +367,8 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
     } catch (_) {
       if (!mounted) return;
       if (usesChatPullToRefresh(context)) rethrow;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('加载更早消息失败，请重试'))
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('加载更早消息失败，请重试')));
     } finally {
       _loadingOlder = false;
     }
@@ -859,15 +863,13 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
   Future<void> _send() async {
     if (!_input.hasRichContent || _sending) return;
     if (_input.hasUploading) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('文件上传中，请稍候'))
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('文件上传中，请稍候')));
       return;
     }
     if (_input.hasFailed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('有文件上传失败，请移除后重试'))
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('有文件上传失败，请移除后重试')));
       return;
     }
     setState(() => _sending = true);
@@ -909,9 +911,8 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
     if (files.isEmpty) return;
     final slots = (9 - _input.attachments.length).clamp(0, 9);
     if (slots <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('最多一次发送 9 个附件'))
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('最多一次发送 9 个附件')));
       return;
     }
     for (final f in files.take(slots)) {
@@ -920,9 +921,8 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
     }
     _inputFocus.requestFocus();
     if (files.length > slots) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('最多一次发送 9 个附件'))
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('最多一次发送 9 个附件')));
     }
   }
 
@@ -930,9 +930,8 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
     if (files.isEmpty) return;
     final slots = (9 - _input.attachments.length).clamp(0, 9);
     if (slots <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('最多一次发送 9 个附件'))
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('最多一次发送 9 个附件')));
       return;
     }
     for (final f in files.take(slots)) {
@@ -943,17 +942,12 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
     }
     _inputFocus.requestFocus();
     if (files.length > slots) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('最多一次发送 9 个附件'))
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('最多一次发送 9 个附件')));
     }
   }
 
-  void _insertLocalAttachment(
-    String path,
-    String name,
-    ChatFileType fileType
-  ) {
+  void _insertLocalAttachment(String path, String name, ChatFileType fileType) {
     final id = 'att-${DateTime.now().microsecondsSinceEpoch}';
     final cancel = CancelToken();
     final mediaKind =
@@ -1105,10 +1099,7 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
       return;
     }
     if (profile.accountUuid.isEmpty) return;
-    context.push(
-      RoutePaths.contactsPersonDetail,
-      extra: profile.accountUuid
-    );
+    context.push(RoutePaths.contactsPersonDetail, extra: profile.accountUuid);
   }
 
   void _onPickAttachment(ChatAttachmentPickKind kind) {
@@ -1149,9 +1140,8 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
     if (files.isEmpty) return;
     final slots = (9 - _input.attachments.length).clamp(0, 9);
     if (slots <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('最多一次发送 9 个附件'))
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('最多一次发送 9 个附件')));
       return;
     }
     for (final f in files.take(slots)) {
@@ -1175,10 +1165,8 @@ class _HumanDirectChatPaneState extends ConsumerState<HumanDirectChatPane> {
         ? ChatFileType.image
         : _chatFileTypeForName(f.name);
     _input.activateTrailingTextBlock();
-    _input.insertAttachment(RichPromptAttachment(
-      id: id,
-      fileName: f.name,
-      fileType: type),
+    _input.insertAttachment(
+      RichPromptAttachment(id: id, fileName: f.name, fileType: type),
     );
     unawaited(controller.prepareDriveMediaBlock(f).then((block) {
       _input.updateAttachment(
@@ -1713,10 +1701,7 @@ class _Bubble extends StatelessWidget {
       final text = msg.text.isNotEmpty ? msg.text : '[非文本消息]';
       bubble = Container(
         constraints: const BoxConstraints(maxWidth: 480),
-        padding: EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: isPeer ? 8 : 6
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: isPeer ? 8 : 6),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
@@ -1784,9 +1769,7 @@ class _Bubble extends StatelessWidget {
     );
 
     final children = isPeer
-        ? <Widget>[
-            Flexible(fit: FlexFit.loose, child: actionBubble)
-          ]
+        ? <Widget>[Flexible(fit: FlexFit.loose, child: actionBubble)]
         : <Widget>[
             Flexible(
               fit: FlexFit.loose,

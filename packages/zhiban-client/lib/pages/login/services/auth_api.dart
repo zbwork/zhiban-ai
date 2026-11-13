@@ -12,6 +12,7 @@
 import 'dart:async';
 import 'package:zhiban_client/services/local_agent_service.dart';
 import 'dart:convert';
+import 'package:zhiban_core/session/local_token_claims.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -156,20 +157,33 @@ ValueListenable<bool> get tenantSwitchInProgress => _tenantSwitchInProgress;
 ///
 /// 任一登录成功路径 (login/register/scope-switch) 都必须走这里, 保证 SharedPreferences
 /// 与 RequestInterceptor 静态缓存一致。dashboard_token 写空对象, 兼容老页面读取。
-Future<void> _persistLoginResult(AuthLoginResult res, {int? expectedEpoch}) =>
+Future<void> _persistLoginResult(AuthLoginResult res,
+        {int? expectedEpoch, bool preserveSessionRefresh = false}) =>
     withConnectionCredentials(expectedEpoch ?? AppConfig.connectionEpoch,
         () async {
       if (res.accessToken.isEmpty) {
         throw Exception('登录失败，未获取到 accessToken');
       }
+      final sp = await SharedPreferences.getInstance();
+      if (preserveSessionRefresh) {
+        final previousAccess = sp.getString(AppConfig.storageTokenKey) ?? '';
+        for (final claim in ['aid', 'sid']) {
+          final previous = LocalTokenClaims.read(previousAccess, claim);
+          final next = LocalTokenClaims.read(res.accessToken, claim);
+          if (previous == null ||
+              previous.toString().isEmpty ||
+              previous != next) {
+            throw StateError('主体切换响应与当前登录会话不一致');
+          }
+        }
+      }
       if (!_tenantSwitchInProgress.value) clearTenantIdentityPreview();
       await LocalAgentService.instance.beforeIdentityChange(res.accessToken);
-      final sp = await SharedPreferences.getInstance();
       await _resetRealtimeBeforeIdentityChange(sp, res.accessToken);
       await sp.setString(AppConfig.storageTokenKey, res.accessToken);
       if (res.refreshToken.isNotEmpty) {
         await sp.setString(AppConfig.storageRefreshTokenKey, res.refreshToken);
-      } else {
+      } else if (!preserveSessionRefresh) {
         await sp.remove(AppConfig.storageRefreshTokenKey);
       }
       // 老页面 (recharge / wallet 等) 可能读 dashboard_token, 这里写空对象避免它们崩。
@@ -230,8 +244,9 @@ Future<void> _resetRealtimeBeforeIdentityChange(
 }
 
 @visibleForTesting
-Future<void> persistLoginResultForTest(AuthLoginResult res) =>
-    _persistLoginResult(res);
+Future<void> persistLoginResultForTest(AuthLoginResult res,
+        {bool preserveSessionRefresh = false}) =>
+    _persistLoginResult(res, preserveSessionRefresh: preserveSessionRefresh);
 
 Future<LoginCaptchaData> getCaptchaApi() async {
   final response = await request.get('/auth/captcha');
@@ -439,7 +454,8 @@ Future<AuthLoginResult> switchToTenantApi(int tenantId) async {
     );
     res = AuthLoginResult.fromJson(
         (response.data as Map).cast<String, dynamic>());
-    await _persistLoginResult(res, expectedEpoch: epoch);
+    await _persistLoginResult(res,
+        expectedEpoch: epoch, preserveSessionRefresh: true);
   } finally {
     _tenantSwitchInProgress.value = false;
   }

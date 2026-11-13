@@ -1,3 +1,4 @@
+import 'package:zhiban_client/config/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -143,7 +144,17 @@ CreateAgentDraft draft({String model = 'gpt-6-astra', bool byok = false}) =>
     );
 
 void main() {
-  testWidgets(
+  test(
+      'community does not fetch a managed member key or initialize managed models',
+      () async {
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    final state = await c.read(managedModelServiceProvider.future);
+    expect(state.status, 'unavailable');
+    expect(state.models, isEmpty);
+    expect(await c.read(managedModelKeyProvider.future), isEmpty);
+  });
+  managedTestWidgets(
       'new employee defaults to member BeeBridge models without a source toggle or legacy request',
       (tester) async {
     addTearDown(tester.view.reset);
@@ -158,7 +169,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
+  managedTestWidgets(
       'editing a BeeBridge employee returns only its model and no BYOK key',
       (tester) async {
     addTearDown(tester.view.reset);
@@ -171,7 +182,7 @@ void main() {
     expect(h.store.keyReads, isEmpty);
   });
 
-  testWidgets(
+  managedTestWidgets(
       'custom provider still submits its own key and model configuration',
       (tester) async {
     addTearDown(tester.view.reset);
@@ -184,7 +195,8 @@ void main() {
     expect(h.store.keyReads, ['custom']);
   });
 
-  testWidgets('another tenant stale model cannot be retained or submitted',
+  managedTestWidgets(
+      'another tenant stale model cannot be retained or submitted',
       (tester) async {
     addTearDown(tester.view.reset);
     final h = Harness();
@@ -196,7 +208,7 @@ void main() {
     expect(h.store.keyReads, isEmpty);
   });
 
-  testWidgets(
+  managedTestWidgets(
       'unavailable member catalogue never falls back to local BeeBridge models',
       (tester) async {
     addTearDown(tester.view.reset);
@@ -212,7 +224,7 @@ void main() {
     await h.save(tester);
     expect(h.result, isNull);
   });
-  testWidgets(
+  managedTestWidgets(
       'switching a custom employee to BeeBridge clears BYOK fields without reading its key',
       (tester) async {
     addTearDown(tester.view.reset);
@@ -229,7 +241,7 @@ void main() {
     expect(h.store.keyReads, isEmpty);
   });
 
-  testWidgets(
+  managedTestWidgets(
       'switching a BeeBridge employee to a custom provider uses that provider key',
       (tester) async {
     addTearDown(tester.view.reset);
@@ -243,4 +255,9 @@ void main() {
     expect(h.result?.modelServiceModelId, 'custom-chat');
     expect(h.store.keyReads, ['custom']);
   });
+}
+
+void managedTestWidgets(
+    String description, Future<void> Function(WidgetTester) callback) {
+  testWidgets(description, callback, skip: AppConfig.communityEdition);
 }

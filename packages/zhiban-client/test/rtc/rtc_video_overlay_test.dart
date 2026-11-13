@@ -510,21 +510,17 @@ void main() {
     expect(speaker.width, lessThan(gallery.width)); // speaker 下本地变 PiP
   });
 
-  testWidgets('meeting：邀请打开 scaffold（分享 disabled）', (tester) async {
+  testWidgets('meeting：可邀请时显示可操作入口', (tester) async {
     final h = _Harness();
     addTearDown(h.dispose);
     await _pumpOverlay(tester, h.controller);
     await _reachActiveVideo(tester, h);
-
-    await tester.tap(find.byTooltip('邀请'));
-    await tester.pump();
-    await tester.pump(const Duration(
-        milliseconds: 350)); // 等弹窗过场（不 pumpAndSettle：时长 Timer 不settle）
-    expect(find.textContaining('多人邀请待后续接入'), findsOneWidget);
-    // 分享按钮 disabled（onPressed: null）。
-    final share = tester
-        .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, '分享'));
-    expect(share.onPressed, isNull);
+    expect(h.controller.canInviteParticipants, isTrue);
+    final button = find.byTooltip('邀请');
+    expect(button, findsOneWidget);
+    final action = find.descendant(of: button, matching: find.byType(InkWell));
+    expect(action, findsOneWidget);
+    expect(tester.widget<InkWell>(action).onTap, isNotNull);
   });
 
   testWidgets('meeting：可拖动（标题栏）+ 还原位置', (tester) async {
