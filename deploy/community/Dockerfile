@@ -1,4 +1,5 @@
-FROM golang:1.26.1-bookworm AS build
+FROM golang:1.26.1-bookworm AS certificates
+FROM certificates AS build
 WORKDIR /src
 COPY services/agent-bus/go.mod services/agent-bus/go.sum ./
 RUN go mod download
@@ -6,7 +7,8 @@ COPY services/agent-bus/ ./
 RUN mkdir /out && for name in bus admin worker audit-writer migrate bootstrap; do CGO_ENABLED=0 go build -trimpath -o /out/community-$name ./cmd/community-$name; done
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates poppler-utils antiword tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-eng libreoffice-calc libreoffice-impress fonts-noto-cjk && rm -rf /var/lib/apt/lists/* && useradd -u 10001 -r community
+COPY --from=certificates /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && apt-get -o Acquire::Retries=3 -o Acquire::https::Timeout=30 update && apt-get install -y --no-install-recommends ca-certificates poppler-utils antiword tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-eng libreoffice-calc libreoffice-impress fonts-noto-cjk && rm -rf /var/lib/apt/lists/* && useradd -u 10001 -r community
 COPY --from=build /out/ /usr/local/bin/
 USER community
 CMD ["community-bus", "-config", "/etc/community/service.yaml"]
