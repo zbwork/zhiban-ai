@@ -1,18 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:zhiban_client/config/community_resources.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:zhiban_client/network/api_image_auth.dart';
 
 typedef UiNetworkPlaceholderBuilder = Widget Function(
-  BuildContext context,
-  String imageUrl
-);
+    BuildContext context, String imageUrl);
 
 typedef UiNetworkErrorBuilder = Widget Function(
-  BuildContext context,
-  String imageUrl,
-  Object error
-);
+    BuildContext context, String imageUrl, Object error);
 
 /// 统一封装的网络图片组件。
 /// - 默认 fadeIn/fadeOut 为 Duration.zero（无闪烁过渡）
@@ -84,9 +80,16 @@ class _UiNetworkImageState extends State<UiNetworkImage> {
     }
   }
 
+  String get _resourceUrl => CommunityResources.imageUrl(widget.imageUrl);
+
   void _resolveHeaders() {
     _headers = null;
     _headersFuture = null;
+    if (_resourceUrl != widget.imageUrl ||
+        CommunityResources.isOfficialImage(_resourceUrl)) {
+      _headers = const {};
+      return;
+    }
     // Explicit headers take priority — skip auto-detection.
     if (widget.httpHeaders != null) {
       _headers = widget.httpHeaders;
@@ -131,7 +134,7 @@ class _UiNetworkImageState extends State<UiNetworkImage> {
 
   Widget _buildImage(Map<String, String>? headers) {
     final image = CachedNetworkImage(
-      imageUrl: widget.imageUrl,
+      imageUrl: _resourceUrl,
       width: widget.width,
       height: widget.height,
       fit: widget.fit,
@@ -140,7 +143,7 @@ class _UiNetworkImageState extends State<UiNetworkImage> {
       fadeOutDuration: widget.fadeOutDuration,
       httpHeaders: headers,
       // 用稳定键缓存：剥掉预签名 URL 每次变化的签名参数，避免后端重签后整图重下闪烁。
-      cacheKey: stableImageCacheKey(widget.cacheKey ?? widget.imageUrl),
+      cacheKey: stableImageCacheKey(widget.cacheKey ?? _resourceUrl),
       imageBuilder: widget.imageBuilder,
       placeholder: (ctx, url) =>
           widget.placeholderBuilder?.call(ctx, url) ?? _defaultPlaceholder(),

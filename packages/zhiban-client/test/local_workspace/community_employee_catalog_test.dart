@@ -19,28 +19,29 @@ Map<String, dynamic> employee(String id) => {
     };
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  test('anonymous pagination caches complete official catalog', () async {
+  test('anonymous static snapshot caches the complete official catalog',
+      () async {
     final dio = Dio(BaseOptions(baseUrl: 'https://catalog.example'));
     var requests = 0;
     dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
       expect(options.headers.containsKey('Authorization'), isFalse);
-      expect(options.path, '/api/public/v1/agents');
-      final offset = options.queryParameters['offset'] as int;
+      expect(Uri.parse(options.path).path, '/catalog/v1/employees.json');
+      expect(options.queryParameters, isEmpty);
       requests++;
       handler.resolve(Response(requestOptions: options, data: {
+        'format_version': 1,
         'success': true,
         'data': {
           'total': 51,
           'items': [
-            for (var i = offset; i < (offset == 0 ? 50 : 51); i++)
-              employee('$i'),
+            for (var i = 0; i < 51; i++) employee('$i'),
           ]
         },
       }));
     }));
     final client = CommunityEmployeeCatalog(dio: dio);
     expect(await client.fetch(), hasLength(51));
-    expect(requests, 2);
+    expect(requests, 1);
     expect(await client.cached(), hasLength(51));
   });
   test('public avatar uses the catalog origin and survives cached reload',
@@ -48,29 +49,28 @@ void main() {
     final dio = Dio(BaseOptions(baseUrl: 'https://catalog.example/root'));
     dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
       handler.resolve(Response(requestOptions: options, data: {
+        'format_version': 1,
         'success': true,
         'data': {
           'total': 1,
           'items': [
-            {
-              ...employee('one'),
-              'avatar_url': '/api/public/v1/agents/one/avatar/hash.png'
-            }
+            {...employee('one'), 'avatar_url': 'assets/agents/hash.png'}
           ]
         },
       }));
     }));
     final catalog = CommunityEmployeeCatalog(dio: dio);
     expect((await catalog.fetch()).single['avatar_url'],
-        'https://catalog.example/api/public/v1/agents/one/avatar/hash.png');
+        'https://catalog.example/root/assets/agents/hash.png');
     expect((await catalog.cached()).single['avatar_url'],
-        'https://catalog.example/api/public/v1/agents/one/avatar/hash.png');
+        'https://catalog.example/root/assets/agents/hash.png');
   });
   test('invalid refresh does not overwrite last successful cache', () async {
     final dio = Dio(BaseOptions(baseUrl: 'https://catalog.example'));
     var invalid = false;
     dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
       handler.resolve(Response(requestOptions: options, data: {
+        'format_version': 1,
         'success': true,
         'data': {
           'total': invalid ? 2 : 1,

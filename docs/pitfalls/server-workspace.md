@@ -86,3 +86,18 @@
 - 403 代表原权限拒绝，500 需核对实际查询与缺表；不能通过空响应、权限通配或 SQL 补丁计为修复。导航与请求成功分别验收。
 
 - 本地工具目录新接线使用上游 howett.net/plist v1.0.1，公开模块遗漏时 go 可能先尝试读取无关 difflib.mod 并超时。先检查新增 import 与上游依赖，补同版本 require/checksum 和导出 overlay；用 GOPROXY=off 验证已有缓存，不改业务逻辑规避解析库。
+
+### 静态官方资源迁移（2026-11-13）
+
+只替换目录主机不够：旧技能下载为 POST 动态 export，须改为静态 GET + 清单 SHA-256，静态包仅允许配置站点 packages/ 路径（包括重定向）；相对地址必须基于含仓库路径的完整根 URL 解析，不能丢掉 /skills/ 或 /agents/ 或拼出端口后缺斜杠的非法 URL。旧员工/会话存储的图片须在统一图像组件按摘要改址，且不能带原 Bus token。
+
+首次导入发现 arxiv-translator 的 5 个文件使用 Windows 反斜杠路径，原安全安装器会拒绝。导出到资源源码时规范化为安全正斜杠并重新生成确定性包，禁止放松客户端解压校验。第三方 Markdown 保留原始换行/空白，未为压平 diff-check 改写资源内容。Pages 构建先核对包和目录，再将其作为同一 artifact 部署；首个资源 Git 提交未推送时，Pages 仅启用配置，不能算资源已上线。
+
+
+### 图片 UI 验收不能把占位图算加载成功
+
+AgentAvatar 的 placeholder/error 都使用默认机器人图片，自身也有已解码的 RawImage。只检查 RawImage 会在网络头像尚未完成时提前截图并误报成功。原生 UI 验收必须检查 CachedNetworkImageProvider 的 Image 及其已解码 RawImage，且 RawImage 最近的 Image 祖先必须是该网络 Image。因为 Image.frameBuilder 会把 AssetImage 占位嵌套在网络 Image 下面，仅检查网络 Image 的任意后代仍会误判。默认 AssetImage 不算通过。失败保留原始异常，不让失败截图再次抛错覆盖结果。
+
+图片解码完成与屏幕完成绘制不是同一时刻。LiveWidgetController 验收在检查真实图像后必须再 pump 下一绘制帧，并等待 endOfFrame 再做 RepaintBoundary 截图；单看网络成功、RawImage 或控件树不能替代截图复核。
+
+LiveWidgetController.pump 会等待真实 endOfFrame。独立原生窗口不绘制时会连同超时循环一起停住，不能直接判定 HTTP 超时；先检查该独立窗口的可见性并置前，不能为唤醒测试而操作用户会话。

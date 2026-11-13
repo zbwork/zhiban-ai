@@ -30,6 +30,7 @@ dependencies:
   zhiban_ui:
     path: "../../packages/zhiban-ui"
 dev_dependencies:
+  cached_network_image: 3.3.1
   sqflite_common_ffi: "^2.3.7+1"
   flutter_test:
     sdk: flutter

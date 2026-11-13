@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:zhiban_client/config/community_resources.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -7,14 +8,13 @@ class CommunityEmployeeCatalog {
   CommunityEmployeeCatalog({Dio? dio})
       : _dio = dio ??
             Dio(BaseOptions(
-                baseUrl: const String.fromEnvironment(
-                    'COMMUNITY_SKILLS_BASE_URL',
-                    defaultValue: 'https://zb.qkfintech.cn'),
+                baseUrl: CommunityResources.agentsBaseUrl,
                 followRedirects: false,
                 connectTimeout: const Duration(seconds: 8),
                 receiveTimeout: const Duration(seconds: 15)));
   final Dio _dio;
-  String get _key => 'community_employee_catalog_v1.${_dio.options.baseUrl}';
+  String get _key =>
+      'community_employee_catalog_github_v1.${_dio.options.baseUrl}';
   Future<List<Map<String, dynamic>>> cached() async {
     try {
       final raw = (await SharedPreferences.getInstance()).getString(_key);
@@ -65,39 +65,32 @@ class CommunityEmployeeCatalog {
         throw const FormatException('数字员工标签无效');
       }
       final avatar = item['avatar_url'] as String? ?? '';
-      if (avatar.startsWith('/api/public/v1/agents/')) {
+      if (avatar.isNotEmpty) {
         item['avatar_url'] =
-            Uri.parse(_dio.options.baseUrl).resolve(avatar).toString();
+            CommunityResources.resolve(_dio.options.baseUrl, avatar);
       }
       return item;
     }).toList();
   }
 
   Future<List<Map<String, dynamic>>> fetch() async {
-    final all = <dynamic>[];
-    for (var page = 0; page < 200; page++) {
-      final response = await _dio.get('/api/public/v1/agents',
-          queryParameters: {'limit': 50, 'offset': page * 50});
-      final envelope = response.data;
-      if (envelope is! Map ||
-          envelope['success'] != true ||
-          envelope['data'] is! Map) {
-        throw const FormatException('数字员工目录响应无效');
-      }
-      final data = envelope['data'] as Map;
-      if (data['items'] is! List || data['total'] is! int) {
-        throw const FormatException('数字员工目录响应无效');
-      }
-      final items = data['items'] as List;
-      all.addAll(items);
-      if (all.length >= (data['total'] as int)) {
-        final parsed = _parse(all);
-        await (await SharedPreferences.getInstance())
-            .setString(_key, jsonEncode(parsed));
-        return parsed;
-      }
-      if (items.length != 50) throw const FormatException('数字员工目录不完整');
+    final response = await _dio.get(CommunityResources.resolve(
+        _dio.options.baseUrl, 'catalog/v1/employees.json'));
+    final envelope = response.data;
+    if (envelope is! Map ||
+        envelope['format_version'] != 1 ||
+        envelope['success'] != true ||
+        envelope['data'] is! Map) {
+      throw const FormatException('数字员工目录响应无效');
     }
-    throw const FormatException('数字员工目录过大');
+    final data = envelope['data'] as Map;
+    if (data['items'] is! List ||
+        data['total'] != (data['items'] as List).length) {
+      throw const FormatException('数字员工目录不完整');
+    }
+    final parsed = _parse(data['items']);
+    await (await SharedPreferences.getInstance())
+        .setString(_key, jsonEncode(parsed));
+    return parsed;
   }
 }

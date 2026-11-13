@@ -45,3 +45,7 @@
 - [社区版Windows 1.0.0构建与验收](releases/community-windows-1.0.0.md)
 
 - [社区版 README PC 实机截图](verification/community-readme-desktop-2026-11-10.md)
+
+- [官方资源 GitHub 托管决策](adr/0004-github-official-resources.md)
+
+- [官方资源 GitHub 迁移验收](verification/github-official-resources-2026-11-13.md)

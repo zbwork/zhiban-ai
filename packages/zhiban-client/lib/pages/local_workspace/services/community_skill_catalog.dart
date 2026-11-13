@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:zhiban_client/config/community_resources.dart';
 import 'dart:typed_data';
 
 /// Anonymous catalog client: intentionally has no session interceptors.
@@ -6,46 +7,79 @@ class CommunitySkillCatalog {
   CommunitySkillCatalog({Dio? dio})
       : _dio = dio ??
             Dio(BaseOptions(
-              baseUrl: const String.fromEnvironment('COMMUNITY_SKILLS_BASE_URL',
-                  defaultValue: 'https://zb.qkfintech.cn'),
+              baseUrl: CommunityResources.skillsBaseUrl,
               connectTimeout: const Duration(seconds: 8),
               receiveTimeout: const Duration(seconds: 15),
               followRedirects: false,
             ));
   final Dio _dio;
 
+  final Map<String, Map<String, dynamic>> _bundles = {};
+
+  Uri _bundleUri(String value) {
+    final uri =
+        Uri.parse(CommunityResources.resolve(_dio.options.baseUrl, value));
+    final base = CommunityResources.origin(_dio.options.baseUrl);
+    if (uri.origin != base.origin ||
+        !uri.path.startsWith('${base.path}packages/')) {
+      throw const FormatException('技能包下载来源无效');
+    }
+    return uri;
+  }
+
   Future<({Uint8List bytes, String sha256})> downloadBundle(String uuid) async {
-    final response = await _dio.post<ResponseBody>(
-        '/api/public/v1/skills:export',
-        data: {
-          'skill_uuids': [uuid]
-        },
-        options: Options(
-            responseType: ResponseType.stream,
-            receiveTimeout: const Duration(minutes: 2)));
-    final body = response.data!;
-    if (!(body.headers['content-type']?.first ?? '')
-        .contains('application/zip')) {
-      await body.stream.drain<void>();
-      throw StateError('该技能暂未开放下载，请刷新技能广场后重试');
+    if (!_bundles.containsKey(uuid)) await fetch();
+    final item = _bundles[uuid];
+    if (item == null ||
+        item['bundle_url'] is! String ||
+        !RegExp(r'^[a-f0-9]{64}$')
+            .hasMatch(item['bundle_sha256'] as String? ?? '')) {
+      throw StateError('技能包未发布，请刷新技能广场后重试');
     }
-    final bytes = BytesBuilder(copy: false);
-    await for (final chunk in body.stream) {
-      if (bytes.length + chunk.length > 200 * 1024 * 1024) {
-        throw StateError('技能包过大');
+    var uri = _bundleUri(item['bundle_url'] as String);
+    for (var redirect = 0; redirect <= 5; redirect++) {
+      final response = await _dio.get<ResponseBody>(uri.toString(),
+          options: Options(
+              responseType: ResponseType.stream,
+              followRedirects: false,
+              validateStatus: (s) => s != null && s >= 200 && s < 400,
+              receiveTimeout: const Duration(minutes: 2)));
+      final body = response.data!;
+      if ((response.statusCode ?? 0) >= 300) {
+        await body.stream.drain<void>();
+        final location = response.headers.value('location');
+        if (location == null) {
+          throw StateError('技能包跳转地址无效');
+        }
+        uri = _bundleUri(uri.resolve(location).toString());
+        continue;
       }
-      bytes.add(chunk);
+      final type = body.headers['content-type']?.first ?? '';
+      if (!type.contains('zip') && !type.contains('octet-stream')) {
+        await body.stream.drain<void>();
+        throw StateError('技能包响应无效');
+      }
+      final bytes = BytesBuilder(copy: false);
+      await for (final chunk in body.stream) {
+        if (bytes.length + chunk.length > 200 * 1024 * 1024) {
+          throw StateError('技能包过大');
+        }
+        bytes.add(chunk);
+      }
+      return (
+        bytes: bytes.takeBytes(),
+        sha256: item['bundle_sha256'] as String
+      );
     }
-    return (
-      bytes: bytes.takeBytes(),
-      sha256: body.headers['x-content-sha256']?.first ?? ''
-    );
+    throw StateError('技能包跳转次数过多');
   }
 
   Future<Map<String, dynamic>> fetch() async {
-    final response = await _dio.get('/api/public/v1/skills');
+    final response = await _dio.get(CommunityResources.resolve(
+        _dio.options.baseUrl, 'catalog/v1/skills.json'));
     final envelope = response.data;
     if (envelope is! Map ||
+        envelope['format_version'] != 1 ||
         envelope['success'] != true ||
         envelope['data'] is! Map) {
       throw const FormatException('技能目录响应无效');
@@ -79,9 +113,9 @@ class CommunitySkillCatalog {
         }
       }
       final icon = raw['icon_url'] as String? ?? '';
-      if (icon.startsWith('/api/public/v1/skills/')) {
+      if (icon.isNotEmpty) {
         raw['icon_url'] =
-            Uri.parse(_dio.options.baseUrl).resolve(icon).toString();
+            CommunityResources.resolve(_dio.options.baseUrl, icon);
       }
       for (final field in ['category_id', 'sort_order', 'install_count']) {
         if (raw[field] != null && raw[field] is! int) {
@@ -97,6 +131,11 @@ class CommunitySkillCatalog {
           raw['sort_order'] is! int) {
         throw const FormatException('技能分类无效');
       }
+    }
+    _bundles.clear();
+    for (final raw in data['items'] as List) {
+      _bundles[raw['skill_uuid'] as String] =
+          Map<String, dynamic>.from(raw as Map);
     }
     return data;
   }

@@ -15,10 +15,11 @@ void main() {
     addTearDown(() => server.close(force: true));
     var valid = true;
     server.listen((request) async {
-      expect(request.uri.path, '/api/public/v1/skills');
+      expect(request.uri.path, '/catalog/v1/skills.json');
       expect(request.headers.value('authorization'), isNull);
       request.response.headers.contentType = ContentType.json;
       request.response.write(jsonEncode({
+        'format_version': 1,
         'success': true,
         'data': {'items': [], 'categories': [], 'total': valid ? 0 : 10}
       }));
@@ -36,6 +37,7 @@ void main() {
     final dio = Dio(BaseOptions(baseUrl: 'https://catalog.example/root'));
     dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
       handler.resolve(Response(requestOptions: options, data: {
+        'format_version': 1,
         'success': true,
         'data': {
           'items': [
@@ -43,7 +45,7 @@ void main() {
               'skill_uuid': 'one',
               'code': 'one',
               'name': 'One',
-              'icon_url': '/api/public/v1/skills/one/icon/hash.png'
+              'icon_url': 'assets/skills/hash.png'
             }
           ],
           'categories': [],
@@ -53,7 +55,100 @@ void main() {
     }));
     final data = await CommunitySkillCatalog(dio: dio).fetch();
     expect(data['items'][0]['icon_url'],
-        'https://catalog.example/api/public/v1/skills/one/icon/hash.png');
+        'https://catalog.example/root/assets/skills/hash.png');
+  });
+
+  for (final redirect in [false, true]) {
+    test('static bundle GET uses manifest digest; unsafe redirect=$redirect',
+        () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://catalog.example/project/'));
+      var bundleRequests = 0;
+      final hash = 'a' * 64;
+      dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+        expect(options.method, 'GET');
+        expect(options.headers.containsKey('Authorization'), false);
+        if (options.path.endsWith('skills.json')) {
+          handler.resolve(Response(requestOptions: options, data: {
+            'format_version': 1,
+            'success': true,
+            'data': {
+              'total': 1,
+              'categories': [],
+              'items': [
+                {
+                  'skill_uuid': 'one',
+                  'code': 'demo',
+                  'name': 'Demo',
+                  'bundle_url': 'packages/demo.zip',
+                  'bundle_sha256': hash
+                }
+              ]
+            }
+          }));
+        } else {
+          bundleRequests++;
+          handler.resolve(Response(
+              requestOptions: options,
+              statusCode: redirect ? 302 : 200,
+              data: ResponseBody.fromBytes([80, 75, 3, 4], redirect ? 302 : 200,
+                  headers: {
+                    'content-type': ['application/octet-stream'],
+                    if (redirect)
+                      'location': ['https://untrusted.example/package.zip']
+                  }),
+              headers: Headers.fromMap({
+                if (redirect)
+                  'location': ['https://untrusted.example/package.zip']
+              })));
+        }
+      }));
+      final client = CommunitySkillCatalog(dio: dio);
+      if (redirect) {
+        await expectLater(client.downloadBundle('one'), throwsFormatException);
+      } else {
+        final bundle = await client.downloadBundle('one');
+        expect(bundle.sha256, hash);
+        expect(bundle.bytes, [80, 75, 3, 4]);
+      }
+      expect(bundleRequests, 1);
+    });
+  }
+
+  test('bundle metadata cannot escape Pages packages or use a Release',
+      () async {
+    for (final path in [
+      'https://github.com/zbwork/skills/releases/download/test/demo.zip',
+      '../agents/packages/demo.zip',
+      'catalog/v1/skills.json',
+      'https://catalog.example.evil/project/packages/demo.zip',
+    ]) {
+      final dio = Dio(BaseOptions(baseUrl: 'https://catalog.example/project/'));
+      var requests = 0;
+      dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+        requests++;
+        handler.resolve(Response(requestOptions: options, data: {
+          'format_version': 1,
+          'success': true,
+          'data': {
+            'total': 1,
+            'categories': [],
+            'items': [
+              {
+                'skill_uuid': 'one',
+                'code': 'demo',
+                'name': 'Demo',
+                'bundle_url': path,
+                'bundle_sha256': 'a' * 64,
+              }
+            ]
+          },
+        }));
+      }));
+      await expectLater(CommunitySkillCatalog(dio: dio).downloadBundle('one'),
+          throwsFormatException);
+      expect(requests, 1, reason: 'Reject before any package request: $path');
+      dio.close(force: true);
+    }
   });
 
   test('market uses only current Bus response and clears on failure', () async {
