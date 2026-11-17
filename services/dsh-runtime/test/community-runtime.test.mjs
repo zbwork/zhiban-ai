@@ -9,6 +9,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
 
+// Windows includes AppContainer ACL setup/cleanup; use the tool's production default.
+const shellTimeoutMs = process.platform === 'win32' ? 60000 : 10000;
 const packageRoot = process.env.COMMUNITY_RUNTIME_TEST_ROOT;
 assert.ok(packageRoot, 'COMMUNITY_RUNTIME_TEST_ROOT must name a built runtime');
 const { communityModel, communityToolGuide } = await import(pathToFileURL(join(packageRoot, 'dist/desktop/community.js')));
@@ -248,11 +250,11 @@ for (const mode of ['allow', 'no-declaration', 'legacy-official', 'deny', 'cance
       ['declare_deliverables', { files: [{ name: 'hello.txt', mime: 'text/plain', text_contains: ['community-ok'] }] }],
       ['write_file', { path: 'hello.txt', text: 'community-ok' }],
       ['read_file', { path: 'hello.txt' }],
-      ['local_shell', { command: process.platform === 'win32' ? `[IO.File]::WriteAllText('shell-result.txt','shell-ok'); Write-Output 'shell-ok'` : 'printf shell-ok > shell-result.txt; printf shell-ok', timeout_ms: 10000 }],
+      ['local_shell', { command: process.platform === 'win32' ? `[IO.File]::WriteAllText('shell-result.txt','shell-ok'); Write-Output 'shell-ok'` : 'printf shell-ok > shell-result.txt; printf shell-ok', timeout_ms: shellTimeoutMs }],
     ];
     if (mode === 'no-declaration') {
       steps.splice(5, 1);
-      steps[5] = ['local_shell', { command: process.platform === 'win32' ? "[IO.File]::WriteAllText('hello.txt','community-ok')" : 'printf community-ok > hello.txt', timeout_ms: 10000 }];
+      steps[5] = ['local_shell', { command: process.platform === 'win32' ? "[IO.File]::WriteAllText('hello.txt','community-ok')" : 'printf community-ok > hello.txt', timeout_ms: shellTimeoutMs }];
     }
     const step = steps[calls++];
     if (mode.startsWith('codex')) {

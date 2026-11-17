@@ -55,3 +55,5 @@
 - [官方资源 GitHub 托管决策](adr/0004-github-official-resources.md)
 
 - [官方资源 GitHub 迁移验收](verification/github-official-resources-2026-11-13.md)
+
+- [社区版 1.0.1 打包记录](releases/community-1.0.1.md)

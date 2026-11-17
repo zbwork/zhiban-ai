@@ -1,0 +1,153 @@
+{
+  "version": "1.0.1+10101",
+  "business_source_commit": "e6643f89d0cbf09dd1b2a3bee390ea586224f66a",
+  "source_archive_sha256": "a76a75ff9f250067961d23c69e252d02e32103278dfffa7aa4c69bb05d01b58c",
+  "source_overlay": [
+    "apps/zhiban-app/pubspec.yaml: version 1.0.1+10101"
+  ],
+  "qa_only_overlay": {
+    "file": "services/dsh-runtime/test/community-runtime.test.mjs",
+    "sha256": "5f42ce455926043833df6e5b4d1135541824f605d5f6c580c98ac55a2f21e661",
+    "windows_shell_timeout_ms": 60000,
+    "macos_shell_timeout_ms": 10000
+  },
+  "artifacts": [
+    {
+      "platform": "macos",
+      "arch": "arm64",
+      "name": "ZhiBanAI_Community_1.0.1_macos_arm64.dmg",
+      "bytes": 216954420,
+      "sha256": "599835631bc5d8c8a51a2e6c704e721966a78c23b0ae16b7dc3cc6d4960c0459",
+      "notary_id": "7db3d757-df35-4a6d-bc07-89d27db028ef",
+      "notary_status": "Accepted",
+      "stapled": true,
+      "gatekeeper": true
+    },
+    {
+      "platform": "macos",
+      "arch": "x64",
+      "name": "ZhiBanAI_Community_1.0.1_macos_x64.dmg",
+      "bytes": 241612635,
+      "sha256": "8cad2139783a0fde40ff487f39c9020ec247443c501c015d80e3fd3a03261136",
+      "notary_id": "9b495d17-ae04-4021-8bf0-fac20ab723d7",
+      "notary_status": "Accepted",
+      "stapled": true,
+      "gatekeeper": true
+    },
+    {
+      "platform": "windows",
+      "arch": "x64",
+      "name": "ZhiBanAI_Community_1.0.1_windows_x64.exe",
+      "bytes": 393762570,
+      "sha256": "66d0f157d02d351cba2970a1ad92582b6327d7f8d5f67cfa674db59acf823b95",
+      "authenticode": "NotSigned",
+      "offline_webview2_bytes": 212745424
+    }
+  ],
+  "verification": {
+    "macos_arm64": {
+      "runtime_tests": 28,
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0,
+      "signed_mach_o_files": 44,
+      "bridge_initialize": true
+    },
+    "macos_x64": {
+      "runtime_tests": 28,
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0,
+      "signed_mach_o_files": 44,
+      "bridge_initialize": true
+    },
+    "windows_x64": {
+      "tests": 30,
+      "pass": 30,
+      "fail": 0,
+      "skipped": 0
+    },
+    "all_platform_component_checks": [
+      "node",
+      "engine",
+      "office",
+      "browser",
+      "isolation",
+      "codex"
+    ],
+    "dart_lock_packages": 225,
+    "dart_version_and_sha256_differences": 0,
+    "windows_offline_webview2_authenticode": "Valid",
+    "windows_pruned_files": 18,
+    "windows_pruned_bytes": 273170472,
+    "windows_payload_bytes": 874987602,
+    "windows_pe_machine": "0x8664"
+  },
+  "observed_issue": {
+    "case": "codex-missing-response-id",
+    "initial_complete_run": {
+      "pass": 29,
+      "fail": 1
+    },
+    "error": "zap.upstream_failure",
+    "isolated_retests_passed": 3,
+    "final_complete_run": {
+      "tests": 30,
+      "pass": 30,
+      "fail": 0,
+      "skipped": 0
+    },
+    "root_cause": "unconfirmed",
+    "production_fix_claimed": false
+  },
+  "not_executed": [
+    "fresh install/upgrade through installer UI",
+    "complete business UI regression in this packaging run",
+    "real paid model request",
+    "Windows 10 hardware",
+    "native Windows ARM64 package"
+  ],
+  "git_remote_writes": false,
+  "release_published": false,
+  "github_release": {
+    "id": 448451922,
+    "url": "https://github.com/zbwork/zhiban-ai/releases/tag/untagged-0d9ce88dc89030129fe2",
+    "tag_name": "v1.0.1",
+    "target_commitish": "e6643f89d0cbf09dd1b2a3bee390ea586224f66a",
+    "draft": true,
+    "assets": [
+      {
+        "id": 758574683,
+        "name": "SHA256SUMS",
+        "bytes": 319,
+        "digest": "sha256:0f4f107c36c89e5ecaaf1b35f76d440d23a5cafe53a30d128ec106c0a2ba222d",
+        "state": "uploaded",
+        "download_url": "https://github.com/zbwork/zhiban-ai/releases/download/untagged-0d9ce88dc89030129fe2/SHA256SUMS"
+      },
+      {
+        "id": 758574678,
+        "name": "ZhiBanAI_Community_1.0.1_macos_arm64.dmg",
+        "bytes": 216954420,
+        "digest": "sha256:599835631bc5d8c8a51a2e6c704e721966a78c23b0ae16b7dc3cc6d4960c0459",
+        "state": "uploaded",
+        "download_url": "https://github.com/zbwork/zhiban-ai/releases/download/untagged-0d9ce88dc89030129fe2/ZhiBanAI_Community_1.0.1_macos_arm64.dmg"
+      },
+      {
+        "id": 758574687,
+        "name": "ZhiBanAI_Community_1.0.1_macos_x64.dmg",
+        "bytes": 241612635,
+        "digest": "sha256:8cad2139783a0fde40ff487f39c9020ec247443c501c015d80e3fd3a03261136",
+        "state": "uploaded",
+        "download_url": "https://github.com/zbwork/zhiban-ai/releases/download/untagged-0d9ce88dc89030129fe2/ZhiBanAI_Community_1.0.1_macos_x64.dmg"
+      },
+      {
+        "id": 758574669,
+        "name": "ZhiBanAI_Community_1.0.1_windows_x64.exe",
+        "bytes": 393762570,
+        "digest": "sha256:66d0f157d02d351cba2970a1ad92582b6327d7f8d5f67cfa674db59acf823b95",
+        "state": "uploaded",
+        "download_url": "https://github.com/zbwork/zhiban-ai/releases/download/untagged-0d9ce88dc89030129fe2/ZhiBanAI_Community_1.0.1_windows_x64.exe"
+      }
+    ]
+  }
+}
