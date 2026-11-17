@@ -22,6 +22,10 @@ class RefreshedManagedCatalog {
 }
 
 class ConversationModelSources {
+  const ConversationModelSources(
+      {ModelServiceStore store = const ModelServiceStore()})
+      : _store = store;
+  final ModelServiceStore _store;
   static final managedRevision = ValueNotifier<int>(0);
 
   /// Both manual refresh buttons use the same member-scoped server operation.
@@ -135,7 +139,10 @@ class ConversationModelSources {
     if (identity == null) throw StateError('请重新登录');
     final account = modelConfigurationAccount(token);
     if (account == null) throw StateError('请重新登录');
-    final raw = prefs.getString('model_service.providers.v1.$account');
+    final epoch = AppConfig.connectionEpoch;
+    final origin = AppConfig.apiUrl();
+    final scope = await _store.configurationScope();
+    final raw = prefs.getString('model_service.providers.v1.$scope');
     // Remote dispatch consumes the desktop's member catalog. A fresh device also
     // has no configuration to replace the member's saved sources.
     if (!publishLocalConfiguration || (raw == null && changes == null)) {
@@ -166,7 +173,7 @@ class ConversationModelSources {
             .toList();
     final keys = {
       for (final p in providers)
-        p.id: prefs.getString('model_service.api_key.$account.${p.id}') ?? ''
+        p.id: p.enabled ? (await _store.getApiKey(p.id) ?? '') : ''
     };
     final catalog = await const ModelCatalogLoader().load();
     final entries = {for (final c in catalog.providers) c.id: c};
@@ -204,8 +211,10 @@ class ConversationModelSources {
         ],
       };
     }).toList();
-    if (prefs.getString(AppConfig.storageTokenKey) != token) {
-      throw StateError('登录身份已变化');
+    if (prefs.getString(AppConfig.storageTokenKey) != token ||
+        AppConfig.connectionEpoch != epoch ||
+        AppConfig.apiUrl() != origin) {
+      throw StateError('登录身份或服务器已变化');
     }
     final response = await sensitiveRequest.post(
         '/model-service/providers/sync',
@@ -214,8 +223,10 @@ class ConversationModelSources {
         options: Options(
             headers: {'Authorization': 'Bearer $token'},
             extra: {'authRetried': true}));
-    if (prefs.getString(AppConfig.storageTokenKey) != token) {
-      throw StateError('登录身份已变化');
+    if (prefs.getString(AppConfig.storageTokenKey) != token ||
+        AppConfig.connectionEpoch != epoch ||
+        AppConfig.apiUrl() != origin) {
+      throw StateError('登录身份或服务器已变化');
     }
     final data = response.data;
     final map =

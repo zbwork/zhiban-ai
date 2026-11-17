@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { hasAdminPermission } from '../lib/adminPermissions'
 import { Departments, type Department } from '../lib/api'
 import { ChevronRight, Users, Folder, Plus, Edit2, Trash2, X } from 'lucide-react'
 import { ConfirmDialog, InlineAlert, PageHeader, PrimaryButton, Select, Toolbar } from '../components/ui'
@@ -64,7 +65,7 @@ export function DepartmentTree() {
             <span className="ml-2 text-[var(--color-text-mute)]">在岗 {totalMembers} 人</span>
           </>
         }
-        actions={<PrimaryButton onClick={() => setCreating({})}>新建部门</PrimaryButton>}
+        actions={hasAdminPermission('tenant.department.create') ? <PrimaryButton onClick={() => setCreating({})}>新建部门</PrimaryButton> : undefined}
       />
 
       <div className="bg-white rounded-lg card-shadow p-3">
@@ -169,9 +170,9 @@ function Branch({
             {subtreeMemberCount(node)}
           </span>
           <div className="opacity-0 group-hover:opacity-100 transition flex items-center gap-0.5">
-            <IconBtn title="新建子部门" onClick={() => onAddChild(node)}><Plus size={12} /></IconBtn>
-            <IconBtn title="编辑" onClick={() => onEdit(node)}><Edit2 size={12} /></IconBtn>
-            <IconBtn title="删除" danger onClick={() => onDelete(node)}><Trash2 size={12} /></IconBtn>
+            {hasAdminPermission('tenant.department.create') && <IconBtn title="新建子部门" onClick={() => onAddChild(node)}><Plus size={12} /></IconBtn>}
+            {hasAdminPermission('tenant.department.update') && <IconBtn title="编辑" onClick={() => onEdit(node)}><Edit2 size={12} /></IconBtn>}
+            {hasAdminPermission('tenant.department.delete') && <IconBtn title="删除" danger onClick={() => onDelete(node)}><Trash2 size={12} /></IconBtn>}
           </div>
         </span>
       </div>

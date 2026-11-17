@@ -4,6 +4,7 @@ import (
 	"context"
 	runtimeadapter "github.com/zbwork/zhiban-ai/services/agent-bus/internal/adapter/runtime"
 	dommsg "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/message"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/modelerror"
 	"strings"
 	"time"
 )
@@ -20,27 +21,38 @@ func (s *impl) runGenericRuntime(ctx context.Context, streamID string, in runAge
 		defer cancel()
 		s.fanout.Close(cleanup, streamID)
 	}()
-	finish := func(blocks []map[string]any, status, code string) {
+	finish := func(blocks []map[string]any, status, code, detail string) {
 		if ctx.Err() != nil {
 			blocks = nil
 			status = "cancelled"
 			code = ""
+			detail = ""
 		}
 		terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		s.finalize(terminal, streamID, in.AccountID, in.TenantID, in.Conversation.UUID, in.RoomUUID, messageUUID, blocks, status, code, "", nil)
+		s.finalize(terminal, streamID, in.AccountID, in.TenantID, in.Conversation.UUID, in.RoomUUID, messageUUID, blocks, status, code, detail, nil)
+	}
+	fail := func(stage, fallback string, err error) {
+		code, detail, status := modelerror.Details(err)
+		if code == "" {
+			code = fallback
+		}
+		if s.logger != nil {
+			s.logger.Warn(ctx, "chat generic runtime failed", "stage", stage, "code", code, "upstream_status", status, "stream_id", streamID, "tenant_id", in.TenantID, "account_id", in.AccountID)
+		}
+		finish(nil, "failed", code, detail)
 	}
 	if ctx.Err() != nil {
-		finish(nil, "cancelled", "")
+		finish(nil, "cancelled", "", "")
 		return
 	}
 	if s.genericRuntime == nil {
-		finish(nil, "failed", ErrCodeProtocolUnsupported)
+		finish(nil, "failed", ErrCodeProtocolUnsupported, "")
 		return
 	}
 	history, err := s.messages.History(ctx, dommsg.HistoryFilter{ConversationID: in.Conversation.ID, Limit: 80})
 	if err != nil {
-		finish(nil, "failed", "chat.history_unavailable")
+		finish(nil, "failed", "chat.history_unavailable", "")
 		return
 	}
 	req := runtimeadapter.StreamRequest{StreamID: streamID, TenantID: in.TenantID, AccountID: in.AccountID, AgentUUID: in.Agent.UUID, ConversationID: in.Conversation.ID, UserMessage: in.PromptText, UserBlocks: in.UserBlocks, ModelHint: selectedConversationModel(in.UserMetadata)}
@@ -51,7 +63,7 @@ func (s *impl) runGenericRuntime(ctx context.Context, streamID string, in runAge
 	if in.Agent.CurrentVersion > 0 {
 		version, err := s.agents.GetVersion(ctx, in.Agent.ID, in.Agent.CurrentVersion)
 		if err != nil || version == nil {
-			finish(nil, "failed", "chat.version_unavailable")
+			finish(nil, "failed", "chat.version_unavailable", "")
 			return
 		}
 		if description, ok := version.Snapshot["description"].(string); ok {
@@ -63,7 +75,7 @@ func (s *impl) runGenericRuntime(ctx context.Context, streamID string, in runAge
 	}
 	for _, m := range history {
 		if m.TenantID != in.TenantID || m.ConversationID != in.Conversation.ID {
-			finish(nil, "failed", "chat.history_scope_mismatch")
+			finish(nil, "failed", "chat.history_scope_mismatch", "")
 			return
 		}
 		if m.Status != "final" || m.UUID == messageUUID || m.UUID == in.UserMessageUUID || m.UUID == in.InputMessageUUID {
@@ -76,22 +88,25 @@ func (s *impl) runGenericRuntime(ctx context.Context, streamID string, in runAge
 	}
 	stream, err := s.genericRuntime.Stream(ctx, req)
 	if err != nil {
-		finish(nil, "failed", "chat.runtime_unavailable")
+		fail("open", "chat.runtime_unavailable", err)
 		return
 	}
 	defer stream.Close()
 	for {
 		ev, err := stream.Recv()
 		if err != nil || ev.Err != nil || ev.Kind == "error" {
-			finish(nil, "failed", "chat.runtime_stream_failed")
+			if err == nil {
+				err = ev.Err
+			}
+			fail("read", "chat.runtime_stream_failed", err)
 			return
 		}
 		if ctx.Err() != nil {
-			finish(nil, "cancelled", "")
+			finish(nil, "cancelled", "", "")
 			return
 		}
 		if ev.Final && ev.Kind == "final" {
-			finish(finalBlocksWithKnowledgeContextSources(ev.Blocks, kc), "final", "")
+			finish(finalBlocksWithKnowledgeContextSources(ev.Blocks, kc), "final", "", "")
 			return
 		}
 		if ev.Kind != "delta" {
@@ -99,11 +114,11 @@ func (s *impl) runGenericRuntime(ctx context.Context, streamID string, in runAge
 		}
 		blocks := []map[string]any{{"type": "markdown", "text": ev.Text}}
 		if err := s.messages.UpdateStreamBlocks(ctx, streamID, blocks); err != nil {
-			finish(nil, "failed", "chat.persistence_failed")
+			finish(nil, "failed", "chat.persistence_failed", "")
 			return
 		}
 		if err := s.fanout.Publish(ctx, streamID, in.AccountID, in.TenantID, StreamEvent{Kind: EventMessageBlockDelta, ConversationUUID: in.Conversation.UUID, RoomUUID: in.RoomUUID, MessageUUID: messageUUID, Blocks: blocks, Text: ev.Text, Timestamp: time.Now()}); err != nil {
-			finish(nil, "failed", "chat.publish_failed")
+			finish(nil, "failed", "chat.publish_failed", "")
 			return
 		}
 	}

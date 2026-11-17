@@ -1,0 +1,2165 @@
+-- Original shared admin dependency schema, selected by owning table from upstream baseline.
+SET LOCAL search_path=agent_bus,public;
+--
+-- Name: a2a_call_edges; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.a2a_call_edges (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by bigint,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by bigint,
+    is_deleted boolean DEFAULT false NOT NULL,
+    deleted_at timestamp with time zone,
+    tenant_id bigint NOT NULL,
+    room_id bigint,
+    from_agent_id bigint NOT NULL,
+    to_agent_id bigint NOT NULL,
+    orchestration_id bigint,
+    parent_edge_id bigint,
+    depth smallint DEFAULT 0 NOT NULL,
+    idem_key character varying(64) NOT NULL,
+    invoke_kind character varying(32) DEFAULT 'sync'::character varying NOT NULL,
+    request_payload jsonb NOT NULL,
+    response_payload jsonb,
+    status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    error_message text,
+    tokens_in integer DEFAULT 0 NOT NULL,
+    tokens_out integer DEFAULT 0 NOT NULL,
+    latency_ms integer,
+    CONSTRAINT a2a_call_edges_invoke_kind_check CHECK (((invoke_kind)::text = ANY (ARRAY[('sync'::character varying)::text, ('async'::character varying)::text, ('stream'::character varying)::text]))),
+    CONSTRAINT a2a_call_edges_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('awaiting_approval'::character varying)::text, ('running'::character varying)::text, ('done'::character varying)::text, ('failed'::character varying)::text, ('cancelled'::character varying)::text, ('rejected'::character varying)::text, ('expired'::character varying)::text, ('dropped_loop'::character varying)::text, ('dropped_budget'::character varying)::text, ('dropped_whitelist'::character varying)::text]))),
+    CONSTRAINT chk_a2a_depth_max CHECK (((depth >= 0) AND (depth <= 3))),
+    CONSTRAINT chk_a2a_no_self CHECK ((from_agent_id <> to_agent_id)),
+    CONSTRAINT chk_a2a_soft_delete CHECK (((is_deleted = false) OR (deleted_at IS NOT NULL)))
+)
+PARTITION BY RANGE (created_at);
+
+
+--
+-- Name: TABLE a2a_call_edges; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.a2a_call_edges IS 'F09 Phase B: A2A 调用图边 (月分区, 90 天 hot retention). 一行 = 一次 A→B 调用. parent_edge_id self-FK 分区表受限, 仅 service 层校验 (§14 D28). depth ≤ 3 DB CHECK 强制.';
+
+
+SET default_table_access_method = heap;
+
+--
+-- Name: a2a_call_edges_default; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.a2a_call_edges_default (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by bigint,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by bigint,
+    is_deleted boolean DEFAULT false NOT NULL,
+    deleted_at timestamp with time zone,
+    tenant_id bigint NOT NULL,
+    room_id bigint,
+    from_agent_id bigint NOT NULL,
+    to_agent_id bigint NOT NULL,
+    orchestration_id bigint,
+    parent_edge_id bigint,
+    depth smallint DEFAULT 0 NOT NULL,
+    idem_key character varying(64) NOT NULL,
+    invoke_kind character varying(32) DEFAULT 'sync'::character varying NOT NULL,
+    request_payload jsonb NOT NULL,
+    response_payload jsonb,
+    status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    error_message text,
+    tokens_in integer DEFAULT 0 NOT NULL,
+    tokens_out integer DEFAULT 0 NOT NULL,
+    latency_ms integer,
+    CONSTRAINT a2a_call_edges_invoke_kind_check CHECK (((invoke_kind)::text = ANY (ARRAY[('sync'::character varying)::text, ('async'::character varying)::text, ('stream'::character varying)::text]))),
+    CONSTRAINT a2a_call_edges_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('awaiting_approval'::character varying)::text, ('running'::character varying)::text, ('done'::character varying)::text, ('failed'::character varying)::text, ('cancelled'::character varying)::text, ('rejected'::character varying)::text, ('expired'::character varying)::text, ('dropped_loop'::character varying)::text, ('dropped_budget'::character varying)::text, ('dropped_whitelist'::character varying)::text]))),
+    CONSTRAINT chk_a2a_depth_max CHECK (((depth >= 0) AND (depth <= 3))),
+    CONSTRAINT chk_a2a_no_self CHECK ((from_agent_id <> to_agent_id)),
+    CONSTRAINT chk_a2a_soft_delete CHECK (((is_deleted = false) OR (deleted_at IS NOT NULL)))
+);
+
+
+--
+-- Name: a2a_approval_requests; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.a2a_approval_requests (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id bigint NOT NULL,
+    edge_id bigint NOT NULL,
+    edge_uuid uuid NOT NULL,
+    edge_created_at timestamp with time zone NOT NULL,
+    from_agent_id bigint NOT NULL,
+    to_agent_id bigint NOT NULL,
+    parent_session_token_id bigint NOT NULL,
+    parent_account_id bigint,
+    caller_capabilities jsonb DEFAULT '[]'::jsonb NOT NULL,
+    invoke_kind character varying(16) NOT NULL,
+    request_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    request_payload_redacted jsonb DEFAULT '{}'::jsonb NOT NULL,
+    form_schema jsonb DEFAULT '{}'::jsonb NOT NULL,
+    form_result jsonb DEFAULT '{}'::jsonb NOT NULL,
+    status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    reason text,
+    expires_at timestamp with time zone,
+    decided_by_account_id bigint,
+    decided_at timestamp with time zone,
+    dispatched_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_deleted boolean DEFAULT false NOT NULL,
+    deleted_at timestamp with time zone,
+    CONSTRAINT uq_a2a_approval_requests_uuid UNIQUE (uuid),
+    CONSTRAINT uq_a2a_approval_requests_edge UNIQUE (tenant_id, edge_uuid, edge_created_at),
+    CONSTRAINT chk_a2a_approval_requests_status CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('approved'::character varying)::text, ('rejected'::character varying)::text, ('expired'::character varying)::text, ('cancelled'::character varying)::text]))),
+    CONSTRAINT chk_a2a_approval_requests_kind CHECK (((invoke_kind)::text = ANY (ARRAY[('sync'::character varying)::text, ('async'::character varying)::text, ('stream'::character varying)::text]))),
+    CONSTRAINT chk_a2a_approval_requests_soft_delete CHECK (((is_deleted = false) OR (deleted_at IS NOT NULL)))
+);
+
+
+COMMENT ON TABLE agent_bus.a2a_approval_requests IS 'A2A v1e strategy-driven approval requests. Raw request_payload is short-lived for resume and cleared after decision.';
+COMMENT ON COLUMN agent_bus.a2a_approval_requests.parent_account_id IS 'Parent session account scope used to resolve account-scoped hosted runtime_instances during A2A approval resume; NULL means tenant-scoped token and hosted runtime dispatch fail-closed.';
+
+
+--
+-- Name: a2a_call_edges_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.a2a_call_edges ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.a2a_call_edges_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: agent_callable_whitelist; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.agent_callable_whitelist (
+    id bigint NOT NULL,
+    callee_id bigint NOT NULL,
+    caller_id bigint NOT NULL,
+    granted_by bigint,
+    note text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE agent_callable_whitelist; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.agent_callable_whitelist IS 'A2A 调用白名单(谁可被谁调用)';
+
+
+--
+-- Name: COLUMN agent_callable_whitelist.id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_callable_whitelist.id IS '主键 ID';
+
+
+--
+-- Name: COLUMN agent_callable_whitelist.callee_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_callable_whitelist.callee_id IS '被调用方数字员工 ID';
+
+
+--
+-- Name: COLUMN agent_callable_whitelist.caller_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_callable_whitelist.caller_id IS '调用方数字员工 ID';
+
+
+--
+-- Name: COLUMN agent_callable_whitelist.granted_by; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_callable_whitelist.granted_by IS '授权人';
+
+
+--
+-- Name: COLUMN agent_callable_whitelist.note; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_callable_whitelist.note IS '备注';
+
+
+--
+-- Name: COLUMN agent_callable_whitelist.created_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_callable_whitelist.created_at IS '创建时间';
+
+
+--
+-- Name: agent_callable_whitelist_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.agent_callable_whitelist ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.agent_callable_whitelist_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: agent_cron_runtime_bindings; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.agent_cron_runtime_bindings (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    cron_job_id bigint NOT NULL,
+    tenant_id bigint NOT NULL,
+    account_id bigint NOT NULL,
+    agent_id bigint NOT NULL,
+    runtime_environment_id bigint NOT NULL,
+    adapter_kind character varying(32) NOT NULL,
+    framework character varying(32) NOT NULL,
+    remote_job_id character varying(128),
+    desired_revision character varying(64) DEFAULT ''::character varying NOT NULL,
+    remote_revision character varying(64) DEFAULT ''::character varying NOT NULL,
+    sync_status character varying(16) DEFAULT 'pending'::character varying NOT NULL,
+    last_sync_error text DEFAULT ''::text NOT NULL,
+    last_synced_at timestamp with time zone,
+    last_seen_at timestamp with time zone,
+    source_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    CONSTRAINT agent_cron_runtime_bindings_status_check CHECK (((sync_status)::text = ANY ((ARRAY['pending'::character varying, 'syncing'::character varying, 'synced'::character varying, 'drift'::character varying, 'error'::character varying, 'deleting'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE agent_cron_runtime_bindings; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.agent_cron_runtime_bindings IS 'F08 runtime cron projection state. Bus agent_cron_jobs is authoritative; runtime native cron jobs are projections.';
+
+
+--
+-- Name: COLUMN agent_cron_runtime_bindings.remote_job_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_cron_runtime_bindings.remote_job_id IS 'Runtime-native cron id, e.g. OpenClaw jobs.json id.';
+
+
+--
+-- Name: COLUMN agent_cron_runtime_bindings.source_snapshot; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_cron_runtime_bindings.source_snapshot IS 'Last Bus desired spec projected to runtime; not runtime truth.';
+
+
+--
+-- Name: agent_cron_runtime_bindings_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.agent_cron_runtime_bindings ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME agent_bus.agent_cron_runtime_bindings_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: agent_orchestration_steps; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.agent_orchestration_steps (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by bigint,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by bigint,
+    is_deleted boolean DEFAULT false NOT NULL,
+    deleted_at timestamp with time zone,
+    orchestration_id bigint NOT NULL,
+    call_edge_id bigint,
+    step_index smallint NOT NULL,
+    role character varying(32) NOT NULL,
+    worker_agent_id bigint,
+    input_summary text,
+    output_summary text,
+    status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    error_message text,
+    tokens_in integer DEFAULT 0 NOT NULL,
+    tokens_out integer DEFAULT 0 NOT NULL,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    CONSTRAINT agent_orchestration_steps_role_check CHECK (((role)::text = ANY (ARRAY[('planner'::character varying)::text, ('worker'::character varying)::text, ('reducer'::character varying)::text, ('validator'::character varying)::text]))),
+    CONSTRAINT agent_orchestration_steps_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('done'::character varying)::text, ('failed'::character varying)::text, ('skipped'::character varying)::text]))),
+    CONSTRAINT chk_aos_soft_delete CHECK (((is_deleted = false) OR (deleted_at IS NOT NULL)))
+);
+
+
+--
+-- Name: TABLE agent_orchestration_steps; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.agent_orchestration_steps IS 'F09 Phase B: 编排子步骤. role planner/worker/reducer/validator. call_edge_id 关联 a2a_call_edges (soft FK, 分区表受限).';
+
+
+--
+-- Name: agent_orchestration_steps_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.agent_orchestration_steps ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.agent_orchestration_steps_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: agent_orchestrations; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.agent_orchestrations (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by bigint,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by bigint,
+    is_deleted boolean DEFAULT false NOT NULL,
+    deleted_at timestamp with time zone,
+    tenant_id bigint NOT NULL,
+    room_id bigint,
+    trigger_msg_id bigint,
+    master_agent_id bigint NOT NULL,
+    depth_limit smallint DEFAULT 3 NOT NULL,
+    token_budget integer DEFAULT 16000 NOT NULL,
+    time_budget_ms integer DEFAULT 60000 NOT NULL,
+    status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    plan_summary text,
+    final_summary text,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    error_message text,
+    tokens_in_total integer DEFAULT 0 NOT NULL,
+    tokens_out_total integer DEFAULT 0 NOT NULL,
+    edges_count integer DEFAULT 0 NOT NULL,
+    max_depth_reached smallint DEFAULT 0 NOT NULL,
+    CONSTRAINT agent_orchestrations_depth_limit_check CHECK (((depth_limit >= 1) AND (depth_limit <= 3))),
+    CONSTRAINT agent_orchestrations_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('done'::character varying)::text, ('failed'::character varying)::text, ('cancelled'::character varying)::text, ('timed_out'::character varying)::text, ('budget_exhausted'::character varying)::text]))),
+    CONSTRAINT chk_ao_soft_delete CHECK (((is_deleted = false) OR (deleted_at IS NOT NULL)))
+);
+
+
+--
+-- Name: TABLE agent_orchestrations; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.agent_orchestrations IS 'F09 Phase B: 主-子 Agent 编排根记录. 预算 (depth/token/time) + 状态机 + 计量都在这.';
+
+
+--
+-- Name: agent_orchestrations_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.agent_orchestrations ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.agent_orchestrations_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: agent_sdk_credentials; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.agent_sdk_credentials (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id bigint NOT NULL,
+    creator_id bigint NOT NULL,
+    name character varying(128) NOT NULL,
+    client_id character varying(128) NOT NULL,
+    client_secret_hash character varying(256) NOT NULL,
+    capability_bindings character varying(64)[] DEFAULT '{}'::character varying[] NOT NULL,
+    runtime_environment_id bigint,
+    last_used_at timestamp with time zone,
+    status character varying(32) DEFAULT 'active'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    revoked_at timestamp with time zone,
+    CONSTRAINT agent_sdk_credentials_status_check CHECK (((status)::text = ANY (ARRAY[('active'::character varying)::text, ('revoked'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE agent_sdk_credentials; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.agent_sdk_credentials IS '自定义 Agent SDK 接入凭证 (F01 §3.6 场景 6 链路 A)';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.id IS '主键 ID';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.uuid; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.uuid IS '对外业务唯一标识';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.tenant_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.tenant_id IS '租户 ID';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.creator_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.creator_id IS '创建人';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.name; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.name IS '名称';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.client_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.client_id IS 'agentsdk_<rand>; 类似飞书 app_id';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.client_secret_hash; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.client_secret_hash IS 'sha256(明文 secret) hex; 明文仅创建时一次性返回';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.capability_bindings; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.capability_bindings IS '允许借的 scope 上限 (kb.read / drive.read / ...)';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.runtime_environment_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.runtime_environment_id IS '绑定的 runtime_environment; NULL=不限 (F02 v0.3, 原 runtime_registration_id)';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.last_used_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.last_used_at IS '最近一次成功 exchange token 的时间';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.status; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.status IS '状态 active/revoked';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.created_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.updated_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.updated_at IS '更新时间';
+
+
+--
+-- Name: COLUMN agent_sdk_credentials.revoked_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.agent_sdk_credentials.revoked_at IS '吊销时间';
+
+
+--
+-- Name: agent_sdk_credentials_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.agent_sdk_credentials ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.agent_sdk_credentials_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: api_keys; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.api_keys (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id bigint NOT NULL,
+    creator_id bigint NOT NULL,
+    name character varying(128) NOT NULL,
+    key_prefix character varying(16) NOT NULL,
+    key_hash character varying(256) NOT NULL,
+    scopes character varying(64)[] DEFAULT '{}'::character varying[] NOT NULL,
+    last_used_at timestamp with time zone,
+    expires_at timestamp with time zone,
+    status character varying(32) DEFAULT 'active'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    revoked_at timestamp with time zone,
+    CONSTRAINT api_keys_status_check CHECK (((status)::text = ANY (ARRAY[('active'::character varying)::text, ('revoked'::character varying)::text, ('expired'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE api_keys; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.api_keys IS 'API Key (开发者侧调用 Bus)';
+
+
+--
+-- Name: COLUMN api_keys.id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.id IS '主键 ID';
+
+
+--
+-- Name: COLUMN api_keys.uuid; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.uuid IS '对外业务唯一标识';
+
+
+--
+-- Name: COLUMN api_keys.tenant_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.tenant_id IS '租户 ID';
+
+
+--
+-- Name: COLUMN api_keys.creator_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.creator_id IS '创建人';
+
+
+--
+-- Name: COLUMN api_keys.name; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.name IS '名称';
+
+
+--
+-- Name: COLUMN api_keys.key_prefix; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.key_prefix IS 'Key 前缀(展示用)';
+
+
+--
+-- Name: COLUMN api_keys.key_hash; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.key_hash IS 'Key 哈希值(不存明文)';
+
+
+--
+-- Name: COLUMN api_keys.scopes; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.scopes IS '权限范围';
+
+
+--
+-- Name: COLUMN api_keys.last_used_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.last_used_at IS '最近一次使用时间';
+
+
+--
+-- Name: COLUMN api_keys.expires_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.expires_at IS '过期时间';
+
+
+--
+-- Name: COLUMN api_keys.status; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.status IS '状态 active/revoked/expired';
+
+
+--
+-- Name: COLUMN api_keys.created_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN api_keys.updated_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.updated_at IS '更新时间';
+
+
+--
+-- Name: COLUMN api_keys.revoked_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.api_keys.revoked_at IS '吊销时间';
+
+
+--
+-- Name: api_keys_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.api_keys ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.api_keys_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: client_builtin_handshakes; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.client_builtin_handshakes (
+    account_id bigint NOT NULL,
+    client_platform character varying(16) NOT NULL,
+    device_id character varying(128) NOT NULL,
+    client_version character varying(32) NOT NULL,
+    supported_builtin_keys text[] DEFAULT '{}'::text[] NOT NULL,
+    last_reported_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT client_builtin_handshakes_client_platform_check CHECK (((client_platform)::text = ANY (ARRAY[('ios'::character varying)::text, ('android'::character varying)::text, ('macos'::character varying)::text, ('windows'::character varying)::text, ('web'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE client_builtin_handshakes; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.client_builtin_handshakes IS 'module: f03; F03 v0.9.1 客户端心跳上报支持的 builtin_keys；POST /builtin-skills/handshake upsert；过期由 cron worker 按 AGBUS_BUILTIN_SKILL_HANDSHAKE_TTL 清理';
+
+
+--
+-- Name: runtime_instances; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.runtime_instances (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id bigint NOT NULL,
+    created_by bigint,
+    runtime_environment_id bigint NOT NULL,
+    k8s_namespace character varying(128),
+    k8s_deployment character varying(128),
+    k8s_service character varying(128),
+    workload_instance_id bigint,
+    image_version character varying(64),
+    target_image_version character varying(64),
+    last_upgraded_at timestamp with time zone,
+    upgrade_message text,
+    workspace_root character varying(512),
+    sessions_root character varying(512),
+    endpoint_url character varying(512),
+    agent_gateway_token character varying(256),
+    status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    last_healthy_at timestamp with time zone,
+    error_message text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    agent_id bigint,
+    updated_by bigint,
+    is_deleted boolean DEFAULT false NOT NULL,
+    CONSTRAINT chk_rinst_soft_delete CHECK (((is_deleted = false) OR (deleted_at IS NOT NULL))),
+    CONSTRAINT runtime_instances_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('starting'::character varying)::text, ('ready'::character varying)::text, ('degraded'::character varying)::text, ('stopped'::character varying)::text, ('failed'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE runtime_instances; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.runtime_instances IS 'Runtime 实例(K8s Pod / 本地容器)';
+
+
+--
+-- Name: COLUMN runtime_instances.id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.id IS '主键 ID';
+
+
+--
+-- Name: COLUMN runtime_instances.uuid; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.uuid IS '对外业务唯一标识';
+
+
+--
+-- Name: COLUMN runtime_instances.tenant_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.tenant_id IS '租户 ID';
+
+
+--
+-- Name: COLUMN runtime_instances.created_by; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.created_by IS '归属账号 ID(单实例模式)';
+
+
+--
+-- Name: COLUMN runtime_instances.runtime_environment_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.runtime_environment_id IS 'Runtime 类型外键';
+
+
+--
+-- Name: COLUMN runtime_instances.k8s_namespace; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.k8s_namespace IS 'K8s namespace';
+
+
+--
+-- Name: COLUMN runtime_instances.k8s_deployment; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.k8s_deployment IS 'K8s deployment 名';
+
+
+--
+-- Name: COLUMN runtime_instances.k8s_service; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.k8s_service IS 'K8s service 名';
+
+
+--
+-- Name: COLUMN runtime_instances.workload_instance_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.workload_instance_id IS '关联部署系统的 workload ID';
+
+
+--
+-- Name: COLUMN runtime_instances.image_version; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.image_version IS '当前镜像版本';
+
+
+--
+-- Name: COLUMN runtime_instances.target_image_version; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.target_image_version IS '目标镜像版本';
+
+
+--
+-- Name: COLUMN runtime_instances.last_upgraded_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.last_upgraded_at IS '上次升级时间';
+
+
+--
+-- Name: COLUMN runtime_instances.upgrade_message; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.upgrade_message IS '升级日志';
+
+
+--
+-- Name: COLUMN runtime_instances.workspace_root; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.workspace_root IS '运行时工作目录';
+
+
+--
+-- Name: COLUMN runtime_instances.sessions_root; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.sessions_root IS '运行时会话目录';
+
+
+--
+-- Name: COLUMN runtime_instances.endpoint_url; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.endpoint_url IS 'Runtime 入口 URL(本地模式使用)';
+
+
+--
+-- Name: COLUMN runtime_instances.agent_gateway_token; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.agent_gateway_token IS 'ADR-0021: pod 内 OPENCLAW_GATEWAY_TOKEN; 允许 value:// / vault:// 引用前缀, 由 SecretResolver 解明文';
+
+
+--
+-- Name: COLUMN runtime_instances.status; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.status IS '状态 pending/starting/ready/degraded/stopped/failed';
+
+
+--
+-- Name: COLUMN runtime_instances.last_healthy_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.last_healthy_at IS '最近健康时间';
+
+
+--
+-- Name: COLUMN runtime_instances.error_message; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.error_message IS '错误信息';
+
+
+--
+-- Name: COLUMN runtime_instances.metadata; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.metadata IS '元数据 JSON';
+
+
+--
+-- Name: COLUMN runtime_instances.created_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN runtime_instances.updated_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.updated_at IS '更新时间';
+
+
+--
+-- Name: COLUMN runtime_instances.deleted_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.runtime_instances.deleted_at IS '软删除时间';
+
+
+--
+-- Name: runtime_instances_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.runtime_instances ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.runtime_instances_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: session_tokens; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.session_tokens (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    credential_id bigint NOT NULL,
+    tenant_id bigint NOT NULL,
+    conversation_id bigint,
+    agent_id bigint,
+    token_prefix character varying(16) NOT NULL,
+    token_hash character varying(256) NOT NULL,
+    capability_bindings character varying(64)[] DEFAULT '{}'::character varying[] NOT NULL,
+    issued_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    last_used_at timestamp with time zone,
+    status character varying(32) DEFAULT 'active'::character varying NOT NULL,
+    revoked_at timestamp with time zone,
+    parent_session_id bigint,
+    CONSTRAINT session_tokens_status_check CHECK (((status)::text = ANY (ARRAY[('active'::character varying)::text, ('revoked'::character varying)::text, ('expired'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE session_tokens; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.session_tokens IS 'Agent SDK 每会话短期 token (TTL 60min; F01 §3.6 场景 6 链路 B)';
+
+
+--
+-- Name: COLUMN session_tokens.id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.id IS '主键 ID';
+
+
+--
+-- Name: COLUMN session_tokens.uuid; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.uuid IS '对外业务唯一标识';
+
+
+--
+-- Name: COLUMN session_tokens.credential_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.credential_id IS '颁发此 token 的 agent_sdk_credentials.id';
+
+
+--
+-- Name: COLUMN session_tokens.tenant_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.tenant_id IS '租户 ID (=credential.tenant_id)';
+
+
+--
+-- Name: COLUMN session_tokens.conversation_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.conversation_id IS '绑定会话; NULL = 通用';
+
+
+--
+-- Name: COLUMN session_tokens.agent_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.agent_id IS '绑定数字员工; NULL = 通用';
+
+
+--
+-- Name: COLUMN session_tokens.token_prefix; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.token_prefix IS '8 hex; uq_session_tokens_prefix 唯一';
+
+
+--
+-- Name: COLUMN session_tokens.token_hash; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.token_hash IS 'sha256(明文 secret) hex';
+
+
+--
+-- Name: COLUMN session_tokens.capability_bindings; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.capability_bindings IS '会话期可借 scope 快照';
+
+
+--
+-- Name: COLUMN session_tokens.issued_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.issued_at IS '颁发时间';
+
+
+--
+-- Name: COLUMN session_tokens.expires_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.expires_at IS '到期时间 (硬保证)';
+
+
+--
+-- Name: COLUMN session_tokens.last_used_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.last_used_at IS '最近一次成功校验时间';
+
+
+--
+-- Name: COLUMN session_tokens.status; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.status IS '状态 active/revoked/expired';
+
+
+--
+-- Name: COLUMN session_tokens.revoked_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.revoked_at IS '吊销时间';
+
+
+--
+-- Name: COLUMN session_tokens.parent_session_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.session_tokens.parent_session_id IS 'F09 A2A 派生链: 该 token 由哪条 parent session 派生而来 (NULL = master session, 直接由 credential 颁发). Phase B 起 F09 A2A invoke 调 IssueDerivedSessionToken 时填. ValidateSessionToken 沿此字段回溯, 任一 ancestor 不活跃则拒. RevokeChain(rootID) 沿此字段正向 cascade revoke 所有 descendant.';
+
+
+--
+-- Name: session_tokens_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.session_tokens ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.session_tokens_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: speaker_policies; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.speaker_policies (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by bigint,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by bigint,
+    is_deleted boolean DEFAULT false NOT NULL,
+    deleted_at timestamp with time zone,
+    tenant_id bigint NOT NULL,
+    name character varying(128) NOT NULL,
+    description text,
+    is_template boolean DEFAULT false NOT NULL,
+    base_policy character varying(32) NOT NULL,
+    manager_agent_id bigint,
+    selector_config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    max_speaker_decisions_per_minute integer DEFAULT 30 NOT NULL,
+    CONSTRAINT chk_sp_manager_required CHECK ((((base_policy)::text <> 'manager'::text) OR (manager_agent_id IS NOT NULL))),
+    CONSTRAINT chk_sp_soft_delete CHECK (((is_deleted = false) OR (deleted_at IS NOT NULL))),
+    CONSTRAINT speaker_policies_base_policy_check CHECK (((base_policy)::text = ANY (ARRAY[('manual'::character varying)::text, ('round_robin'::character varying)::text, ('auto_llm'::character varying)::text, ('manager'::character varying)::text, ('parallel'::character varying)::text, ('handoff'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE speaker_policies; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.speaker_policies IS 'F09 Phase B: SpeakerSelector 策略模板. Phase A 内联在 rooms.speaker_policy 的策略抽出来, 同租户多 room 可共用. base_policy=manager 时 manager_agent_id 必填.';
+
+
+--
+-- Name: speaker_policies_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.speaker_policies ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.speaker_policies_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: tenant_identity_providers; Type: TABLE; Schema: agent_bus; Owner: -
+--
+
+CREATE TABLE agent_bus.tenant_identity_providers (
+    id bigint NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id bigint NOT NULL,
+    kind character varying(16) NOT NULL,
+    name character varying(128) NOT NULL,
+    issuer character varying(512),
+    client_id character varying(256),
+    client_secret_enc character varying(1024),
+    redirect_uri character varying(512),
+    scopes character varying(64)[] DEFAULT '{}'::character varying[] NOT NULL,
+    settings jsonb DEFAULT '{}'::jsonb NOT NULL,
+    status character varying(16) DEFAULT 'active'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    CONSTRAINT tenant_identity_providers_kind_check CHECK (((kind)::text = ANY (ARRAY[('oidc'::character varying)::text, ('saml'::character varying)::text, ('ldap'::character varying)::text, ('scim'::character varying)::text]))),
+    CONSTRAINT tenant_identity_providers_status_check CHECK (((status)::text = ANY (ARRAY[('active'::character varying)::text, ('disabled'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE tenant_identity_providers; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON TABLE agent_bus.tenant_identity_providers IS '租户级 IdP 配置 (F01 §4.3)';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.id IS '主键 ID';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.uuid; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.uuid IS '对外业务唯一标识';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.tenant_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.tenant_id IS '租户 ID';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.kind; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.kind IS '协议类型 oidc/saml/ldap/scim';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.name; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.name IS '显示名 "招行 SSO"';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.issuer; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.issuer IS 'OIDC discovery 起点 / SAML EntityID; LDAP/SCIM 留空';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.client_id; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.client_id IS 'OIDC client_id / SAML SP EntityID';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.client_secret_enc; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.client_secret_enc IS 'OIDC client_secret 密文; 不存明文';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.redirect_uri; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.redirect_uri IS 'OIDC callback URI';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.scopes; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.scopes IS 'OIDC scope 列表';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.settings; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.settings IS '协议私有字段 (SAML metadata_xml / LDAP BindDN / SCIM token 等)';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.status; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.status IS '状态 active/disabled';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.created_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.updated_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.updated_at IS '更新时间';
+
+
+--
+-- Name: COLUMN tenant_identity_providers.deleted_at; Type: COMMENT; Schema: agent_bus; Owner: -
+--
+
+COMMENT ON COLUMN agent_bus.tenant_identity_providers.deleted_at IS '软删除时间';
+
+
+--
+-- Name: tenant_identity_providers_id_seq; Type: SEQUENCE; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.tenant_identity_providers ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME agent_bus.tenant_identity_providers_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: a2a_call_edges_default; Type: TABLE ATTACH; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.a2a_call_edges ATTACH PARTITION agent_bus.a2a_call_edges_default DEFAULT;
+
+
+--
+-- Name: a2a_call_edges a2a_call_edges_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.a2a_call_edges
+    ADD CONSTRAINT a2a_call_edges_pkey PRIMARY KEY (id, created_at);
+
+
+--
+-- Name: a2a_call_edges_default a2a_call_edges_default_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.a2a_call_edges_default
+    ADD CONSTRAINT a2a_call_edges_default_pkey PRIMARY KEY (id, created_at);
+
+
+--
+-- Name: agent_callable_whitelist agent_callable_whitelist_callee_id_caller_id_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_callable_whitelist
+    ADD CONSTRAINT agent_callable_whitelist_callee_id_caller_id_key UNIQUE (callee_id, caller_id);
+
+
+--
+-- Name: agent_callable_whitelist agent_callable_whitelist_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_callable_whitelist
+    ADD CONSTRAINT agent_callable_whitelist_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_cron_runtime_bindings agent_cron_runtime_bindings_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_cron_runtime_bindings
+    ADD CONSTRAINT agent_cron_runtime_bindings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_cron_runtime_bindings agent_cron_runtime_bindings_uuid_unique; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_cron_runtime_bindings
+    ADD CONSTRAINT agent_cron_runtime_bindings_uuid_unique UNIQUE (uuid);
+
+
+--
+-- Name: agent_orchestration_steps agent_orchestration_steps_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestration_steps
+    ADD CONSTRAINT agent_orchestration_steps_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_orchestration_steps agent_orchestration_steps_uuid_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestration_steps
+    ADD CONSTRAINT agent_orchestration_steps_uuid_key UNIQUE (uuid);
+
+
+--
+-- Name: agent_orchestrations agent_orchestrations_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestrations
+    ADD CONSTRAINT agent_orchestrations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_orchestrations agent_orchestrations_uuid_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestrations
+    ADD CONSTRAINT agent_orchestrations_uuid_key UNIQUE (uuid);
+
+
+--
+-- Name: agent_sdk_credentials agent_sdk_credentials_client_id_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_sdk_credentials
+    ADD CONSTRAINT agent_sdk_credentials_client_id_key UNIQUE (client_id);
+
+
+--
+-- Name: agent_sdk_credentials agent_sdk_credentials_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_sdk_credentials
+    ADD CONSTRAINT agent_sdk_credentials_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_sdk_credentials agent_sdk_credentials_uuid_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_sdk_credentials
+    ADD CONSTRAINT agent_sdk_credentials_uuid_key UNIQUE (uuid);
+
+
+--
+-- Name: api_keys api_keys_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.api_keys
+    ADD CONSTRAINT api_keys_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: api_keys api_keys_uuid_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.api_keys
+    ADD CONSTRAINT api_keys_uuid_key UNIQUE (uuid);
+
+
+--
+-- Name: client_builtin_handshakes client_builtin_handshakes_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.client_builtin_handshakes
+    ADD CONSTRAINT client_builtin_handshakes_pkey PRIMARY KEY (account_id, client_platform, device_id);
+
+
+--
+-- Name: runtime_instances runtime_instances_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.runtime_instances
+    ADD CONSTRAINT runtime_instances_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: runtime_instances runtime_instances_uuid_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.runtime_instances
+    ADD CONSTRAINT runtime_instances_uuid_key UNIQUE (uuid);
+
+
+--
+-- Name: session_tokens session_tokens_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.session_tokens
+    ADD CONSTRAINT session_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: session_tokens session_tokens_uuid_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.session_tokens
+    ADD CONSTRAINT session_tokens_uuid_key UNIQUE (uuid);
+
+
+--
+-- Name: speaker_policies speaker_policies_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.speaker_policies
+    ADD CONSTRAINT speaker_policies_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: speaker_policies speaker_policies_uuid_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.speaker_policies
+    ADD CONSTRAINT speaker_policies_uuid_key UNIQUE (uuid);
+
+
+--
+-- Name: tenant_identity_providers tenant_identity_providers_pkey; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.tenant_identity_providers
+    ADD CONSTRAINT tenant_identity_providers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tenant_identity_providers tenant_identity_providers_uuid_key; Type: CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.tenant_identity_providers
+    ADD CONSTRAINT tenant_identity_providers_uuid_key UNIQUE (uuid);
+
+
+--
+-- Name: idx_a2a_from; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_a2a_from ON ONLY agent_bus.a2a_call_edges USING btree (from_agent_id, created_at DESC) WHERE (is_deleted = false);
+
+
+--
+-- Name: a2a_call_edges_default_from_agent_id_created_at_idx; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX a2a_call_edges_default_from_agent_id_created_at_idx ON agent_bus.a2a_call_edges_default USING btree (from_agent_id, created_at DESC) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_a2a_orch; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_a2a_orch ON ONLY agent_bus.a2a_call_edges USING btree (orchestration_id, depth) WHERE (is_deleted = false);
+
+
+--
+-- Name: a2a_call_edges_default_orchestration_id_depth_idx; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX a2a_call_edges_default_orchestration_id_depth_idx ON agent_bus.a2a_call_edges_default USING btree (orchestration_id, depth) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_a2a_room; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_a2a_room ON ONLY agent_bus.a2a_call_edges USING btree (room_id, created_at DESC) WHERE (room_id IS NOT NULL);
+
+
+--
+-- Name: a2a_call_edges_default_room_id_created_at_idx; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX a2a_call_edges_default_room_id_created_at_idx ON agent_bus.a2a_call_edges_default USING btree (room_id, created_at DESC) WHERE (room_id IS NOT NULL);
+
+
+--
+-- Name: idx_a2a_status; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_a2a_status ON ONLY agent_bus.a2a_call_edges USING btree (status, created_at DESC) WHERE ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('awaiting_approval'::character varying)::text, ('running'::character varying)::text]));
+
+
+--
+-- Name: a2a_call_edges_default_status_created_at_idx; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX a2a_call_edges_default_status_created_at_idx ON agent_bus.a2a_call_edges_default USING btree (status, created_at DESC) WHERE ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('awaiting_approval'::character varying)::text, ('running'::character varying)::text]));
+
+
+--
+-- Name: uq_a2a_idem; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_a2a_idem ON ONLY agent_bus.a2a_call_edges USING btree (tenant_id, idem_key, created_at) WHERE (is_deleted = false);
+
+
+--
+-- Name: a2a_call_edges_default_tenant_id_idem_key_created_at_idx; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX a2a_call_edges_default_tenant_id_idem_key_created_at_idx ON agent_bus.a2a_call_edges_default USING btree (tenant_id, idem_key, created_at) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_a2a_to; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_a2a_to ON ONLY agent_bus.a2a_call_edges USING btree (to_agent_id, created_at DESC) WHERE (is_deleted = false);
+
+
+--
+-- Name: a2a_call_edges_default_to_agent_id_created_at_idx; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX a2a_call_edges_default_to_agent_id_created_at_idx ON agent_bus.a2a_call_edges_default USING btree (to_agent_id, created_at DESC) WHERE (is_deleted = false);
+
+
+--
+-- Name: uq_a2a_uuid; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_a2a_uuid ON ONLY agent_bus.a2a_call_edges USING btree (uuid, created_at);
+
+
+--
+-- Name: a2a_call_edges_default_uuid_created_at_idx; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX a2a_call_edges_default_uuid_created_at_idx ON agent_bus.a2a_call_edges_default USING btree (uuid, created_at);
+
+
+--
+-- Name: idx_a2a_approval_requests_tenant_status; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_a2a_approval_requests_tenant_status ON agent_bus.a2a_approval_requests USING btree (tenant_id, status, created_at DESC) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_a2a_approval_requests_edge; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_a2a_approval_requests_edge ON agent_bus.a2a_approval_requests USING btree (tenant_id, edge_uuid, edge_created_at) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_agent_sdk_credentials_tenant; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_agent_sdk_credentials_tenant ON agent_bus.agent_sdk_credentials USING btree (tenant_id);
+
+
+--
+-- Name: idx_ao_master; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_ao_master ON agent_bus.agent_orchestrations USING btree (master_agent_id, created_at DESC) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_ao_status; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_ao_status ON agent_bus.agent_orchestrations USING btree (status) WHERE ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text]));
+
+
+--
+-- Name: idx_ao_tenant; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_ao_tenant ON agent_bus.agent_orchestrations USING btree (tenant_id, created_at DESC) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_aos_edge; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_aos_edge ON agent_bus.agent_orchestration_steps USING btree (call_edge_id) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_aos_worker; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_aos_worker ON agent_bus.agent_orchestration_steps USING btree (worker_agent_id, created_at DESC) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_api_keys_tenant; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_api_keys_tenant ON agent_bus.api_keys USING btree (tenant_id);
+
+
+--
+-- Name: idx_client_builtin_handshakes_reported; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_client_builtin_handshakes_reported ON agent_bus.client_builtin_handshakes USING btree (last_reported_at);
+
+
+--
+-- Name: idx_cron_runtime_bindings_remote; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_cron_runtime_bindings_remote ON agent_bus.agent_cron_runtime_bindings USING btree (adapter_kind, remote_job_id) WHERE ((deleted_at IS NULL) AND (remote_job_id IS NOT NULL));
+
+
+--
+-- Name: idx_cron_runtime_bindings_status; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_cron_runtime_bindings_status ON agent_bus.agent_cron_runtime_bindings USING btree (sync_status, updated_at) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: idx_rinst_agent; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_rinst_agent ON agent_bus.runtime_instances USING btree (agent_id) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_rinst_runtime; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_rinst_runtime ON agent_bus.runtime_instances USING btree (runtime_environment_id) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_rinst_status; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_rinst_status ON agent_bus.runtime_instances USING btree (status) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_rinst_tenant; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_rinst_tenant ON agent_bus.runtime_instances USING btree (tenant_id) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_runtime_inst_account; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_runtime_inst_account ON agent_bus.runtime_instances USING btree (created_by);
+
+
+--
+-- Name: idx_runtime_inst_tenant_status; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_runtime_inst_tenant_status ON agent_bus.runtime_instances USING btree (tenant_id, status);
+
+
+--
+-- Name: idx_session_tokens_credential; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_session_tokens_credential ON agent_bus.session_tokens USING btree (credential_id);
+
+
+--
+-- Name: idx_session_tokens_expires_at; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_session_tokens_expires_at ON agent_bus.session_tokens USING btree (expires_at) WHERE ((status)::text = 'active'::text);
+
+
+--
+-- Name: idx_session_tokens_parent; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_session_tokens_parent ON agent_bus.session_tokens USING btree (parent_session_id) WHERE (parent_session_id IS NOT NULL);
+
+
+--
+-- Name: idx_session_tokens_revoked_at; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_session_tokens_revoked_at ON agent_bus.session_tokens USING btree (revoked_at) WHERE (revoked_at IS NOT NULL);
+
+
+--
+-- Name: idx_session_tokens_tenant; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_session_tokens_tenant ON agent_bus.session_tokens USING btree (tenant_id);
+
+
+--
+-- Name: idx_sp_template; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_sp_template ON agent_bus.speaker_policies USING btree (tenant_id, is_template) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_sp_tenant; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_sp_tenant ON agent_bus.speaker_policies USING btree (tenant_id) WHERE (is_deleted = false);
+
+
+--
+-- Name: idx_tenant_identity_providers_tenant; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE INDEX idx_tenant_identity_providers_tenant ON agent_bus.tenant_identity_providers USING btree (tenant_id) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: uq_agent_sdk_credentials_client_id; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_agent_sdk_credentials_client_id ON agent_bus.agent_sdk_credentials USING btree (client_id);
+
+
+--
+-- Name: uq_aos_step; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_aos_step ON agent_bus.agent_orchestration_steps USING btree (orchestration_id, step_index) WHERE (is_deleted = false);
+
+
+--
+-- Name: uq_api_keys_prefix; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_api_keys_prefix ON agent_bus.api_keys USING btree (key_prefix);
+
+
+--
+-- Name: uq_cron_runtime_bindings_active; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_cron_runtime_bindings_active ON agent_bus.agent_cron_runtime_bindings USING btree (cron_job_id, runtime_environment_id, adapter_kind) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: uq_runtime_inst_account_runtime; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_runtime_inst_account_runtime ON agent_bus.runtime_instances USING btree (tenant_id, created_by, runtime_environment_id) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: uq_session_tokens_prefix; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_session_tokens_prefix ON agent_bus.session_tokens USING btree (token_prefix);
+
+
+--
+-- Name: uq_tenant_idp_issuer_kind; Type: INDEX; Schema: agent_bus; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_tenant_idp_issuer_kind ON agent_bus.tenant_identity_providers USING btree (tenant_id, kind, COALESCE(issuer, ''::character varying)) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: a2a_call_edges a2a_call_edges_created_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.a2a_call_edges
+    ADD CONSTRAINT a2a_call_edges_created_by_fkey FOREIGN KEY (created_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: a2a_call_edges a2a_call_edges_from_agent_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.a2a_call_edges
+    ADD CONSTRAINT a2a_call_edges_from_agent_id_fkey FOREIGN KEY (from_agent_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: a2a_call_edges a2a_call_edges_room_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.a2a_call_edges
+    ADD CONSTRAINT a2a_call_edges_room_id_fkey FOREIGN KEY (room_id) REFERENCES agent_bus.rooms(id);
+
+
+--
+-- Name: a2a_call_edges a2a_call_edges_tenant_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.a2a_call_edges
+    ADD CONSTRAINT a2a_call_edges_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES agent_bus.tenants(id);
+
+
+--
+-- Name: a2a_call_edges a2a_call_edges_to_agent_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.a2a_call_edges
+    ADD CONSTRAINT a2a_call_edges_to_agent_id_fkey FOREIGN KEY (to_agent_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: a2a_call_edges a2a_call_edges_updated_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.a2a_call_edges
+    ADD CONSTRAINT a2a_call_edges_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: agent_callable_whitelist agent_callable_whitelist_callee_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_callable_whitelist
+    ADD CONSTRAINT agent_callable_whitelist_callee_id_fkey FOREIGN KEY (callee_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: agent_callable_whitelist agent_callable_whitelist_caller_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_callable_whitelist
+    ADD CONSTRAINT agent_callable_whitelist_caller_id_fkey FOREIGN KEY (caller_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: agent_callable_whitelist agent_callable_whitelist_granted_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_callable_whitelist
+    ADD CONSTRAINT agent_callable_whitelist_granted_by_fkey FOREIGN KEY (granted_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: agent_cron_runtime_bindings agent_cron_runtime_bindings_account_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_cron_runtime_bindings
+    ADD CONSTRAINT agent_cron_runtime_bindings_account_id_fkey FOREIGN KEY (account_id) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: agent_cron_runtime_bindings agent_cron_runtime_bindings_agent_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_cron_runtime_bindings
+    ADD CONSTRAINT agent_cron_runtime_bindings_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: agent_cron_runtime_bindings agent_cron_runtime_bindings_cron_job_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_cron_runtime_bindings
+    ADD CONSTRAINT agent_cron_runtime_bindings_cron_job_id_fkey FOREIGN KEY (cron_job_id) REFERENCES agent_bus.agent_cron_jobs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_cron_runtime_bindings agent_cron_runtime_bindings_runtime_environment_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_cron_runtime_bindings
+    ADD CONSTRAINT agent_cron_runtime_bindings_runtime_environment_id_fkey FOREIGN KEY (runtime_environment_id) REFERENCES agent_bus.runtime_environments(id);
+
+
+--
+-- Name: agent_cron_runtime_bindings agent_cron_runtime_bindings_tenant_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_cron_runtime_bindings
+    ADD CONSTRAINT agent_cron_runtime_bindings_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES agent_bus.tenants(id);
+
+
+--
+-- Name: agent_orchestration_steps agent_orchestration_steps_created_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestration_steps
+    ADD CONSTRAINT agent_orchestration_steps_created_by_fkey FOREIGN KEY (created_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: agent_orchestration_steps agent_orchestration_steps_orchestration_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestration_steps
+    ADD CONSTRAINT agent_orchestration_steps_orchestration_id_fkey FOREIGN KEY (orchestration_id) REFERENCES agent_bus.agent_orchestrations(id);
+
+
+--
+-- Name: agent_orchestration_steps agent_orchestration_steps_updated_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestration_steps
+    ADD CONSTRAINT agent_orchestration_steps_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: agent_orchestration_steps agent_orchestration_steps_worker_agent_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestration_steps
+    ADD CONSTRAINT agent_orchestration_steps_worker_agent_id_fkey FOREIGN KEY (worker_agent_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: agent_orchestrations agent_orchestrations_created_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestrations
+    ADD CONSTRAINT agent_orchestrations_created_by_fkey FOREIGN KEY (created_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: agent_orchestrations agent_orchestrations_master_agent_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestrations
+    ADD CONSTRAINT agent_orchestrations_master_agent_id_fkey FOREIGN KEY (master_agent_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: agent_orchestrations agent_orchestrations_room_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestrations
+    ADD CONSTRAINT agent_orchestrations_room_id_fkey FOREIGN KEY (room_id) REFERENCES agent_bus.rooms(id);
+
+
+--
+-- Name: agent_orchestrations agent_orchestrations_tenant_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestrations
+    ADD CONSTRAINT agent_orchestrations_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES agent_bus.tenants(id);
+
+
+--
+-- Name: agent_orchestrations agent_orchestrations_updated_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_orchestrations
+    ADD CONSTRAINT agent_orchestrations_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: agent_sdk_credentials agent_sdk_credentials_creator_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_sdk_credentials
+    ADD CONSTRAINT agent_sdk_credentials_creator_id_fkey FOREIGN KEY (creator_id) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: agent_sdk_credentials agent_sdk_credentials_runtime_environment_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_sdk_credentials
+    ADD CONSTRAINT agent_sdk_credentials_runtime_environment_id_fkey FOREIGN KEY (runtime_environment_id) REFERENCES agent_bus.runtime_environments(id);
+
+
+--
+-- Name: agent_sdk_credentials agent_sdk_credentials_tenant_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.agent_sdk_credentials
+    ADD CONSTRAINT agent_sdk_credentials_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES agent_bus.tenants(id);
+
+
+--
+-- Name: api_keys api_keys_creator_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.api_keys
+    ADD CONSTRAINT api_keys_creator_id_fkey FOREIGN KEY (creator_id) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: api_keys api_keys_tenant_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.api_keys
+    ADD CONSTRAINT api_keys_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES agent_bus.tenants(id);
+
+
+--
+-- Name: client_builtin_handshakes client_builtin_handshakes_account_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.client_builtin_handshakes
+    ADD CONSTRAINT client_builtin_handshakes_account_id_fkey FOREIGN KEY (account_id) REFERENCES agent_bus.accounts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: a2a_call_edges fk_a2a_orchestration; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE agent_bus.a2a_call_edges
+    ADD CONSTRAINT fk_a2a_orchestration FOREIGN KEY (orchestration_id) REFERENCES agent_bus.agent_orchestrations(id);
+
+
+--
+-- Name: runtime_instances runtime_instances_account_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.runtime_instances
+    ADD CONSTRAINT runtime_instances_account_id_fkey FOREIGN KEY (created_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: runtime_instances runtime_instances_agent_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.runtime_instances
+    ADD CONSTRAINT runtime_instances_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: runtime_instances runtime_instances_runtime_environment_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.runtime_instances
+    ADD CONSTRAINT runtime_instances_runtime_environment_id_fkey FOREIGN KEY (runtime_environment_id) REFERENCES agent_bus.runtime_environments(id);
+
+
+--
+-- Name: runtime_instances runtime_instances_tenant_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.runtime_instances
+    ADD CONSTRAINT runtime_instances_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES agent_bus.tenants(id);
+
+
+--
+-- Name: runtime_instances runtime_instances_updated_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.runtime_instances
+    ADD CONSTRAINT runtime_instances_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: session_tokens session_tokens_agent_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.session_tokens
+    ADD CONSTRAINT session_tokens_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: session_tokens session_tokens_conversation_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.session_tokens
+    ADD CONSTRAINT session_tokens_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES agent_bus.conversations(id);
+
+
+--
+-- Name: session_tokens session_tokens_credential_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.session_tokens
+    ADD CONSTRAINT session_tokens_credential_id_fkey FOREIGN KEY (credential_id) REFERENCES agent_bus.agent_sdk_credentials(id);
+
+
+--
+-- Name: session_tokens session_tokens_parent_session_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.session_tokens
+    ADD CONSTRAINT session_tokens_parent_session_id_fkey FOREIGN KEY (parent_session_id) REFERENCES agent_bus.session_tokens(id);
+
+
+--
+-- Name: session_tokens session_tokens_tenant_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.session_tokens
+    ADD CONSTRAINT session_tokens_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES agent_bus.tenants(id);
+
+
+--
+-- Name: speaker_policies speaker_policies_created_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.speaker_policies
+    ADD CONSTRAINT speaker_policies_created_by_fkey FOREIGN KEY (created_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: speaker_policies speaker_policies_manager_agent_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.speaker_policies
+    ADD CONSTRAINT speaker_policies_manager_agent_id_fkey FOREIGN KEY (manager_agent_id) REFERENCES agent_bus.digital_employees(id);
+
+
+--
+-- Name: speaker_policies speaker_policies_tenant_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.speaker_policies
+    ADD CONSTRAINT speaker_policies_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES agent_bus.tenants(id);
+
+
+--
+-- Name: speaker_policies speaker_policies_updated_by_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.speaker_policies
+    ADD CONSTRAINT speaker_policies_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES agent_bus.accounts(id);
+
+
+--
+-- Name: tenant_identity_providers tenant_identity_providers_tenant_id_fkey; Type: FK CONSTRAINT; Schema: agent_bus; Owner: -
+--
+
+ALTER TABLE ONLY agent_bus.tenant_identity_providers
+    ADD CONSTRAINT tenant_identity_providers_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES agent_bus.tenants(id);

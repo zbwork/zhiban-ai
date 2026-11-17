@@ -3,7 +3,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { Stats, type PlatformOverview, type TenantOverview, type TenantTodos, type ScopeOption } from '../lib/api'
 import {
   Activity, AlertTriangle, ArrowRight, BellRing, BookOpen, Bot, Building, Calendar, CheckCircle2,
-  CheckSquare, Circle, Coins, Cpu, MessageSquare, ServerCog, Timer, Users,
+  CheckSquare, Circle, Cpu, MessageSquare, ServerCog, Timer, Users,
 } from 'lucide-react'
 import { EmptyState, TrendChart } from '../components/ui'
 
@@ -173,17 +173,6 @@ function TenantDashboard() {
     },
     { icon: MessageSquare, label: '今日消息', value: o.messages_today, hint: `今日会话 ${o.conversations_today}`, color: 'text-indigo-700 bg-indigo-50' },
     {
-      icon: Coins, label: '积分余额',
-      value: o.billing ? o.billing.credit_balance.toLocaleString() : '—',
-      hint: !o.billing
-        ? '未开通套餐'
-        : o.billing.wallet_frozen
-          ? '钱包已冻结'
-          : `本月消耗 ${o.billing.month_credits_used.toLocaleString()} · ${o.billing.plan_name}`,
-      color: o.billing?.wallet_frozen ? 'text-red-700 bg-red-50' : 'text-amber-700 bg-amber-50',
-      to: '/billing/subscription?tab=wallet',
-    },
-    {
       icon: Activity, label: '24h 调用',
       value: o.health.calls_24h,
       hint: `失败 ${o.health.calls_failed_24h}${o.health.instances_total > 0 ? ` · 实例就绪 ${o.health.instances_ready}/${o.health.instances_total}` : ''}`,
@@ -200,7 +189,7 @@ function TenantDashboard() {
 
   return (
     <div>
-      <Header title="租户控制台" subtitle="一眼看清采用、用量、成本、健康与待办，再决定去哪里处理。" />
+      <Header title="租户控制台" subtitle="查看团队使用情况、服务健康与待办，快速找到需要处理的事项。" />
       <StatGrid cards={cards} />
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
@@ -258,7 +247,6 @@ function TenantDashboard() {
           <NavLink to="/skills" label="技能管理" />
           <NavLink to="/kb" label="知识库" />
           <NavLink to="/members" label="成员" />
-          <NavLink to="/billing/usage" label="用量明细" />
           <NavLink to="/observability/call-logs" label="调用日志" />
         </Tile>
       </div>
@@ -374,7 +362,7 @@ type StatCard = {
   value: number | string
   hint?: string
   color: string
-  // F25: 可点击卡片的下钻路由（如 积分余额 → 订阅与配额钱包 Tab）
+  // 可点击卡片跳转到对应的业务管理页面。
   to?: string
 }
 

@@ -1,10 +1,13 @@
+import 'package:zhiban_client/pages/login/initial_password_page.dart';
+import 'package:zhiban_core/session/local_token_claims.dart';
 import 'package:zhiban_client/pages/contacts/contact_detail_pages.dart';
 import 'package:zhiban_client/pages/chat/widgets/local_approval_host.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:zhiban_client/pages/chat/direct_chat_with_human_page.dart';
 import 'package:zhiban_core/contacts/contact_models.dart';
 import 'package:zhiban_client/pages/login/tenant_picker_page.dart';
-import 'package:zhiban_client/pages/login/services/auth_api.dart' show ScopeOption;
+import 'package:zhiban_client/pages/login/services/auth_api.dart'
+    show ScopeOption;
 import 'package:zhiban_core/models/account_info.dart';
 import 'package:zhiban_client/pages/settings/settings_page.dart';
 import 'package:zhiban_client/pages/settings/account_security_page.dart';
@@ -32,8 +35,18 @@ GoRouter createSessionRouter({
     observers: [BotToastNavigatorObserver()],
     redirect: (context, state) async {
       final path = state.uri.path;
+      final token = await const SessionService().getToken();
+      final mustChange =
+          token != null && LocalTokenClaims.read(token, 'mc') == true;
+      if (mustChange && path != RoutePaths.initialPassword) {
+        return RoutePaths.initialPassword;
+      }
+      if (!mustChange && path == RoutePaths.initialPassword) {
+        return RoutePaths.login;
+      }
       final isPublic = path == RoutePaths.login ||
           path == RoutePaths.tenantPicker ||
+          path == RoutePaths.initialPassword ||
           publicPaths.contains(path);
       if (isPublic) return null;
       final hasSession = await const SessionService().hasValidSession();
@@ -42,6 +55,11 @@ GoRouter createSessionRouter({
       return RoutePaths.login;
     },
     routes: [
+      GoRoute(
+          path: RoutePaths.initialPassword,
+          parentNavigatorKey: rootNavigatorKey,
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: InitialPasswordPage())),
       ShellRoute(
           pageBuilder: (context, state, child) => NoTransitionPage(
               child: LocalApprovalHost(child: shellBuilder(child))),
@@ -52,9 +70,7 @@ GoRouter createSessionRouter({
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
           final scopes = (state.extra as List<ScopeOption>?) ?? const [];
-          return MaterialPage(
-            child: TenantPickerPage(tenantScopes: scopes)
-          );
+          return MaterialPage(child: TenantPickerPage(tenantScopes: scopes));
         },
       ),
       GoRoute(

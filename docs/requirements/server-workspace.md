@@ -111,3 +111,112 @@
 ## 官方资源来源迁移（2026-11-13，替代旧公共 API 来源约定）
 
 官方目录、图片与技能包统一迁至 GitHub 独立资源仓库；客户端默认 Pages，包为 skills 同站点 packages/ 静态下载；不再请求旧公共接口或回退旧服务器。私服的组织/个人目录和权限保持不变。详见 [ADR-0004](../adr/0004-github-official-resources.md)。远端内容推送受用户永久 Git 边界约束；本地验证完成与线上发布完成分开记录。
+
+
+## 里程碑二：管理台完整字段与权限（2026-11-13）
+
+现状证据：真实独立管理员登录后，概览被缺失 platform.overview.read 种子拒绝；当前 communityagent Admin 适配只收 name/intro/runtime_environment_id，DTO 又缺 ID、人设、执行位置和本机引擎，与已复用的完整后台表单不兼容。
+
+采用与当前社区依赖兼容的原后台版本（499ae8922）员工 list/get/create/update/publish/unpublish、原完整 DigitalEmployee DTO 和原 Agent service；装配同一 admincore，不维护第二份简化服务。员工位置支持原 cloud/local、local_engine=dsh/codex_app_server，已有本机员工禁止切换引擎、禁止绑定云环境、创建者/可见性规则不变。能力装配及发布沿该版本原流程，不能吞掉绑定失败；较新上游 AtomicEdit/MCP 尚未导出，不能将当前多步骤保存宣称为原子事务。K8s RuntimeHosting 不属于社区已导出依赖，不从租户创建路径引入商业服务。
+
+管理权限种子按当前已注册公开 Admin 路由的原权限码补齐，限定 platform.admin / 各租户 tenant.admin，保留每次请求及 scope 检查；普通成员不新增任何管理权。未来租户沿原角色初始化获得同一套租户管理权限。已执行 SQL 保留字节；缺少原共享功能表时只追加原正式表定义，不改账本、不返回假空数组掩盖缺表。
+
+### 行业最佳实践与适配性
+
+2026-11-13 核对 [OWASP Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) 的默认拒绝、逐请求授权和授权测试；[PostgreSQL pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html) 的部分导出与依赖边界。adopt 原服务授权、明确权限种子及同租户写入保护；adapt 将原 HTTP 员工处理器接入公共 admincore；reject 放宽 RequirePermission、给普通成员管理权限、修改已执行迁移、商业后台整包依赖和伪造概览。
+
+UI 验收要求：独立测试管理员登录，概览无权限/SQL 错误；测试租户创建编辑回读；DSH/Codex 两个员工从后台创建发布并在同一独立账号客户端实际执行；原组织/角色及其余开源模块依次验证。未覆盖项逐条留在验收矩阵，不以导航/保存成功代替执行。计划见 [02-community-admin-milestone](../plans/02-community-admin-milestone.md)。
+
+租户创建 UI 实测补充：原服务与 HTTP 已开启 AllowExistingEmailAdmin，但表单仍强制手机号；填写新手机号并复用邮箱会触发唯一约束冲突。社区表单支持手机号或已有密码账号邮箱，说明邮箱路径只复用现有凭据、不生成/展示临时密码；不开放未验证身份的新密码账号。未配置商业计费权限时不请求套餐目录、不显示空套餐选择。
+
+租户概览复验定位 runtime_call_logs 缺表及未导出的商业 subscriptions/plans/钱包查询。追加 21 原调用日志表；平台服务增加显式 NewCommunity 构造，仅在社区租户概览取消商业计费查询，原 New 默认保留原行为。响应 billing 保持未提供，不伪造免费套餐/余额。社区概览不展示不可用的计费跳转。管理台账号菜单补当前账号已授权租户选择，仍调用原 scope/switch 逐次鉴权，不只写前端 tenantId。
+
+真实新建员工 UI 的运行配置只有云端下拉。本轮在共用 AgentExecutionFields 增加仅新建租户员工启用的执行位置/引擎选择；保留模板原发布开关与已有员工引擎不可变规则。本地选择后不提示云环境缺失，人设说明覆盖 DSH/Codex，主模型默认取部署目录的默认项。
+
+员工完整表单联动补接原模板列表/详情与头像上传处理器，头像路径分别保留 tenant.agent.create/update 与 platform.preset_agent.create/update 任一原权限、原 scope 和原媒体文件校验；不因后台上传扩大成员文件读取权限。
+
+用户明确确认：后台创建的 DSH/Codex 组织员工同租户可见，各成员各自在自己电脑运行。个人本地员工仍仅创建者。组织本地员工保留 tenant/workspace/private 原可见性选项，默认 tenant；模型绑定与代理每次使用原 contacts.AssertAgentVisible（含部门/通讯录/平台隐藏策略），模型引用始终按实际调用成员的 tenant/account 解析。任务、会话、设备、登录 session 和工作目录仍绑定调用成员，不使用管理员 Key/设备，不跨租户共享配置。
+
+头像复验发现原 file input 保留上次选择，失败后选同一文件不会重新触发 onChange；读取 File 后立即清空 input 值，支持原图重试。编辑已有员工时，每一步均提供保存/发布动作，避免只改头像也必须进入无关协作设置；新建向导的逐步校验保留。应用绑定补回原 GET/PUT 与 tenant.app.agent_bind 权限，读取使用原脱敏 app DTO，写入继续保护仅租户组织员工。
+
+头像闭环追加：后台上传保留稳定 oss:// 引用；Bus 装配共享 media resolver，为通讯录、会话和群详情动态签发头像 URL，不把短期签名回写数据库。真实客户端验证发现后台预览成功并不代表 Bus 已装配该解析器，需逐处回显验收。
+
+客户端通讯录员工 DTO 必须与会话 DTO 返回一致的 execution_locus、local_engine、supports_model_selection、model_source、model_service_model_id。组织目录缺少字段会把 DSH/Codex 错当云端员工，展示错误执行标志和输入框。复用原 ConversationCapabilities 结构及同一模型选择规则，不在客户端猜测。
+
+已发布本地员工保存确认文案说明配置更新与本机权限保持不变，不声称向云端实例下发更新任务；云端员工仍按原确认流程。
+
+模型服务配置修复：无后端本地工作区不向任何服务器同步；连接服务器后，用户在该工作区明确保存的配置同步到当前成员的加密模型源。社区版构建标识不能代替连接状态。模型元数据和私有文件密钥按服务器地址与账号隔离，不自动迁移本地工作区 Key；切换连接后的晚响应不得向新目标写入。ConversationModelSources 读取唯一 ModelServiceStore，不再从已停用的明文偏好字段读 Key。
+
+首次编辑模型目录草稿时，落地为同一服务商记录不得清空用户正在输入的地址/Key。真正切换到另一服务商仍清空并读取该服务商密钥；并发失焦保存共用同一次落地，避免双建及错写。Widget 回归已复现旧实现输入 Key 被清空。
+
+## 2026-11-16：私有部署成员由管理员创建
+
+用户确认采用管理员创建账号、成员首次登录设置密码，不依赖手机号短信和邀请 H5。
+
+行业做法：Keycloak 的 temporary password + UPDATE_PASSWORD 要求首次登录更新凭据；OWASP 建议首次凭据只允许进入改密流程。来源：[Keycloak](https://www.keycloak.org/docs/latest/server_admin/)、[OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html)。适配判断 adapt：复用已有 membership.Invite 的随机临时密码、admin_accounts.must_change_password、JWT mc、Auth.ChangePassword 和会话撤销；不另造账号或密码表，不导入商业短信依赖。
+
+- Admin POST `/api/admin/v1/tenant/members`，要求 tenant.member.invite；只接受邮箱/手机号、姓名、工号、部门和职位文字。创建默认 tenant.member，后续角色编辑仍走原授权接口；不接受客户端传入密码或管理员角色。
+- 新账号只在本次创建响应返回随机临时密码，后台仅在关闭即销毁的凭据对话框展示，不持久化明文。复用已有账号不改其密码、不重置首次改密状态。
+- 新成员未改密前，Bus 业务接口统一拒绝。仅可访问 me、刷新、改密、退出；改密不依赖已选租户。范围切换、IM、联系人、文件、运行时均不放行。
+- 客户端根据 JWT mc 在路由层进入首次设置密码页，重启或深链仍不能绕过。改密成功撤销旧会话，要求用新密码重新登录；仅校验前端提示不能代替服务端闸门。
+- 原短信邀请 UI 和不存在的 member-invitations 请求由本社区版成员创建流程替换。不模拟短信成功、不把 pending 邀请当成入企。
+- 验收：实际创建→临时凭据登录→设置密码→旧凭据被拒→新密码登录→普通成员头像/组织员工本机执行；同时验证无权限、错误部门、跨租户和已有账号不改密。
+
+模型服务保存并同步成功后，须使用服务端返回的账号模型目录更新已打开会话的模型状态；从“管理模型服务”返回聊天不得继续展示配置前的空目录。更新仍以原登录 token、服务器地址和连接代数有效为前提，不从其他账号缓存拼装模型，也不擅自替换用户已选但失效的模型。
+
+社区知识库沿用现有 PostgreSQL 全文检索 provider（代码名 stub，实际写 kb_chunks 并执行 tsvector 检索）。Admin 管理上传和失败重试必须复用客户端已有的非 RAGFlow 入库/终态流程；仅 RAGFlow 知识库进入 RAGFlow 上传。原文件、租户/平台配额、审计、失败释放、成功文档计数与作用域校验保持。禁止为通过验收把文档直接改为 ready 或伪造检索结果。
+
+私服技能媒体与官方 GitHub 资源分别解析。管理员上传的技能图标/示例图保留原平台媒体稳定引用，Bus 技能目录与详情装配现有 Media.ResolveURLMap 动态签名；不能把 oss:// 直接交给客户端，不能把签名地址写回数据库或迁移私服资源到公共 GitHub。
+
+后台正式绑定的 Agent 技能须沿原 GetSkillRail → BuildZapSessionSkills → 本地任务 payload.skills 链路下发，包含原版本 SHA256、大小和动态签名包 URL，继续由桌面校验/解包。Bus 为同一技能服务配置平台包存储，并在本机 dispatcher 注入原 carrier；本机员工的 runtime framework 必须保留 local_engine，不能用 generic 覆盖导致兼容性过滤失真。无绑定时维持原空集，不另造提示词拼接或包下载协议。
+
+#### 私服本机技能包下载
+
+2026-11-16 实测 carrier 正确，但桌面资源下载器拒绝内网 MinIO 地址，实际回复明确报告未加载技能。行业做法：[OWASP SSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html) 建议已知目标采用白名单并禁止重定向。适配判断 adapt：私服只有客户端明确连接的 Bus 是可信网络目的地；对象存储可以是内部地址，不应要求桌面直接访问。采用固定资源 ID 的同源 Bus 读取，reject 放开任意 RFC1918/loopback 地址或把用户 URL 作为代理参数。
+
+- GET `/api/agent-bus/v1/local-runtime/runs/{run}/skills/{skill}/package` 沿用原 run capability、fence、设备及会话/有效期校验；不接受 URL、对象 key 或客户端版本参数。
+- 仅允许读取该任务 skills 快照中已授权 skill_id 的版本，从原平台 PackageStore 按规范 key 读取，单包上限 20 MiB，服务端与桌面均核对快照 SHA256/大小；响应 no-store。
+- 桌面由 host-only channel 发起固定同源请求，capability 只在 Authorization 头传到当前 Bus，禁重定向、限时限量、完成后再检查连接身份；不暴露给模型工具或改变公开 URL 下载器的地址规则。
+- 无后端本地工作区的 GitHub 技能安装流程不变。旧 Bus 没有该接口须明确报告未加载/选中技能不可用，不能降级声称已使用。
+
+后台员工详情初次读取失败（无权限、跨租户、已移除或网络故障）时，仅呈现中文错误态与返回列表入口，不渲染空白可保存表单；写入函数也必须拒绝没有读取到原对象的编辑操作。字段选项加载失败仍沿原编辑错误处理，不混淆为主对象无权限。
+
+后台成员挂载职位后，通讯录列表、搜索和详情统一优先读取本租户未删除的主职位名称；没有挂载时保留原 membership.title。显式通讯录岗位覆盖仍优先，最终继续应用 title 字段的原可见性规则。用批量仓储查询补充已筛选成员的标签，不复制职位名回旧字段，职位重命名后应立即得到新标签。
+
+管理台通讯录策略保存仍走原 PG config_change 通知；community-bus 必须启动已有 contacts.PolicyListener，及时失效当前租户 policy 缓存，不等待默认五分钟 TTL。字段隐藏的实际验证需先预热旧策略再修改策略、发起新列表/搜索请求，随后从 UI 恢复原测试策略。
+
+### 通用模型执行失败可诊断性（2026-11-17）
+
+独立测试任务跨中断继续调度，保留 84 次 succeeded、11 次 failed；当前已由原三次连续失败闸门停用。历史 10 次为 chat.runtime_unavailable、1 次为 chat.runtime_stream_failed，原代码没有保存上游异常，不能推断它们都是网络或 Key 问题。后续测试优先使用停用任务的单次手动执行，收尾核对 enabled=false，不改生产调度语义。
+
+行业实践：[OWASP Logging](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html) 要求可关联的故障事件，并排除凭据、会话 token、敏感正文。适配判断 adopt：复用现有 modelerror 中文固定文案，Provider 仅返回安全类型和有界 HTTP 状态；通用 runtime 将分类传入原消息终态、cron 运行记录及固定字段日志。reject 返回供应商响应原文、URL、headers、Key、提示词，或为复验引入自动重试。
+
+模型建流区分鉴权、限流、服务不可用、请求错误、超时与连接失败；流阶段区分未完整结束、无效响应、拒答和不支持的工具。未知 runtime/技能错误保留原 chat.* 分类，不能伪装成模型错误。旧失败记录不回填猜测原因。
+
+### 2026-11-17：剩余后台接入闭环
+
+UI 创建只读组织 API Key 成功，但 Bus `/api/external/v1/org/departments` 返回 404；原 External API 与 SDK 换发未随社区导出。应用表单在未配置 issuer 时允许提交，实际 405。两者须区分配置缺失与服务装配缺漏，不能以管理台保存凭据成功代替可用性。
+
+行业最佳实践与适配性：本日复核 [OWASP Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) 的最小权限、每请求授权和负向测试。adopt 现有 APIKeyAuth/SessionTokenAuth/CompositeExternalAuth 与原 external HTTP 协议；adapt 导出兼容原版本的组织/知识库/SDK/OAuth 接口及依赖，数据库操作保留在 repository；reject 把机器凭据当客户端 JWT、允许只读凭据写入、放宽 HTTPS issuer 或以新简化业务替代原实现。
+
+应用目录响应携带非敏感的 OAuth 配置可用状态；未配置时前端明确解释只读原因，写接口在原权限校验后返回明确中文配置错误，不用 405 误导。配置完成后沿原完整写入及单次密钥流程。测试 HTTPS 仅绑定 loopback，测试应用显式信任该测试证书；不安装系统根证书、不跳过 TLS 校验、不影响用户服务。
+
+验收：UI 创建限定范围的 API/SDK 凭据、回读、实际授权请求/越权拒绝、UI 撤销后旧凭据失效；UI 应用创建/编辑/员工绑定/启停。SSO、组织 webhook 的真实外部提供方或接收端依赖单独核实；不能伪造接入成功。用户已授权本机独立租户测试凭据，验收后撤销。
+
+工作台应用启动复用上游已有范围校验：必须是当前租户可用的 end_user/all 应用，租户设置同时 enabled/universal；不以伪造 conversation_uuid 绕过旧 v0.1 限制。后台“启动配置检查”只核对配置与状态，文案不得声称已完成网络连通或 OAuth 回跳。H5 验收夹具是测试调用方，仍使用实际 Bus 登录、授权码、TLS 与签名验证，不替代产品管理 UI 或伪造授权响应。
+
+后台“工作台应用”替换预留页，直接复用应用管理组件及同一编辑器，GET tenant/apps 的 workspace_only=true 在仓储层筛选当前租户已启用、通用且面向用户的 active 应用，并保持后端 limit/offset/total 分页。空态引导到完整应用管理，不另建应用副本或前端全量假分页。
+
+### 2026-11-17 用户指定的三项收尾
+
+仅先完成「系统管理/权限与角色」「凭证与接入/单点登录」「数字员工绑定应用」，均用本机独立租户和真实 UI 验收，不重复聊天与定时任务。
+
+- 自定义角色：管理员显式分配了当前范围的管理权限后，应可进入对应范围的管理台；没有管理权限的普通成员仍不可进入。资格按当前 scope 计算，不把 A 租户权限带到 B；每个操作继续校验原 permission code。菜单及按钮按当前权限显示，直接输入 URL/API 仍由服务端拒绝。
+- 单点登录：接通原 OIDC discovery、state/nonce 一次性校验、ID Token 签名及账号绑定。仅允许当前 IdP 租户已有的有效成员；首次邮箱匹配要求 IdP 明确 email_verified。SSO 会话绑定该 IdP 租户，刷新及切范围均不得扩张到平台或其他租户。不自动创建账号、授予角色或关闭证书验证。Admin Web 只调用 Admin 公共登录接口；桌面员工对话只调用 Bus。
+- 数字员工应用（用户纠正）：应用绑定数字员工，在该员工对话中使用既有应用入口。不得新增客户端工作台 tab。后台绑定 → 对话能力栏加载 → 原 launch 换发单次授权码 → 原桌面应用面板展示，保留显示模式、关闭与返回，不向应用拼入用户登录 token。
+
+行业依据：采用 [OWASP OAuth2](https://cheatsheetseries.owasp.org/cheatsheets/OAuth2_Cheat_Sheet.html) 的 state/nonce、固定回调与 token 验证，采用 [OWASP Authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) 的联邦身份绑定边界；适配为租户配置的认证仅产生该租户会话，不复用全平台登录权限。以官方 [Keycloak 容器](https://www.keycloak.org/server/containers) 在本机独立端口作为真实测试 IdP；不使用伪造签名或 mock token 验收。
+
+验收：只读自定义角色登录可读部门、不可写/读其他模块、不可跨租户；撤权后刷新/重新登录拒绝。实际 Keycloak 登录到回跳进入正确租户，错误 state/重放/未绑定成员拒绝。后台将应用绑定到数字员工后，客户端该员工对话的应用入口可见并可点击，得到实际授权回跳结果；解绑或停用后刷新不再可用，关闭/返回对话正常。
+
+员工绑定不能绕过租户应用启用开关：客户端目录与会话应用列表均读取当前租户设置；已有绑定保留以便重新启用，但停用应用不作为可启动入口输出，缓存旧入口调用 launch 也必须拒绝。读取设置失败须报错，不按启用处理；无设置行沿用原员工绑定默认启用语义。此处复用既有 tenant_app_settings，不新增工作台或第二套开关。OIDC state 同时绑定发起浏览器的 HttpOnly/SameSite Cookie 与服务端一次性 state，不能仅凭他人浏览器产生的回调登录。

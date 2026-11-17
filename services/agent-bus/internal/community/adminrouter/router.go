@@ -8,7 +8,6 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminorg"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminsession"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/admintenant"
-	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/communityagent"
 	"net/http"
 )
 
@@ -18,7 +17,6 @@ type Handlers struct {
 	Session     *adminsession.Handlers
 	Tenant      *admintenant.Handlers
 	Org         *adminorg.Handlers
-	Agents      *communityagent.Handlers
 	Core        *admincore.Handlers
 }
 
@@ -41,15 +39,6 @@ func (h Handlers) Register(mux *http.ServeMux, authMw func(http.Handler) http.Ha
 			h.Apps.RegisterPlatform(mux, platformPerm)
 		}
 	}
-	if h.Agents != nil {
-		mux.Handle("GET /api/admin/v1/tenant/agents", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Agents.List)))
-		mux.Handle("POST /api/admin/v1/tenant/agents", tenantPerm("tenant.agent.create", http.HandlerFunc(h.Agents.Create)))
-		mux.Handle("GET /api/admin/v1/tenant/agents/{uuid}", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Agents.Get)))
-		mux.Handle("PUT /api/admin/v1/tenant/agents/{uuid}", tenantPerm("tenant.agent.update", http.HandlerFunc(h.Agents.Update)))
-		mux.Handle("DELETE /api/admin/v1/tenant/agents/{uuid}", tenantPerm("tenant.agent.delete", http.HandlerFunc(h.Agents.Delete)))
-		mux.Handle("POST /api/admin/v1/tenant/agents/{uuid}/publish", tenantPerm("tenant.agent.publish", http.HandlerFunc(h.Agents.Publish)))
-		mux.Handle("GET /api/admin/v1/tenant/agent-model-options", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Agents.ModelOptions)))
-	}
 	if h.Core != nil {
 		h.Core.Register(mux, adminAuth, platformPerm, tenantPerm)
 	}
@@ -68,6 +57,7 @@ func (h Handlers) Register(mux *http.ServeMux, authMw func(http.Handler) http.Ha
 	mux.Handle("GET /api/admin/v1/platform/tenants/{id}", platformPerm("platform.tenant.read", http.HandlerFunc(h.Tenant.GetTenant)))
 	mux.Handle("PUT /api/admin/v1/platform/tenants/{id}", platformPerm("platform.tenant.update", http.HandlerFunc(h.Tenant.UpdateTenant)))
 	mux.Handle("DELETE /api/admin/v1/platform/tenants/{id}", platformPerm("platform.tenant.suspend", http.HandlerFunc(h.Tenant.DeleteTenant)))
+	mux.Handle("POST /api/admin/v1/tenant/members", tenantPerm("tenant.member.invite", http.HandlerFunc(h.Org.CreateMember)))
 	mux.Handle("GET /api/admin/v1/tenant/members", tenantPerm("tenant.member.read", http.HandlerFunc(h.Org.ListMembers)))
 	mux.Handle("GET /api/admin/v1/tenant/members/{id}", tenantPerm("tenant.member.read", http.HandlerFunc(h.Org.GetMember)))
 	mux.Handle("PUT /api/admin/v1/tenant/members/{id}", tenantPerm("tenant.member.update", http.HandlerFunc(h.Org.UpdateMember)))

@@ -11,17 +11,6 @@ import { GlobalLoading } from './components/GlobalLoading'
 import { TenantHiddenRoute, TenantOnlyRoute } from './components/TenantHiddenRoute'
 import { ScopedDashboard } from './pages/Dashboard'
 import { TenantList } from './pages/TenantList'
-import { TenantBillingDetailPage, TenantBillingSubscriptionPage } from './pages/TenantBillingDetail'
-import {
-  BillingConfigPage,
-  BillingCreditsPage,
-  BillingFeaturesPage,
-  BillingOrdersPage,
-  BillingOverridesPage,
-  BillingPage,
-  BillingPlansPage,
-  BillingUsagePage,
-} from './pages/BillingPage'
 import { AgentList } from './pages/AgentList'
 import { AgentDetail } from './pages/AgentDetail'
 import { RuntimesPage } from './pages/Runtimes'
@@ -114,16 +103,6 @@ createRoot(document.getElementById('root')!).render(
           <Route path="dashboard" element={<ScopedDashboard />} />
           <Route path="client-analytics" element={<TenantHiddenRoute><ClientAnalyticsDashboardPage /></TenantHiddenRoute>} />
           <Route path="tenants" element={<TenantList />} />
-          <Route path="tenants/:id" element={<TenantHiddenRoute><TenantBillingDetailPage /></TenantHiddenRoute>} />
-          <Route path="plans" element={<BillingPage />} />
-          <Route path="billing/subscription" element={<TenantOnlyRoute><TenantBillingSubscriptionPage /></TenantOnlyRoute>} />
-          <Route path="billing/plans" element={<BillingPlansPage />} />
-          <Route path="billing/features" element={<BillingFeaturesPage />} />
-          <Route path="billing/credits" element={<BillingCreditsPage />} />
-          <Route path="billing/orders" element={<BillingOrdersPage />} />
-          <Route path="billing/config" element={<BillingConfigPage />} />
-          <Route path="billing/usage" element={<BillingUsagePage />} />
-          <Route path="billing/overrides" element={<BillingOverridesPage />} />
           {/* 产品化「运行环境」页面，统一消费 /platform/runtime-environments + /platform/runtimes。 */}
           <Route path="runtimes" element={<RuntimesPage />} />
           {/* 4 层 Agent 平台模型 L1: 只读类型枚举。 */}
@@ -219,7 +198,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="drive/workers" element={<PlatformDriveWorkersPage />} />
           <Route path="apps" element={<AppsPage />} />
           <Route path="app-categories" element={<AppCategoriesPage />} />
-          <Route path="workspace-apps" element={<Placeholder title="工作台应用" subtitle="租户工作台里曝光的应用集合与排序。" />} />
+          <Route path="workspace-apps" element={<AppsPage workspaceView />} />
           <Route path="members" element={<MemberList />} />
           {/* M1 B2 (F01 §3.5): 租户 API Key 管理 */}
           <Route path="api-keys" element={<ApiKeysPage />} />

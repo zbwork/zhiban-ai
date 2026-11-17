@@ -30,7 +30,9 @@ func (l SkillAgentLookup) GetAgentByUUID(ctx context.Context, uuid string) (*svc
 		return nil, errors.New("employee not found")
 	}
 	info := svc.AgentInfoFromEmployee(e)
-	info.RuntimeFramework = "generic"
+	if e.ExecutionLocus != "local" {
+		info.RuntimeFramework = "generic"
+	}
 	return info, nil
 }
 func NewSkills(pool *pgxpool.Pool) *svc.Service {

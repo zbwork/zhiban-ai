@@ -26,7 +26,7 @@ const baseCols = `id, uuid, account_id, refresh_token_hash,
     act_scope_kind, act_tenant_id, act_workspace_id, acting_as,
     user_agent, ip, device_fingerprint,
     device_type, device_brand, device_model, device_system_version, device_app_version,
-    revoked_at, revoke_reason`
+    revoked_at, revoke_reason, auth_tenant_id`
 
 func scan(row pgx.Row) (*dom.LoginSession, error) {
 	var s dom.LoginSession
@@ -39,7 +39,7 @@ func scan(row pgx.Row) (*dom.LoginSession, error) {
 		&s.ActScopeKind, &s.ActTenantID, &s.ActWorkspaceID, &actingAs,
 		&ua, &ip, &fp,
 		&deviceType, &deviceBrand, &deviceModel, &deviceSystemVersion, &deviceAppVersion,
-		&s.RevokedAt, &reason,
+		&s.RevokedAt, &reason, &s.AuthTenantID,
 	); err != nil {
 		return nil, err
 	}
@@ -103,14 +103,14 @@ INSERT INTO login_sessions
   (account_id, refresh_token_hash, expires_at, act_scope_kind,
    act_tenant_id, act_workspace_id, acting_as,
    user_agent, ip, device_fingerprint,
-   device_type, device_brand, device_model, device_system_version, device_app_version)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::inet,$10,$11,$12,$13,$14,$15)
+   device_type, device_brand, device_model, device_system_version, device_app_version, auth_tenant_id)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::inet,$10,$11,$12,$13,$14,$15,$16)
 RETURNING `+baseCols,
 		in.AccountID, in.RefreshTokenHash, in.ExpiresAt, in.ActScopeKind,
 		in.ActTenantID, in.ActWorkspaceID, nullIfEmpty(in.ActingAs),
 		nullIfEmpty(in.UserAgent), nullIfEmpty(in.IP), nullIfEmpty(in.DeviceFingerprint),
 		nullIfEmpty(in.DeviceType), nullIfEmpty(in.DeviceBrand), nullIfEmpty(in.DeviceModel),
-		nullIfEmpty(in.DeviceSystemVersion), nullIfEmpty(in.DeviceAppVersion),
+		nullIfEmpty(in.DeviceSystemVersion), nullIfEmpty(in.DeviceAppVersion), in.AuthTenantID,
 	)
 	created, err := scan(row)
 	if err != nil {

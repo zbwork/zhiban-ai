@@ -638,10 +638,23 @@ func (s *impl) LoginOIDC(ctx context.Context, ac AuthContext, req OIDCCallbackRe
 		if profile.Email == "" {
 			return nil, apperr.ErrForbidden.Withf("oidc subject %s 未绑定本地账号; 请联系管理员", profile.Subject)
 		}
+		if !profile.EmailVerified {
+			return nil, apperr.ErrForbidden.Withf("企业账号邮箱未验证，请联系管理员绑定账号")
+		}
 		acct, err = s.d.Accounts.GetByEmail(ctx, profile.Email)
 		if err != nil {
 			return nil, apperr.ErrForbidden.Withf("email %s 未找到对应账号 (M4 不自动 provisioning)", profile.Email)
 		}
+	}
+	if acct.Status != "active" {
+		return nil, apperr.ErrForbidden.Withf("账号已停用，请联系管理员")
+	}
+	if lp.Cfg.TenantID <= 0 {
+		return nil, apperr.ErrForbidden.Withf("单点登录未绑定租户")
+	}
+	membership, err := s.d.Accounts.GetMembership(ctx, acct.ID, lp.Cfg.TenantID)
+	if err != nil || membership == nil || membership.Status != "active" {
+		return nil, apperr.ErrForbidden.Withf("账号不是该企业的有效成员，请联系管理员")
 	}
 	// 3. upsert identity link (绑定 / 更新 last_used_at)
 	meta := map[string]any{
@@ -653,7 +666,7 @@ func (s *impl) LoginOIDC(ctx context.Context, ac AuthContext, req OIDCCallbackRe
 		return nil, apperr.ErrInternal.Wrap(err)
 	}
 	// 4. 走标准 login pipeline 发 session
-	return s.issueLogin(ctx, ac, acct, "oidc", authaudit.EventLoginOIDC)
+	return s.issueLoginScoped(ctx, ac, acct, "oidc", authaudit.EventLoginOIDC, &lp.Cfg.TenantID)
 }
 
 // RegisterSelf 客户端自助注册 (zhiban-app cutover, docs/contracts/agent-bus-client-contract.md §10.2)。
@@ -825,6 +838,9 @@ func (s *impl) Refresh(ctx context.Context, req RefreshReq) (*LoginResp, error) 
 	if err != nil {
 		return nil, apperr.ErrUnauthorized
 	}
+	if sess.AuthTenantID != nil && (sess.ActScopeKind != "tenant" || sess.ActTenantID == nil || *sess.ActTenantID != *sess.AuthTenantID) {
+		return nil, apperr.ErrForbidden.Withf("单点登录会话不能跨企业使用")
+	}
 	// rotation
 	newRefresh, newHash := newRefreshToken()
 	newExpire := time.Now().Add(s.d.RefreshTTL)
@@ -835,7 +851,7 @@ func (s *impl) Refresh(ctx context.Context, req RefreshReq) (*LoginResp, error) 
 	if err != nil {
 		return nil, err
 	}
-	tok, err := s.issueAccessToken(a, sess.UUID, scopeOpt)
+	tok, err := s.issueAccessToken(ctx, a, sess.UUID, scopeOpt)
 	if err != nil {
 		return nil, err
 	}
@@ -919,6 +935,14 @@ func (s *impl) SwitchScope(ctx context.Context, accountID int64, sessionUUID str
 	default:
 		return nil, apperr.ErrInvalidParams.Withf("kind 必须为 platform/tenant/workspace")
 	}
+	prev, perr := s.d.Sessions.GetByUUID(ctx, sessionUUID)
+	if perr != nil || prev == nil || prev.AccountID != accountID || prev.RevokedAt != nil {
+		return nil, apperr.ErrUnauthorized
+	}
+	if prev.AuthTenantID != nil && (kind != "tenant" || req.TenantID != *prev.AuthTenantID) {
+		return nil, apperr.ErrForbidden.Withf("企业单点登录仅可访问所属企业")
+	}
+
 	scopeOpt, err := s.buildScopeOption(ctx, accountID, kind, ptr(req.TenantID), ptr(req.WorkspaceID))
 	if err != nil {
 		return nil, err
@@ -937,10 +961,7 @@ func (s *impl) SwitchScope(ctx context.Context, accountID int64, sessionUUID str
 	}
 	// 取切换前的 scope，用于判断是否需要发 audit.auth.scope.impersonate
 	// （platform → tenant 视为 impersonate；失败拿不到 fromScope 不影响主路径）。
-	var fromScope string
-	if prev, perr := s.d.Sessions.GetByUUID(ctx, sessionUUID); perr == nil && prev != nil {
-		fromScope = prev.ActScopeKind
-	}
+	fromScope := prev.ActScopeKind
 	if err := s.d.Sessions.UpdateScope(ctx, session.UpdateScopeInput{
 		SessionUUID: sessionUUID, ActScopeKind: kind, ActTenantID: tid, ActWorkspaceID: wid,
 	}); err != nil {
@@ -950,7 +971,7 @@ func (s *impl) SwitchScope(ctx context.Context, accountID int64, sessionUUID str
 	if err != nil {
 		return nil, err
 	}
-	tok, err := s.issueAccessToken(a, sessionUUID, scopeOpt)
+	tok, err := s.issueAccessToken(ctx, a, sessionUUID, scopeOpt)
 	if err != nil {
 		return nil, err
 	}
@@ -1056,7 +1077,13 @@ func (s *impl) ChangePassword(ctx context.Context, accountID int64, req ChangePa
 	// 首次登录强制改密 (mustChange=true): 用户刚用种子密码登录成功, 当前 access token
 	// 已是已鉴权状态; 再校验一次旧密码不增加安全性, 反而增加用户摩擦, 与 GitHub /
 	// Atlassian / M365 等业界做法对齐 —— 跳过老密码校验, 只验新密码强度。
-	mustChange, _ := s.adminMustChangePassword(ctx, accountID)
+	mustChange, err := s.adminMustChangePassword(ctx, accountID)
+	if err != nil {
+		return apperr.ErrInternal.Wrap(err)
+	}
+	if crypto.VerifyPassword(a.PasswordHash, req.New) {
+		return apperr.ErrInvalidParams.Withf("新密码不能与临时密码或原密码相同")
+	}
 	if a.PasswordHash != "" && !mustChange {
 		if req.Old == "" || !crypto.VerifyPassword(a.PasswordHash, req.Old) {
 			return apperr.ErrUnauthorized.Withf("原密码不正确")
@@ -1069,14 +1096,20 @@ func (s *impl) ChangePassword(ctx context.Context, accountID int64, req ChangePa
 	if err := s.d.Accounts.UpdatePassword(ctx, accountID, hash); err != nil {
 		return apperr.ErrInternal.Wrap(err)
 	}
-	_ = s.clearMustChangePassword(ctx, accountID)
+	if err := s.clearMustChangePassword(ctx, accountID); err != nil {
+		return apperr.ErrInternal.Wrap(err)
+	}
 	// 改密后强制下线所有 session（DB 行 revoked_at + Redis account-level revoke）
-	_ = s.d.Sessions.RevokeAllByAccount(ctx, accountID, "password_change")
+	if err := s.d.Sessions.RevokeAllByAccount(ctx, accountID, "password_change"); err != nil {
+		return apperr.ErrInternal.Wrap(err)
+	}
 	if s.d.Revoke != nil {
 		// 决策 #4: 写 Redis account-level revoke，让旧 access token 立即失效，不等 access_ttl
 		// cutoff = now（秒精度）：所有 iat<=cutoff_sec 的 token 被拒。
 		revokeAt := time.Now()
-		_ = s.d.Revoke.RevokeAccount(ctx, accountID, revokeAt)
+		if err := s.d.Revoke.RevokeAccount(ctx, accountID, revokeAt); err != nil {
+			return apperr.ErrInternal.Wrap(err)
+		}
 
 		// Batch 2B closeout #1：JWT iat 只有秒精度。若改密响应在同一 wall-clock 秒内返回，
 		// 客户端立即重新登录拿到的新 token iat == cutoff_sec → 被误判已撤销。
@@ -1245,6 +1278,10 @@ func (s *impl) Impersonate(ctx context.Context, ac AuthContext, platformAccountI
 
 // issueLogin 在密码 / 短信 / OIDC 验证通过后, 写 session + 返回 token 对。
 func (s *impl) issueLogin(ctx context.Context, ac AuthContext, a *account.Account, method string, kind authaudit.EventKind) (*LoginResp, error) {
+	return s.issueLoginScoped(ctx, ac, a, method, kind, nil)
+}
+
+func (s *impl) issueLoginScoped(ctx context.Context, ac AuthContext, a *account.Account, method string, kind authaudit.EventKind, authTenantID *int64) (*LoginResp, error) {
 	// pick initial scope: 第一个 platform > 第一个 tenant
 	scopes, err := s.buildScopeOptions(ctx, a.ID)
 	if err != nil {
@@ -1261,6 +1298,19 @@ func (s *impl) issueLogin(ctx context.Context, ac AuthContext, a *account.Accoun
 		}
 	}
 
+	if authTenantID != nil {
+		found := false
+		for _, sc := range scopes {
+			if sc.Kind == "tenant" && sc.TenantID == *authTenantID {
+				initial = sc
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, apperr.ErrForbidden.Withf("账号无该企业访问权限")
+		}
+	}
 	// Session repository atomically replaces the same device class.
 	// 新 session
 	refresh, refreshHash := newRefreshToken()
@@ -1274,6 +1324,7 @@ func (s *impl) issueLogin(ctx context.Context, ac AuthContext, a *account.Accoun
 		widPtr = &v
 	}
 	sess, err := s.d.Sessions.Create(ctx, session.CreateInput{
+		AuthTenantID:        authTenantID,
 		AccountID:           a.ID,
 		RefreshTokenHash:    refreshHash,
 		ExpiresAt:           time.Now().Add(s.d.RefreshTTL),
@@ -1292,7 +1343,7 @@ func (s *impl) issueLogin(ctx context.Context, ac AuthContext, a *account.Accoun
 	if err != nil {
 		return nil, apperr.ErrInternal.Wrap(err)
 	}
-	tok, err := s.issueAccessToken(a, sess.UUID, initial)
+	tok, err := s.issueAccessToken(ctx, a, sess.UUID, initial)
 	if err != nil {
 		return nil, err
 	}
@@ -1315,8 +1366,11 @@ func (s *impl) issueLogin(ctx context.Context, ac AuthContext, a *account.Accoun
 //
 // Batch1 返修 #2: 内部查 admin_accounts.must_change_password 并填入 token claims；
 // 中间件 RequirePasswordValid 据此拦截除改密 / logout / me 类之外的业务请求。
-func (s *impl) issueAccessToken(a *account.Account, sessionUUID string, sc ScopeOption) (string, error) {
-	mustChange, _ := s.adminMustChangePassword(context.Background(), a.ID)
+func (s *impl) issueAccessToken(ctx context.Context, a *account.Account, sessionUUID string, sc ScopeOption) (string, error) {
+	mustChange, err := s.adminMustChangePassword(ctx, a.ID)
+	if err != nil {
+		return "", apperr.ErrInternal.Wrap(err)
+	}
 	return s.d.Issuer.Issue(jwt.IssueOptions{
 		AccountID:      a.ID,
 		AccountUUID:    a.UUID,

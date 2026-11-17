@@ -132,3 +132,90 @@ AgentAvatar 的 placeholder/error 都使用默认机器人图片，自身也有�
 图片解码完成与屏幕完成绘制不是同一时刻。LiveWidgetController 验收在检查真实图像后必须再 pump 下一绘制帧，并等待 endOfFrame 再做 RepaintBoundary 截图；单看网络成功、RawImage 或控件树不能替代截图复核。
 
 LiveWidgetController.pump 会等待真实 endOfFrame。独立原生窗口不绘制时会连同超时循环一起停住，不能直接判定 HTTP 超时；先检查该独立窗口的可见性并置前，不能为唤醒测试而操作用户会话。
+
+
+### 新租户运行状态与本地模型绑定（2026-11-13）
+
+独立 UI 新租户原默认 trial，但本地设备注册/任务权限要求租户 active；管理员可见页面不代表桌面运行身份可用。社区创建表单默认 active，与原 Provision 服务默认值一致；已有试用租户需通过原编辑界面激活，不绕过设备注册权限。组织本地员工还需原通讯录可见性检查，不能直接复用管理员创建者的模型账号。
+
+员工新建/保存首次实际命中 agent kb repo not wired；Admin Knowledge service 未装配已导出的 AgentKBRepo，空绑定也会按原服务明确拒绝。补齐原仓储依赖，不跳过空绑定。此次非原子流程已创建测试草稿 #10，保留并从 UI 编辑继续，不通过重复新建伪装成功；完整多资源事务不在该版本已有保证内。
+
+
+### 头像上传被管理台反向代理 413 拦截（2026-11-13）
+
+实际上传 1,448,593 字节 PNG，未超过头像 5 MiB 客户端/业务限制，但 Admin Nginx 未设置 client_max_body_size，默认 1m 返回 HTML 413，未进入媒体处理器。按 [NGINX 官方指令](https://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size) 设置管理入口 64m 有界网关上限以容纳技能包和媒体请求，头像/图标/技能自身仍由原服务按类型限额验证，不设无限大小。验收须用同一大于 1MiB 图片，经 UI 上传、保存、重开回读与客户端显示，不能只凭路由 200。
+
+### 后台头像正常、客户端仍默认头像
+
+同一新员工在管理台显示头像，原生数字员工卡片仍默认机器人。原因是 community-bus 没有注入 contacts/chat/room 已有的 AvatarURLResolver，导致 oss:// 持久化引用被原样传出。复用 media.ResolveURLForTenant 动态签名；数据库保留稳定 URI。管理台上传/预览和 Bus DTO 展示必须分别验收，不能只看其中一个。
+
+目录变成本机员工后输入框仍显示云端：contacts 已有 ConversationCapabilitiesResolver 与 agent 仓库批量实现，但 community-bus 未注入，输出结构虽有字段却都是零值。应修复装配，避免重复扩展 contacts 原查询；目录列表、详情与会话运行位置需分别在 UI 验证。
+
+模型列表为空而本机已配置：ModelProvidersNotifier 以 communityEdition 跳过同步，Store 仍用 community-local 分区，ConversationModelSources 又从数字账号偏好字段读取 Key。这是构建能力与连接状态混淆、旧明文读取路径未更新的组合问题。服务器模式用地址+账号分区，读取同一 Store；本地模式保持不发送配置，不复制或自动上传旧本地密钥。
+
+### 模型配置首次输入丢失密钥
+
+2026-11-16 真机拉模型报 401，但同一私有夹具直接请求 /models 返回 200，目标地址与 UI 输入一致；本地已落地 provider.enabled=false 且不存在 Key 文件。Widget 复现：修改目录草稿地址 → 失焦开始落地 → 在 Key 框输入 → provider 列表先更新，面板 identity 从 catalog 变 UUID → didUpdateWidget 调 _loadKey 清空刚输入的 Key。区分同一草稿落地与真正切换服务商；前者保留表单，后者仍清除旧密钥。落地使用 single-flight，晚完成不得把选中项改回旧服务商。
+
+### 2026-11-16：任务模板创建返回 404，但数据已落库
+
+真实后台 UI 创建模板返回“资源不存在”。原 service 已提交 INSERT，随后 resolver 因社区装配未传 PromptTemplates 而失败；列表能读不代表创建回读已接通。修复 Admin 与 Bus 构造时注入同一原 cron repository 的 PromptTemplateLookup，保留租户隔离、状态和变量检查。复验必须先回读已有测试编号，不能重复创建后把唯一冲突当新错误。
+
+### 原生 WebView 截图边界
+
+Flutter RepaintBoundary.toImage 不包含 macOS 原生 platform view，附件已渲染时截图仍可能是白块。验收附件预览必须补实际原生窗口截图；不能以 Flutter 截图白块认定预览坏了，也不能仅以脚本 ready 宣称视觉通过。
+
+### 模型保存成功后聊天仍显示零模型
+
+普通成员真实 UI 已配置 Key、服务商启用且服务端 member_model_sources 行存在，但返回原会话的模型弹层仍显示配置前的零模型。_publishConfiguration 丢弃 Sync 返回目录，ConversationModels 保留此前空状态。修复复用 applyCatalog 更新已加载会话，保留失效模型选择与错误；异步结果必须仍属于原 token / origin / epoch。
+
+社区版的“刷新模型”不能调用仅商业托管模型提供的 refreshManaged 接口；社区配置仍以账号自己的 /conversation-models 目录为准。真实 UI 的刷新失败与配置保存后仍见旧目录须分别修复和验收。
+
+### Admin 知识文档无条件发往 RAGFlow
+
+实际 UI 上传 Markdown 后原件存在，但状态为解析失败：`kb provider "stub" has no ragflow dataset`。客户端非 RAGFlow provider 已有真实入库流程，后台 UploadManagedDocument / RetryManagedDocument 却无条件调用 RAGFlow。提取现有 provider 入库与 finalize 为同一私有函数，Admin 按 provider 类型选择，失败重试使用原存储文件重新解析。不能把“stub”误当纯 mock：该实现真实写入 kb_chunks，提供 PG 全文检索。
+
+### 私服技能图标在管理台正常、原生客户端为扳手
+
+2026-11-16 实际后台上传并回读 480px 图标成功，普通成员的当前服务器技能卡片/详情仍显示默认扳手。clientcatalog 已有 ResolveMedia 回调，但 community-bus 构造未注入。技能媒体原上传使用平台媒体配置（tenantID=0）；装配同一 mediaService.ResolveURLMap，保留原媒体 key 白名单及有界签名，不改客户端 fallback、不扩大对象读取范围。需分别检查列表与详情的实际图片。
+
+同次组织技能绑定验收检查发现 WireLocal 构造 dispatcher 时未配置 ZapSkillsCarrierBuilder，且客户端技能 service 未配置 PackageStore。后台绑定存在、列表可见不代表任务载荷有技能。复用原 typed carrier 适配器、平台包存储和 local payload.skills；不把本机引擎识别覆盖成 generic。实际执行须核对载荷版本/哈希及真实技能使用，不能只看模型自然语言声称已用技能。
+
+技能载荷补齐后真实 Codex 仍明确报告未加载：桌面 URL 下载器拒绝内网对象存储地址/端口。保留该 SSRF 防护，改用已连接 Bus 的固定 run/skill 包接口，复用 run capability，服务端仅按本任务快照读取原受控 PackageStore。真实 read_skill_file 成功后才认定技能使用通过。
+
+跨租户 UI 验收中，后端正确返回 forbidden，但 AgentDetail 仍展示空白表单和保存按钮。将主对象读取错误与选项错误分开；主对象不可读时整页错误态，不渲染编辑器，也不执行保存。拒绝状态须实际重开验证，不能因服务端拒绝就忽略前端误导。
+
+PG 知识库当前是词法检索，不是语义检索：plainto_tsquery 对长自然语言问题采用 AND，全问题 ILIKE 也不会自动提取关键词。同次实际 UI 长问题检索为空；短关键词“验收代号”成功召回并答出真实文档标记。两项结果均保留，不能将关键词成功宣称为任意自然语言问题通过，也不能把模型搜索工作目录当成知识库召回。
+
+后台镜像替换后普通导航与工具 reload 仍读旧 index：浏览器 script[src] 为 index-nvJW2uRQ.js，容器和本机 HTTP 返回 index-C-LZq00k.js；同路径带一次验证 query 的新文档加载后才看到新中文错误态。给 SPA index.html 显式 Cache-Control: no-cache，要求重验证，带内容哈希的资源继续正常缓存。验收应比较实际加载资产，不能以 Docker 构建成功认定浏览器已经更新；工具快捷键未生效不能算完成刷新。
+
+技能服务的旧 rail_failure_test 引用了未随社区导出的 zapRailRepo/newZapCarrierFixture，首次测试该包即编译失败。改为本测试自带的最小 Repository/AgentLookup 夹具，保留禁用表查询失败必须拒绝的原断言，不删除失败测试或复制整套不相关测试依赖。
+
+成员职位 UI 保存并重新打开正确，但原生通讯录列表及重新搜索仍显示原 UI 验证员：后台使用 tenant_member_positions，contacts 只读 tenant_memberships.title。通过 account 仓储批量读取已筛选成员的当前主职位，列表/搜索与详情复用；保留原 contacts 岗位覆盖及字段 mask。不要靠管理员另改自由文本字段或直接 SQL 改 fixture 把两个来源暂时凑成一致。
+
+检查通讯录策略保存链路时发现 community-bus 漏启动已有 PolicyListener，而 policyCache 默认五分钟。后台成功保存/发送 pg_notify 不代表 Bus 已接收；复用原 listener 监听 config_change，不把安全策略更新寄托在 TTL 自然到期。实际验证先缓存旧策略，再从 UI 隐藏岗位并重新查询。
+
+通讯录搜索框基于 ContactsDirectoryStore 做本地过滤，改变搜索词不能证明已发出新的服务端查询；须重新进入通讯录触发 refreshInBackground 后看权威快照。首次排查不能把“重新搜索”本身当作排除客户端缓存的证据。
+
+原生 UI 测试 wait 对尚未出现的文字提前取 Finder.first 会直接抛 Bad state: No element，未进入轮询。等待使用完整文字 Finder，元素出现后点击才取 first。该夹具问题必须与产品业务失败分开；只有实际截图/最终控件状态可作为验收证据。
+
+2026-11-17 中断后检查发现前日 UI 创建的循环测试任务没有完成停用收尾，已累计 84 成功、11 失败，原失败阈值将其停用。保留全部运行记录；后续只做停用任务的手动执行或有明确结束条件的测试，不能把关闭客户端当作服务端任务已停止。11 次旧失败只保留通用码，无法追溯供应商状态，必须补充安全分类而不是猜测或自动重试抹去失败。
+
+异常暂停任务的“立即执行”采用 Visibility(maintainState:true) 隐藏；测试驱动仍可枚举到 Text，但点击不产生请求。控件树文字不是可点击证据，驱动命令 passed 也只是操作未抛异常。后续创建 enabled=false 的普通 paused 测试任务，实际点击可见按钮后须核对新增 manual 运行、最终成功、聊天投递和仍停用。长会话中消息正文也可能使用 EditableText；不能把固定输入索引 1 当成聊天编辑器，必须确认实际输入内容及发送后新增用户消息。
+
+2026-11-17 后台续验：API Key/SDK 的原管理服务已接入，不等于 Bus 已提供可调用的 External API。本机真实只读 Key 调 org/departments 404，确认 external HTTP/组织服务未导出。补原实现、原复合鉴权和严格 scope 后再验读取、越权和撤销。应用 issuer 缺失也不能只保留 GET 而让 UI 提交 405；公开只读原因并在原权限校验后返回明确配置错误。
+
+应用“连通性测试”原 handler 仅检查 app/OAuth client 状态并返回 launch_uri，没有发出网络请求或生成授权码。改名为“启动配置检查”，另用真实 H5 调用方完成 TLS、一次性授权码、签名和未授权 scope 拒绝，不能把该按钮当作 OAuth 实测成功。工作台已有列表却仍在启动服务里保留 v0.1 强制 conversation_uuid，应复用当前上游的租户启用/通用/用户入口校验，不虚构会话。
+
+### 2026-11-17：自定义角色与单点登录收尾
+
+- 社区后台用静态菜单而不是未导出的商业菜单种子；不能将“展示全部页面”误当为自定义角色导航。自定义角色须按当前 scope 的实际权限过滤导航与写操作；服务端继续逐请求校验。旧 is_admin 仅识别三个预置角色，导致自定义角色即便获授权也不能登录，已改为当前范围具备实际管理权限即获得资格。
+- 社区 Bus 原来未启动已有 auth_revoke 监听器，后台撤权的 PostgreSQL 通知不会同步 Redis 黑名单。复用原监听器；不要为通过角色验收直接删除 token 或伪造客户端退出。
+- 独立 Compose 覆盖文件只修改 bus/admin 镜像时，migrate 仍可能跑旧镜像，显示成功但迁移条数没有增加。必须核对 migrate 服务镜像、账本条数及旧脚本校验和。
+- OIDC 使用真实 IdP 配置、discovery/JWKS/签名与 nonce；测试 IdP hostname 必须同时能从浏览器与服务容器访问。m2-sso.localhost 仅通过独立测试容器 extra_hosts 映射，不修改系统 hosts 或关闭签名验证。
+
+客户端数字员工应用入口复验：社区 /agents 原来只写 metadata.selected_app_labels，没有返回客户端 AgentItem.apps 实际读取的 apps 数组，因此后台绑定成功仍没有可点击应用。按原 AppItem DTO 补 uuid/name/code/icon_url，保持现有对话应用授权与展示器；不新增工作台 tab，不把标签当成已可用的应用。
+
+2026-11-17 员工应用停用实测：后台 IsEnabled=false 后缓存入口仍可得到授权码。原 ListConversationApps 的 agent_app_bindings 分支只查 app.status，漏查 tenant_app_settings；不能只隐藏 UI，须统一目录和 launch 的启用判断，并保留绑定供重新启用。
+
+UI 验收同名保存按钮：确认弹框与页面页脚同时存在“保存”，DOM last 与 AX 展示顺序不等价。两次误点后没有“已保存”及导航终态，刷新仍有绑定；改点最新 AX 中弹框确认按钮后实际保存并跳转，重开回读为空。此处是测试定位错误，不能归因为产品解绑未持久化。验收必须等待明确保存终态，不能以弹框关闭或尝试点击作为成功证据。

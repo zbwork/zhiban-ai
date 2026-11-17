@@ -170,6 +170,8 @@ func (h *Handlers) registerPages(mux *http.ServeMux, adminAuth func(http.Handler
 		mux.Handle("DELETE /api/admin/v1/tenant/drive/recycle/{uuid}/purge", tenantPerm("tenant.drive.manage_recycle", http.HandlerFunc(h.purgeTenantDriveRecycle)))
 	}
 	if h.Media != nil {
+		mux.Handle("POST /api/admin/v1/tenant/media/agent-avatars/upload", adminAuth(middleware.RequirePasswordValid(middleware.RequireTenant(middleware.RequirePermission("tenant.agent.create", "tenant.agent.update")(http.HandlerFunc(h.uploadAgentAvatarMedia))))))
+		mux.Handle("POST /api/admin/v1/platform/media/agent-avatars/upload", adminAuth(middleware.RequirePasswordValid(middleware.RequirePlatform(middleware.RequirePermission("platform.preset_agent.create", "platform.preset_agent.update")(http.HandlerFunc(h.uploadAgentAvatarMedia))))))
 		mux.Handle("POST /api/admin/v1/tenant/media/preview", tenantPerm("tenant.agent.read", http.HandlerFunc(h.previewMedia)))
 		mux.Handle("POST /api/admin/v1/platform/media/skill-icons/upload", platformPerm("platform.skill.upload", http.HandlerFunc(h.uploadSkillIconMedia)))
 		mux.Handle("POST /api/admin/v1/platform/media/skill-example-images/upload", platformPerm("platform.skill.upload", http.HandlerFunc(h.uploadSkillExampleImageMedia)))
@@ -270,6 +272,7 @@ func (h *Handlers) registerPages(mux *http.ServeMux, adminAuth func(http.Handler
 		mux.Handle("PATCH /api/admin/v1/tenant/knowledge-bases/{uuid}", tenantPerm("tenant.kb.update", h.patchManagedKnowledgeBase(domkb.ScopeTenant)))
 		mux.Handle("DELETE /api/admin/v1/tenant/knowledge-bases/{uuid}", tenantPerm("tenant.kb.delete", h.deleteManagedKnowledgeBase(domkb.ScopeTenant)))
 		mux.Handle("GET /api/admin/v1/tenant/knowledge-bases/{uuid}/references", tenantPerm("tenant.kb.read", h.managedKnowledgeBaseReferences(domkb.ScopeTenant)))
+		mux.Handle("POST /api/admin/v1/tenant/knowledge-bases/{uuid}/recall-test", tenantPerm("tenant.kb.recall", h.recallManagedKnowledgeBase(domkb.ScopeTenant)))
 		mux.Handle("GET /api/admin/v1/tenant/knowledge-bases/{uuid}/folders", tenantPerm("tenant.kb.read", h.listManagedFolders(domkb.ScopeTenant)))
 		mux.Handle("POST /api/admin/v1/tenant/knowledge-bases/{uuid}/folders", tenantPerm("tenant.kb.update", h.createManagedFolder(domkb.ScopeTenant)))
 		mux.Handle("PATCH /api/admin/v1/tenant/knowledge-bases/{uuid}/folders/{folder_uuid}", tenantPerm("tenant.kb.update", h.patchManagedFolder(domkb.ScopeTenant)))
@@ -278,6 +281,7 @@ func (h *Handlers) registerPages(mux *http.ServeMux, adminAuth func(http.Handler
 		mux.Handle("POST /api/admin/v1/tenant/knowledge-bases/{uuid}/documents/upload", tenantPerm("tenant.kb.update", h.uploadManagedDocuments(domkb.ScopeTenant)))
 		mux.Handle("PATCH /api/admin/v1/tenant/knowledge-bases/{uuid}/documents/{document_uuid}", tenantPerm("tenant.kb.update", h.patchManagedDocument(domkb.ScopeTenant)))
 		mux.Handle("DELETE /api/admin/v1/tenant/knowledge-bases/{uuid}/documents/{document_uuid}", tenantPerm("tenant.kb.update", h.deleteManagedDocument(domkb.ScopeTenant)))
+		mux.Handle("POST /api/admin/v1/tenant/knowledge-bases/{uuid}/documents/{document_uuid}/retry", tenantPerm("tenant.kb.update", h.retryManagedDocument(domkb.ScopeTenant)))
 		mux.Handle("GET /api/admin/v1/tenant/knowledge-bases/{uuid}/documents/{document_uuid}/download", tenantPerm("tenant.kb.read", h.managedDocumentDownload(domkb.ScopeTenant)))
 	}
 

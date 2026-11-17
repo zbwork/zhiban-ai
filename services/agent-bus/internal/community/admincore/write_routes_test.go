@@ -14,6 +14,7 @@ import (
 	memory "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/memory/clientbuild"
 	agentsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/agent"
 	buildsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/clientbuild"
+	kbsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/knowledge"
 	localsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/localcodingcatalog"
 	membersvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/membership"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/platform"
@@ -52,13 +53,15 @@ func writeTestMux(t *testing.T, h *Handlers) (*http.ServeMux, *jwt.Issuer) {
 }
 
 func writeTestCore() *Handlers {
-	return &Handlers{KBProviderRepo: struct{ KBProviderRepo }{}, Membership: struct{ membersvc.Service }{}, Platform: struct{ platform.Service }{}, Position: struct{ position.Service }{}, RBAC: struct{ rbacsvc.Service }{}, RuntimeEnv: struct{ runtimeenvsvc.Service }{}, Agent: struct{ agentsvc.Service }{}, ClientBuild: struct{ buildsvc.Service }{}, LocalCodingCatalog: struct{ localsvc.Service }{}, AdminAgentA2AInvoke: &AdminAgentA2AInvokeHandler{}, AdminAgentA2ACard: &AdminAgentA2ACardHandler{}, AgentKBBindings: &AgentKBBindingsHandler{}}
+	return &Handlers{Knowledge: struct{ kbsvc.Service }{}, KBProviderRepo: struct{ KBProviderRepo }{}, Membership: struct{ membersvc.Service }{}, Platform: struct{ platform.Service }{}, Position: struct{ position.Service }{}, RBAC: struct{ rbacsvc.Service }{}, RuntimeEnv: struct{ runtimeenvsvc.Service }{}, Agent: struct{ agentsvc.Service }{}, ClientBuild: struct{ buildsvc.Service }{}, LocalCodingCatalog: struct{ localsvc.Service }{}, AdminAgentA2AInvoke: &AdminAgentA2AInvokeHandler{}, AdminAgentA2ACard: &AdminAgentA2ACardHandler{}, AgentKBBindings: &AgentKBBindingsHandler{}}
 }
 
 // Exercise real middleware, including the correct permission on the wrong scope.
 func TestRestoredWritesRequireAdminScopeAndPermission(t *testing.T) {
 	mux, issuer := writeTestMux(t, writeTestCore())
 	for _, tc := range []struct{ method, path, scope, permission string }{
+		{"POST", "/tenant/knowledge-bases/example/documents/doc/retry", "tenant", "tenant.kb.update"},
+		{"POST", "/tenant/knowledge-bases/example/recall-test", "tenant", "tenant.kb.recall"},
 		{"POST", "/platform/kb-providers", "platform", "platform.kb_provider.create"},
 		{"PATCH", "/platform/kb-providers/example", "platform", "platform.kb_provider.update"},
 		{"DELETE", "/platform/kb-providers/example", "platform", "platform.kb_provider.delete"},

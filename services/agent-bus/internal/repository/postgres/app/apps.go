@@ -147,6 +147,14 @@ func (r *AppRepo) ListByTenant(ctx context.Context, tenantID int64, filter dom.A
 		args = append(args, *filter.CategoryID)
 		where += " AND category_id = $" + strconv.Itoa(len(args))
 	}
+	if filter.WorkspaceOnly {
+		if tenantID <= 0 {
+			return nil, 0, apperr.ErrInvalidParams.Withf("workspace apps require tenant scope")
+		}
+		where += ` AND status='active' AND COALESCE(usage_scope,'all') IN ('all','end_user')
+		 AND EXISTS (SELECT 1 FROM tenant_app_settings tas WHERE tas.app_id=apps.id
+		 AND tas.tenant_id=$1 AND tas.is_enabled=true AND tas.is_universal=true)`
+	}
 	if filter.Status != "" {
 		args = append(args, filter.Status)
 		where += " AND status = $" + strconv.Itoa(len(args))

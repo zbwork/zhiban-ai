@@ -41,7 +41,7 @@ func FieldVisible(v FieldVisibility, sameAccount, sameDept bool) bool {
 
 // ApplyMask 把 mask 应用到 raw 字段, 返回客户端可见的 HumanContactFields 与 subtitle。
 //
-// raw 是数据库原值 (可能为空); subtitleRaw 是 tenant_memberships.title (可被 metadata.position_label_override 覆盖)。
+// subtitleRaw 是主职位名称（未挂载时为 membership.title），可被显式岗位覆盖替换。
 func ApplyMask(rawPhone, rawEmail, subtitleRaw string, mask FieldMask, sameAccount, sameDept bool) (HumanContactFields, string) {
 	out := HumanContactFields{}
 	if rawPhone != "" && FieldVisible(mask.Phone, sameAccount, sameDept) {

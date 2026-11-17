@@ -542,7 +542,14 @@ func (s *impl) UploadManagedDocument(ctx context.Context, actor domkb.Actor, kbU
 	}
 	digest := sha256.Sum256(req.Content)
 	shaHex := hex.EncodeToString(digest[:])
-	chunks := chunkText(string(req.Content))
+	text := string(req.Content)
+	if s.cfg.ExtractDocuments && kb.ProviderKind != "ragflow" {
+		text, err = extractDocumentText(ctx, req.Content, mime)
+		if err != nil {
+			return nil, apperr.New(apperr.InvalidParams, ErrCodeKBDocFormat).Withf("%v", err)
+		}
+	}
+	chunks := chunkText(text)
 	var doc *domkb.Document
 	err = s.runTx(ctx, func(tx pgx.Tx) error {
 		if err := s.reserveManagedQuota(ctx, tx, actor, kb, int64(len(req.Content))); err != nil {
@@ -598,6 +605,9 @@ func (s *impl) UploadManagedDocument(ctx context.Context, actor domkb.Actor, kbU
 	doc.StorageKey = storageKey
 	doc.ContentSHA256 = shaHex
 	doc.OriginalName = firstNonEmpty(req.OriginalName, title)
+	if kb.ProviderKind != "ragflow" {
+		return s.ingestProviderDocument(ctx, actor.AccountID, managedTenantID(actor), kb, doc, chunks)
+	}
 	dto, err := s.uploadDocumentToRagflowSync(ctx, actor.AccountID, managedTenantID(actor), kb, doc, title, mime, req.Content, len(chunks))
 	if err != nil {
 		return nil, err
@@ -711,13 +721,28 @@ func (s *impl) RetryManagedDocument(ctx context.Context, actor domkb.Actor, kbUU
 	if err != nil {
 		return nil, apperr.New(apperr.Conflict, "kb.storage_unavailable").Withf("object storage unavailable")
 	}
-	presigned, err := store.PresignGet(ctx, object.PresignGetInput{Key: doc.StorageKey, TTL: 5 * time.Minute})
+	input := object.PresignGetInput{Key: doc.StorageKey, TTL: 5 * time.Minute}
+	var presigned *object.PresignGetOutput
+	if internal, ok := store.(interface {
+		PresignGetInternal(context.Context, object.PresignGetInput) (*object.PresignGetOutput, error)
+	}); ok {
+		presigned, err = internal.PresignGetInternal(ctx, input)
+	} else {
+		presigned, err = store.PresignGet(ctx, input)
+	}
 	if err != nil {
 		return nil, apperr.New(apperr.Conflict, "kb.original_unavailable").Withf("original file unavailable")
 	}
 	content, err := fetchDriveBytes(ctx, presigned.URL, s.cfg.DocMaxBytes)
 	if err != nil {
 		return nil, apperr.New(apperr.Conflict, "kb.original_unavailable").Withf("failed to read original file for retry")
+	}
+	text := string(content)
+	if s.cfg.ExtractDocuments && kb.ProviderKind != "ragflow" {
+		text, err = extractDocumentText(ctx, content, doc.MimeType)
+		if err != nil {
+			return nil, apperr.New(apperr.InvalidParams, ErrCodeKBDocFormat).Withf("%v", err)
+		}
 	}
 	if err := s.runTx(ctx, func(tx pgx.Tx) error {
 		if err := s.reserveManagedQuota(ctx, tx, actor, kb, int64(len(content))); err != nil {
@@ -728,7 +753,10 @@ func (s *impl) RetryManagedDocument(ctx context.Context, actor domkb.Actor, kbUU
 	}); err != nil {
 		return nil, mapManagedWriteErr(err)
 	}
-	chunks := chunkText(string(content))
+	chunks := chunkText(text)
+	if kb.ProviderKind != "ragflow" {
+		return s.ingestProviderDocument(ctx, actor.AccountID, managedTenantID(actor), kb, doc, chunks)
+	}
 	return s.uploadDocumentToRagflowSync(ctx, actor.AccountID, managedTenantID(actor), kb, doc, doc.Title, doc.MimeType, content, len(chunks))
 }
 

@@ -153,7 +153,7 @@ class ConversationModels extends ChangeNotifier {
           // Keep the saved preference and continue with the remote catalog.
         }
       }
-      final models = refresh
+      final models = refresh && !AppConfig.communityEdition
           ? (await ConversationModelSources().refreshManaged()).items
           : await ConversationModelSources()
               .sync(publishLocalConfiguration: false);

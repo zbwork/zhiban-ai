@@ -194,7 +194,9 @@ Future<void> _persistLoginResult(AuthLoginResult res,
             AppConfig.storageAccountInfoKey, jsonEncode(res.account));
       }
       RequestInterceptor.clearTokenCache();
-      unawaited(sessionPushLifecycle.start());
+      if (res.account['mustChangePassword'] != true) {
+        unawaited(sessionPushLifecycle.start());
+      }
     });
 
 Future<void> _resetRealtimeBeforeIdentityChange(
@@ -468,4 +470,14 @@ Future<AuthLoginResult> switchToTenantApi(int tenantId) async {
   // 这里显式广播一次, 让它跟其它切租户入口(登录选租户/mine_drawer 等)保持一致。
   notifyBillingSummaryChanged();
   return res;
+}
+
+/// Change the temporary password, then discard only this connection's revoked session.
+Future<void> setInitialPasswordApi(String password) async {
+  final epoch = AppConfig.connectionEpoch;
+  await request.post('/auth/password/change', data: {'new': password});
+  await withConnectionCredentials(
+      epoch,
+      () => const SessionService()
+          .clearSessionStorage(connectionTransition: true));
 }

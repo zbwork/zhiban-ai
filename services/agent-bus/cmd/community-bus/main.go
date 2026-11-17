@@ -20,6 +20,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/crypto/aesgcm"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/encode"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/jwt"
+	logpkg "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/log"
 	oauthjwt "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/oauth2/jwt"
 	oauthkeys "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/oauth2/keys"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/pgcli"
@@ -27,6 +28,9 @@ import (
 	account "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/account"
 	agentrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agent"
 	agentkbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agentkb"
+	sdkrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agentsdk"
+	apikeyrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/apikey"
+	repoaudit "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/audit"
 	audit "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/authaudit"
 	driverepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/drive"
 	eventrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/event"
@@ -40,17 +44,24 @@ import (
 	session "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/session"
 	tenant "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/tenant"
 	agentsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/agent"
+	sdksvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/agentsdk"
+	apikeysvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/apikey"
 	authsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/auth"
 	chatsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/chat"
 	personal "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/communityagent"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/contacts"
 	cronsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/cron"
 	drivesvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/drive"
+	extorgsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/externalorg"
+	identitysvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/identity"
 	svckb "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/knowledge"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/knowledge/provider/stub"
 	localmediasvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/localmedia"
+	mediasvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/media"
 	modelsourcesvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/modelsource"
+	skillsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/skill"
 	websearchsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/websearch"
+	authoidchttp "github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/authoidc"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientapps"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientcatalog"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientchat"
@@ -59,6 +70,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientknowledge"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientlocal"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/clientpositions"
+	externalhttp "github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/external"
 	httpsession "github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/session"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/wellknown"
 	"log"
@@ -102,13 +114,32 @@ func run(ctx context.Context, path string) error {
 	}
 	tenantRepo := tenant.New(pool)
 	rbacRepo := rbac.New(pool)
-	auth := authsvc.New(authsvc.Deps{Accounts: account.New(pool), Tenants: tenantRepo, RBAC: rbacRepo, Sessions: session.New(pool), AuditLog: audit.New(pool), Issuer: issuer, Captcha: captcha.New(redisClient), Revoke: authsvc.NewRedisRevoker(redisClient, 15*time.Minute), EventBus: authsvc.NewPgEventBus(pool)})
+	var identities *identitysvc.Registry
+	authDeps := authsvc.Deps{Accounts: account.New(pool), Tenants: tenantRepo, RBAC: rbacRepo, Sessions: session.New(pool), AuditLog: audit.New(pool), Issuer: issuer, Captcha: captcha.New(redisClient), Revoke: authsvc.NewRedisRevoker(redisClient, 15*time.Minute), EventBus: authsvc.NewPgEventBus(pool)}
+	if os.Getenv("AGBUS_SECRETBOX_KEY") != "" {
+		box, err := secretbox.New("production")
+		if err != nil {
+			return err
+		}
+		identities = identitysvc.NewRegistry(pool, box)
+		authDeps.IdentityRegistry = identities
+		authDeps.OIDCStateStore = identitysvc.NewStateStore(redisClient)
+	}
+	revoker := authsvc.NewRedisRevoker(redisClient, 15*time.Minute)
+	authDeps.Revoke = revoker
+	go authsvc.NewRevokeListener(pool, revoker, logpkg.Default()).Run(ctx)
+	auth := authsvc.New(authDeps)
+	mediaService := mediasvc.NewWithResolver(storage, mediasvc.Config{})
 	contactsSvc := contacts.New(pool)
+	go contacts.NewPolicyListener(pool, contactsSvc, logpkg.Default()).Run(ctx)
+	contacts.SetConversationCapabilitiesResolver(contactsSvc, agentrepo.New(pool))
+	contacts.SetAvatarURLResolverOnService(contactsSvc, mediaService.ResolveURLForTenant)
 	chatSvc, err := communitychat.Compose(ctx, pool, redisClient, cfg, contactsSvc)
 	if err != nil {
 		return err
 	}
 	defer chatSvc.StopCancelListener()
+	chatsvc.SetAvatarURLResolverOnService(chatSvc, mediaService.ResolveURLForTenant)
 	// Member model platforms (ADR-0042): without the data key, sync and model calls fail closed.
 	modelCipher, _, err := aesgcm.NewFromEnvAny("AGBUS_AGENT_MODEL_KMS_DATA_KEY", "AGBUS_KMS_DATA_KEY")
 	if err != nil {
@@ -116,11 +147,17 @@ func run(ctx context.Context, path string) error {
 		modelCipher = nil
 	}
 	modelSources := modelsourcesvc.New(modelsourcerepo.New(pool), modelCipher, nil, pem, "", "").WithoutManagedBeeBridge()
-	localService, localModels, err := communitylocal.Compose(pool, cfg.JWTPrivateKeyFile, modelSources)
+	localService, localModels, err := communitylocal.Compose(pool, cfg.JWTPrivateKeyFile, modelSources, contactsSvc)
 	if err != nil {
 		return err
 	}
-	communitychat.WireLocal(chatSvc, pool, localService)
+	skillService := communitychat.NewSkills(pool)
+	var skillPackages *skillsvc.PackageStore
+	if storage != nil {
+		skillPackages = skillsvc.NewPackageStoreWithResolver(storage, 0, skillsvc.PackageStoreConfig{})
+		skillService.SetPackageStore(skillPackages)
+	}
+	communitychat.WireLocal(chatSvc, pool, localService, skillService)
 	chatsvc.SetConversationModelSelector(chatSvc, localModels)
 	localImages := localmediasvc.New(localmediarepo.New(pool), localModels)
 	localSearch := websearchsvc.New(websearchadapter.New(cfg.WebSearch.Endpoint, cfg.WebSearch.APIKey))
@@ -158,8 +195,11 @@ func run(ctx context.Context, path string) error {
 		}
 	}()
 	handlers := busrouter.Handlers{Session: &httpsession.Handlers{Auth: auth}, Chat: &clientchat.Handlers{Chat: chatSvc}, Contacts: &clientcontacts.Handlers{Contacts: contactsSvc}, Local: &clientlocal.Handlers{Local: localService, Models: localModels, Sources: modelSources, Images: localImages, Search: localSearch, Outputs: localOutputs}}
+	if skillPackages != nil {
+		handlers.Local.Skills = communitylocal.SkillPackages{Store: skillPackages}
+	}
 	handlers.Agents = &clientcatalog.AgentHandlers{Agents: agentrepo.New(pool), Personal: &personal.Personal{Agents: agentsvc.New(agentrepo.New(pool), nil, nil, pool, eventrepo.New(pool)), Environments: envrepo.New(pool)}}
-	handlers.Catalog = &clientcatalog.Handlers{Skill: communitychat.NewSkills(pool), SkillConvLookup: communitychat.SkillConversationLookup{Pool: pool}}
+	handlers.Catalog = &clientcatalog.Handlers{Skill: skillService, SkillConvLookup: communitychat.SkillConversationLookup{Pool: pool}, ResolveMedia: mediaService.ResolveURLMap}
 	handlers.Positions = &clientpositions.Handlers{Positions: clientpositions.PgxPositionsPool{P: pool}}
 	handlers.Agents.Skills = handlers.Catalog.Skill
 	cronService := communitycron.Compose(ctx, pool, chatSvc, contactsSvc, communityim.DirectConversations(pool, cfg, contactsSvc))
@@ -182,6 +222,18 @@ func run(ctx context.Context, path string) error {
 		chatsvc.SetAttachmentBinderOnService(chatSvc, handlers.Files.ChatUpload)
 	}
 	mux := http.NewServeMux()
+	if identities != nil {
+		(&authoidchttp.Handlers{Auth: auth, Catalog: identities, AdminOnly: false}).Register(mux, "/api/agent-bus/v1/auth")
+	}
+	extHandlers := &externalhttp.Handlers{
+		APIKeys:      apikeysvc.New(apikeysvc.Deps{Repo: apikeyrepo.New(pool)}),
+		AgentSDK:     sdksvc.New(sdksvc.Deps{CredRepo: sdkrepo.NewCredentialRepo(pool), SessionRepo: sdkrepo.NewSessionTokenRepo(pool), Audit: repoaudit.New(pool)}),
+		Knowledge:    handlers.KnowledgeAPI.Knowledge,
+		ExternalOrg:  extorgsvc.New(pool, eventrepo.New(pool)),
+		Pool:         pool,
+		LoginIssuer:  issuer,
+		LoginRevoker: auth,
+	}
 	if cfg.AppIssuer != "" {
 		box, err := secretbox.New("prod")
 		if err != nil {
@@ -197,13 +249,21 @@ func run(ctx context.Context, path string) error {
 		appService := communityapps.New(pool, cfg.AppIssuer)
 		handlers.Apps = &clientapps.Handlers{App: appService, JWTSigner: oauthjwt.NewSigner(manager), Issuer: cfg.AppIssuer}
 		handlers.Agents.Apps = appService
-		mux.HandleFunc("POST /api/external/v1/oauth/token", handlers.Apps.Token)
+		extHandlers.App = appService
+		extHandlers.JWTSigner = handlers.Apps.JWTSigner
+		extHandlers.JWTVerifier = oauthjwt.NewVerifier(manager)
+		extHandlers.Issuer = cfg.AppIssuer
 		discovery := wellknown.DefaultConfig(cfg.AppIssuer, cfg.AppIssuer)
 		discovery.GrantTypesSupported = []string{"authorization_code", "refresh_token"}
 		(&wellknown.Handlers{Config: discovery, KeysMgr: manager}).Register(mux)
 	}
-	handlers.Register(mux, middleware.Auth(issuer, auth, false), account.New(pool))
-	mux.Handle("GET /api/agent-bus/v1/runtime-environments", middleware.Auth(issuer, auth, false)(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	extHandlers.Register(mux)
+	authMiddleware := middleware.Auth(issuer, auth, false)
+	businessAuth := func(handler http.Handler) http.Handler {
+		return authMiddleware(middleware.RequirePasswordValid(handler))
+	}
+	handlers.Register(mux, authMiddleware, account.New(pool))
+	mux.Handle("GET /api/agent-bus/v1/runtime-environments", businessAuth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		envs, err := envrepo.New(pool).ListTenantCustom(r.Context(), middleware.MustTenantID(r.Context()))
 		if err != nil {
 			encode.JSONError(w, err)
@@ -220,15 +280,15 @@ func run(ctx context.Context, path string) error {
 	accountStream := clientchat.NewAccountStreamMiddleware(chatSvc, clientchat.AccountStreamConfig{})
 	pages := &clientchat.PageHandlers{Messages: msgrepo.New(pool)}
 	for suffix, handler := range map[string]http.HandlerFunc{"around": pages.Around, "newer": pages.Newer} {
-		mux.Handle("GET /api/agent-bus/v1/chat/conversations/{uuid}/messages/"+suffix, middleware.Auth(issuer, auth, false)(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(handler))))
+		mux.Handle("GET /api/agent-bus/v1/chat/conversations/{uuid}/messages/"+suffix, businessAuth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(handler))))
 	}
 	accountStream.Start(ctx)
 	defer accountStream.Stop()
-	mux.Handle("GET /api/agent-bus/v1/conversations/stream", middleware.Auth(issuer, auth, false)(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(http.HandlerFunc(accountStream.Handle)))))
+	mux.Handle("GET /api/agent-bus/v1/conversations/stream", businessAuth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(http.HandlerFunc(accountStream.Handle)))))
 
 	communityim.Register(mux, pool, cfg, chatSvc, contactsSvc, func(handler http.Handler) http.Handler {
-		return middleware.Auth(issuer, auth, false)(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(handler)))
-	})
+		return businessAuth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(handler)))
+	}, mediaService.ResolveURLForTenant)
 	observed := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pattern := mux.Handler(r)
 		if pattern == "" {

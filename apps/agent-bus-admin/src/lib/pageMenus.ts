@@ -11,11 +11,6 @@ const pages: Record<'platform' | 'tenant', Record<string, [string, string][]>> =
       ['/company-profiles', '企业档案'], ['/web-leads', '创业助手咨询单'],
       ['/web-funnel', '获客漏斗'], ['/web-feedback', '回复反馈'], ['/provider-pricing', '服务商与定价'],
     ],
-    '计费中心': [
-      ['/plans', '计费中心'], ['/billing/plans', '套餐管理'], ['/billing/features', '权益项'],
-      ['/billing/credits', '积分包配置'], ['/billing/orders', '订单管理'],
-      ['/billing/config', '计费配置'], ['/billing/usage', '用量统计'], ['/billing/overrides', '权益覆写'],
-    ],
     'Agent 平台': [
       ['/platform-types', 'Agent 平台类型'], ['/runtime-hosting', '平台托管配置'],
       ['/runtimes', '运行环境'], ['/runtime-environments', '智能体托管环境'],
@@ -52,7 +47,6 @@ const pages: Record<'platform' | 'tenant', Record<string, [string, string][]>> =
   },
   tenant: {
     '概览': [['/dashboard', '概览']],
-    '计费中心': [['/billing/subscription', '订阅与配额'], ['/billing/usage', '用量统计']],
     '数字员工': [['/agents', '数字员工列表'], ['/runtime-environments', '智能体托管环境']],
     '技能中心': [['/tenant-skills/platform', '平台技能'], ['/tenant-skills/own', '企业技能']],
     '应用管理': [
@@ -87,7 +81,7 @@ const pages: Record<'platform' | 'tenant', Record<string, [string, string][]>> =
 
 const groupIcons: Record<string, string> = {
   '概览': 'layout-dashboard', '租户管理': 'building-2', '企业管理': 'briefcase',
-  '计费中心': 'layers', 'Agent 平台': 'cpu', '技能中心': 'wand', '应用管理': 'settings',
+  'Agent 平台': 'cpu', '技能中心': 'wand', '应用管理': 'settings',
   '知识库': 'book-open', '云盘': 'hard-drive', '任务与自动化': 'list-checks', '任务': 'list-checks',
   '数字员工': 'bot', '系统管理': 'shield-check', '组织与人员': 'users',
   '群聊与协同': 'message-square', '凭证与接入': 'key', '监控与告警': 'activity',

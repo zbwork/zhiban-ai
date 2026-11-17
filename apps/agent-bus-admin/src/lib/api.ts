@@ -1219,7 +1219,18 @@ export type UpdateMemberInput = {
   status?: string  // active / suspended (= disabled) / left / invited
 }
 
+export type CreateMemberInput = {
+  email: string
+  display_name: string
+  employee_id?: string
+  title?: string
+  department_id: number
+}
+export type CreateMemberResult = { member: MemberDetail; account_reused: boolean; initial_password?: string }
+
 export const Members = {
+  create: (body: CreateMemberInput) =>
+    api<CreateMemberResult>('/api/admin/v1/tenant/members', { method: 'POST', body: JSON.stringify(body) }),
   list: (department_id = 0, q = '', limit = 50, offset = 0) =>
     api<{ items: MemberDetail[]; total: number }>(
       `/api/admin/v1/tenant/members?department_id=${department_id}&q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`
@@ -3826,7 +3837,7 @@ export type OIDCStartResp = {
 // 直接用 fetch + ResponseInterceptor 兼容外壳。
 export const PublicAuth = {
   listIdentityProviders: async (): Promise<PublicIdentityProvider[]> => {
-    const r = await fetch('/api/agent-bus/v1/auth/identity-providers/public')
+    const r = await fetch('/api/admin/v1/auth/identity-providers/public')
     const body = await r.json()
     if (!r.ok || body.success === false) {
       throw new Error(body.message || `HTTP ${r.status}`)
@@ -3834,7 +3845,7 @@ export const PublicAuth = {
     return body.data?.items || []
   },
   oidcStart: async (providerUuid: string, afterRedirect?: string): Promise<OIDCStartResp> => {
-    const r = await fetch('/api/agent-bus/v1/auth/login/oidc/start', {
+    const r = await fetch('/api/admin/v1/auth/login/oidc/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ providerUuid, afterRedirect }),
@@ -3846,7 +3857,7 @@ export const PublicAuth = {
     return body.data
   },
   oidcCallback: async (code: string, state: string): Promise<LoginResp> => {
-    const r = await fetch('/api/agent-bus/v1/auth/login/oidc/callback', {
+    const r = await fetch('/api/admin/v1/auth/login/oidc/callback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code, state }),
@@ -4605,7 +4616,7 @@ export type AppCategory = {
   isSystem: boolean
 }
 
-type AppListParams = { status?: string; keyword?: string; categoryId?: number; usageScope?: string; limit?: number; offset?: number }
+type AppListParams = { workspaceOnly?: boolean; status?: string; keyword?: string; categoryId?: number; usageScope?: string; limit?: number; offset?: number }
 
 export const Apps = {
   list: (params?: AppListParams) => {
@@ -4614,10 +4625,11 @@ export const Apps = {
     if (params?.keyword) q.set('keyword', params.keyword)
     if (params?.categoryId) q.set('category_id', String(params.categoryId))
     if (params?.usageScope) q.set('usageScope', params.usageScope)
+    if (params?.workspaceOnly) q.set('workspace_only', 'true')
     if (params?.limit != null) q.set('limit', String(params.limit))
     if (params?.offset != null) q.set('offset', String(params.offset))
     const suffix = q.toString() ? '?' + q.toString() : ''
-    return api<{ items: App[]; total: number; limit?: number; offset?: number }>('/api/admin/v1/tenant/apps' + suffix)
+    return api<{ items: App[]; total: number; limit?: number; offset?: number; readOnlyReason?: string }>('/api/admin/v1/tenant/apps' + suffix)
   },
   get: (uuid: string) =>
     api<AppDetail>(`/api/admin/v1/tenant/apps/${encodeURIComponent(uuid)}`),
@@ -4662,10 +4674,11 @@ export const PlatformApps = {
     if (params?.keyword) q.set('keyword', params.keyword)
     if (params?.categoryId) q.set('category_id', String(params.categoryId))
     if (params?.usageScope) q.set('usageScope', params.usageScope)
+    if (params?.workspaceOnly) q.set('workspace_only', 'true')
     if (params?.limit != null) q.set('limit', String(params.limit))
     if (params?.offset != null) q.set('offset', String(params.offset))
     const suffix = q.toString() ? '?' + q.toString() : ''
-    return api<{ items: App[]; total: number; limit?: number; offset?: number }>('/api/admin/v1/platform/apps' + suffix)
+    return api<{ items: App[]; total: number; limit?: number; offset?: number; readOnlyReason?: string }>('/api/admin/v1/platform/apps' + suffix)
   },
   get: (uuid: string) =>
     api<AppDetail>(`/api/admin/v1/platform/apps/${encodeURIComponent(uuid)}`),

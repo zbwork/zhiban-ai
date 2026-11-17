@@ -6,7 +6,9 @@
 package adminapps
 
 import (
+	"context"
 	"encoding/json"
+	domagent "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/agent"
 	"net/http"
 	"strconv"
 
@@ -16,7 +18,14 @@ import (
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
 )
 
-type Handlers struct{ App domapp.Service }
+type EmployeeReader interface {
+	Get(context.Context, int64, string) (*domagent.DigitalEmployee, error)
+}
+type Handlers struct {
+	App            domapp.Service
+	Agent          EmployeeReader
+	ReadOnlyReason string
+}
 
 func (h *Handlers) Register(mux *http.ServeMux, guard func(string, http.Handler) http.Handler) {
 	routes := []struct {
@@ -26,6 +35,7 @@ func (h *Handlers) Register(mux *http.ServeMux, guard func(string, http.Handler)
 		{"POST /api/admin/v1/tenant/apps", "tenant.app.create", h.createApp},
 		{"GET /api/admin/v1/tenant/apps", "tenant.app.read", h.listApps},
 		{"GET /api/admin/v1/tenant/apps/{uuid}", "tenant.app.read", h.getApp},
+		{"GET /api/admin/v1/tenant/apps/{uuid}/launch-test", "tenant.app.read", h.launchTestApp},
 		{"PATCH /api/admin/v1/tenant/apps/{uuid}", "tenant.app.update", h.patchApp},
 		{"DELETE /api/admin/v1/tenant/apps/{uuid}", "tenant.app.delete", h.deleteApp},
 		{"POST /api/admin/v1/tenant/apps/{uuid}/secret/rotate", "tenant.app.rotate_secret", h.rotateAppSecret},
@@ -41,20 +51,22 @@ func (h *Handlers) Register(mux *http.ServeMux, guard func(string, http.Handler)
 	}
 }
 
-// RegisterReadOnly exposes catalog reads even when OAuth issuing is unconfigured.
-// Issuer-dependent writes remain unavailable until AppIssuer is configured.
+// RegisterReadOnly retains authorized routes but reports missing issuer explicitly.
 func (h *Handlers) RegisterReadOnly(mux *http.ServeMux, tenantPerm, platformPerm func(string, http.Handler) http.Handler) {
-	for _, route := range []struct {
-		pattern string
-		handler http.HandlerFunc
-	}{
-		{"GET /api/admin/v1/tenant/apps", h.listApps},
-		{"GET /api/admin/v1/tenant/apps/{uuid}", h.getApp},
-		{"GET /api/admin/v1/tenant/app-categories", h.listAppCategories},
-	} {
-		mux.Handle(route.pattern, tenantPerm("tenant.app.read", route.handler))
+	h.ReadOnlyReason = "应用接入尚未配置，请部署者设置 COMMUNITY_APP_ISSUER（HTTPS 地址）后重启 Bus 和 Admin 服务。"
+	readOnlyGuard := func(guard func(string, http.Handler) http.Handler) func(string, http.Handler) http.Handler {
+		return func(permission string, next http.Handler) http.Handler {
+			return guard(permission, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet && r.Method != http.MethodHead {
+					encode.JSONError(w, apperr.New(apperr.PreconditionFailed, h.ReadOnlyReason))
+					return
+				}
+				next.ServeHTTP(w, r)
+			}))
+		}
 	}
-	h.RegisterPlatformReadOnly(mux, platformPerm)
+	h.Register(mux, readOnlyGuard(tenantPerm))
+	h.RegisterPlatform(mux, readOnlyGuard(platformPerm))
 }
 
 func (h *Handlers) RegisterPlatformReadOnly(mux *http.ServeMux, platformPerm func(string, http.Handler) http.Handler) {
@@ -199,9 +211,10 @@ func (h *Handlers) listAppsInScope(w http.ResponseWriter, r *http.Request, tid i
 		return
 	}
 	filter := domapp.AppListFilter{
-		Status:     r.URL.Query().Get("status"),
-		Keyword:    r.URL.Query().Get("keyword"),
-		UsageScope: r.URL.Query().Get("usageScope"),
+		WorkspaceOnly: r.URL.Query().Get("workspace_only") == "true",
+		Status:        r.URL.Query().Get("status"),
+		Keyword:       r.URL.Query().Get("keyword"),
+		UsageScope:    r.URL.Query().Get("usageScope"),
 	}
 	filter.Limit, _ = strconv.Atoi(r.URL.Query().Get("limit"))
 	filter.Offset, _ = strconv.Atoi(r.URL.Query().Get("offset"))
@@ -219,7 +232,7 @@ func (h *Handlers) listAppsInScope(w http.ResponseWriter, r *http.Request, tid i
 	for _, a := range apps {
 		items = append(items, toAppResp(&a, ""))
 	}
-	encode.JSON(w, map[string]any{"items": items, "total": total, "limit": filter.Limit, "offset": filter.Offset})
+	encode.JSON(w, map[string]any{"items": items, "total": total, "limit": filter.Limit, "offset": filter.Offset, "readOnlyReason": h.ReadOnlyReason})
 }
 
 type appDetailResp struct {
@@ -710,4 +723,70 @@ func (h *Handlers) RegisterPlatform(mux *http.ServeMux, platformPerm func(string
 	mux.Handle("DELETE /api/admin/v1/platform/app-categories/{uuid}",
 		platformPerm("platform.app_category.delete", http.HandlerFunc(h.deletePlatformAppCategory)))
 
+}
+
+type bindAgentAppsReq struct {
+	AppUUIDs []string `json:"appUuids"`
+}
+
+func (h *Handlers) bindAgentApps(w http.ResponseWriter, r *http.Request) {
+	if h.App == nil {
+		encode.JSONError(w, apperr.ErrInternal.Withf("app service not wired"))
+		return
+	}
+	tid := middleware.MustTenantID(r.Context())
+	agentUUID := r.PathValue("agent_uuid")
+	if h.Agent == nil {
+		encode.JSONError(w, apperr.ErrInternal.Withf("agent service not wired"))
+		return
+	}
+	agent, err := h.Agent.Get(r.Context(), tid, agentUUID)
+	if err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	var req bindAgentAppsReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		encode.JSONError(w, apperr.ErrInvalidParams.Wrap(err))
+		return
+	}
+	if err := h.App.BindAgentApps(r.Context(), tid, agent.ID, req.AppUUIDs); err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	encode.JSON(w, map[string]any{"agentUuid": agentUUID, "appUuids": req.AppUUIDs})
+}
+
+func (h *Handlers) listAgentApps(w http.ResponseWriter, r *http.Request) {
+	if h.App == nil {
+		encode.JSONError(w, apperr.ErrInternal.Withf("app service not wired"))
+		return
+	}
+	tid := middleware.MustTenantID(r.Context())
+	agentUUID := r.PathValue("agent_uuid")
+	if h.Agent == nil {
+		encode.JSONError(w, apperr.ErrInternal.Withf("agent service not wired"))
+		return
+	}
+	agent, err := h.Agent.Get(r.Context(), tid, agentUUID)
+	if err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	apps, err := h.App.ListAgentApps(r.Context(), tid, agent.ID)
+	if err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	items := make([]appResp, 0, len(apps))
+	for _, a := range apps {
+		items = append(items, toAppResp(&a, ""))
+	}
+	encode.JSON(w, map[string]any{"items": items})
+}
+
+// RegisterAgentBindings is independent of OAuth issuer configuration: no credentials are issued here.
+func (h *Handlers) RegisterAgentBindings(mux *http.ServeMux, guard func(string, http.Handler) http.Handler, writeGuard func(http.Handler) http.Handler) {
+	mux.Handle("GET /api/admin/v1/tenant/agents/{agent_uuid}/apps", guard("tenant.app.agent_bind", http.HandlerFunc(h.listAgentApps)))
+	mux.Handle("PUT /api/admin/v1/tenant/agents/{agent_uuid}/apps", guard("tenant.app.agent_bind", writeGuard(http.HandlerFunc(h.bindAgentApps))))
 }

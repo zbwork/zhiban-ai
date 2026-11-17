@@ -231,9 +231,15 @@ type CatalogItem struct {
 	Category    string `json:"category,omitempty"`
 }
 
-type impl struct{ pool *pgxpool.Pool }
+type impl struct {
+	pool           *pgxpool.Pool
+	includeBilling bool
+}
 
-func New(pool *pgxpool.Pool) Service { return &impl{pool: pool} }
+func New(pool *pgxpool.Pool) Service { return &impl{pool: pool, includeBilling: true} }
+
+// NewCommunity keeps shared operational statistics independent of unexported commercial billing tables.
+func NewCommunity(pool *pgxpool.Pool) Service { return &impl{pool: pool} }
 
 func (s *impl) PlatformStats(ctx context.Context) (*PlatformStats, error) {
 	st := &PlatformStats{}
@@ -398,10 +404,28 @@ func (s *impl) TenantOverview(ctx context.Context, tenantID int64) (*TenantOverv
 
 	// ---- 1. 标量: 存量/今日/活跃/待办/健康/计费 ----
 	var (
+		monthUsed                      int64
 		planName, subStatus, periodEnd *string
 		balance                        *int64
 		frozen                         *bool
 	)
+	billingQuery := ""
+	billingTargets := []any{}
+	if s.includeBilling {
+		billingQuery = `
+		  (SELECT p.name FROM subscriptions s JOIN plans p ON p.id = s.plan_id
+		    WHERE s.tenant_id=$1 AND s.status IN ('trialing','active','past_due') LIMIT 1),
+		  (SELECT s.status FROM subscriptions s
+		    WHERE s.tenant_id=$1 AND s.status IN ('trialing','active','past_due') LIMIT 1),
+		  (SELECT to_char(s.current_period_end, 'YYYY-MM-DD') FROM subscriptions s
+		    WHERE s.tenant_id=$1 AND s.status IN ('trialing','active','past_due') LIMIT 1),
+		  (SELECT balance FROM credit_wallets WHERE tenant_id=$1),
+		  (SELECT frozen FROM credit_wallets WHERE tenant_id=$1),
+		  (SELECT COALESCE(sum(total_credits), 0) FROM usage_aggregates
+		    WHERE tenant_id=$1 AND period='monthly' AND period_start = date_trunc('month', now())::date),
+`
+		billingTargets = []any{&planName, &subStatus, &periodEnd, &balance, &frozen, &monthUsed}
+	}
 	scalarQ := `
 		SELECT
 		  (SELECT count(*) FROM tenant_memberships WHERE tenant_id=$1 AND deleted_at IS NULL),
@@ -427,30 +451,21 @@ func (s *impl) TenantOverview(ctx context.Context, tenantID int64) (*TenantOverv
 		  (SELECT count(*) FROM runtime_call_logs
 		    WHERE tenant_id=$1 AND created_at >= now() - interval '24 hours'
 		      AND (http_status >= 400 OR (http_status IS NULL AND COALESCE(error_message,'') <> ''))),
-		  (SELECT p.name FROM subscriptions s JOIN plans p ON p.id = s.plan_id
-		    WHERE s.tenant_id=$1 AND s.status IN ('trialing','active','past_due') LIMIT 1),
-		  (SELECT s.status FROM subscriptions s
-		    WHERE s.tenant_id=$1 AND s.status IN ('trialing','active','past_due') LIMIT 1),
-		  (SELECT to_char(s.current_period_end, 'YYYY-MM-DD') FROM subscriptions s
-		    WHERE s.tenant_id=$1 AND s.status IN ('trialing','active','past_due') LIMIT 1),
-		  (SELECT balance FROM credit_wallets WHERE tenant_id=$1),
-		  (SELECT frozen FROM credit_wallets WHERE tenant_id=$1),
-		  (SELECT COALESCE(sum(total_credits), 0) FROM usage_aggregates
-		    WHERE tenant_id=$1 AND period='monthly' AND period_start = date_trunc('month', now())::date),
+` + billingQuery + `
 		  (SELECT count(*) FROM alerts WHERE scope_kind='tenant' AND tenant_id=$1 AND status='firing'),
 		  (SELECT count(*) FROM a2a_approval_requests WHERE tenant_id=$1 AND status='pending')
 	`
-	var monthUsed int64
-	if err := s.pool.QueryRow(ctx, scalarQ, tenantID).Scan(
+	targets := []any{
 		&o.Members, &o.Departments, &o.DigitalEmployees, &o.Published,
 		&o.Conversations, &o.MessagesToday, &o.ConversationsToday,
 		&o.ActiveMembers7d, &o.KBCount,
 		&o.Todos.DraftAgents, &o.Todos.CronErrors, &o.Todos.KBIngestFailed7d,
 		&o.Health.InstancesTotal, &o.Health.InstancesReady, &o.Health.InstancesAbnormal,
 		&o.Health.Calls24h, &o.Health.CallsFailed24h,
-		&planName, &subStatus, &periodEnd, &balance, &frozen, &monthUsed,
-		&o.Todos.AlertsFiring, &o.Todos.ApprovalsPending,
-	); err != nil {
+	}
+	targets = append(targets, billingTargets...)
+	targets = append(targets, &o.Todos.AlertsFiring, &o.Todos.ApprovalsPending)
+	if err := s.pool.QueryRow(ctx, scalarQ, tenantID).Scan(targets...); err != nil {
 		return nil, err
 	}
 	o.Todos.InstancesAbnormal = o.Health.InstancesAbnormal

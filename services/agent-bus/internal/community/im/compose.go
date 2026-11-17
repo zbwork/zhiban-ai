@@ -99,7 +99,7 @@ func decode(w http.ResponseWriter, r *http.Request, out any) error {
 	}
 	return nil
 }
-func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc chat.Service, visibility contacts.Service, auth func(http.Handler) http.Handler) {
+func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc chat.Service, visibility contacts.Service, auth func(http.Handler) http.Handler, avatarResolvers ...roomsvc.AvatarURLResolver) {
 	state := &clientchat.StateHandlers{ConvState: convstate.New(pool), ConvAccess: conversation.New(pool)}
 	registerConversationState(mux, state, auth)
 	list := &clientchat.ListHandler{Chat: chatSvc}
@@ -112,6 +112,9 @@ func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc c
 	mapper := wukong.NewDirectRoomMapper(adapter, lookup)
 	rooms := room.New(pool)
 	roomService := roomsvc.New(rooms, account.New(pool), agent.New(pool), conversation.New(pool), message.New(pool), visibility, chatSvc, pool, event.New(pool))
+	if len(avatarResolvers) > 0 {
+		roomsvc.SetAvatarURLResolverOnService(roomService, avatarResolvers[0])
+	}
 	roomsvc.SetWuKongGroupProvisionerOnService(roomService, wukong.NewGroupRoomMapper(adapter.Client(), lookup))
 	roomHandlers := &clientrooms.Handlers{Room: roomService, Contacts: visibility, DirectRoom: directroom.New(directroom.Deps{Logger: log.Default(), Rooms: rooms, Accounts: account.New(pool), WuKong: mapper, ConvState: convstate.New(pool)})}
 	roomHandlers.Register(mux, auth)

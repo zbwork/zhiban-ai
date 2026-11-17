@@ -1,0 +1,22 @@
+{
+  "token_http": 200,
+  "signature_verified": true,
+  "issuer_verified": true,
+  "audience_verified": true,
+  "scope": "",
+  "code_replay_status": 401,
+  "no_login_credentials_in_url": true,
+  "email": "m2-ui-admin@community.test",
+  "cleanup": {
+    "temporary_role_assignments": 0,
+    "employee_app_bindings": 0,
+    "app_soft_deleted": true,
+    "oauth_client_status": "revoked",
+    "idp_soft_deleted": true
+  },
+  "schema": {
+    "count": 27,
+    "first_26_digest_before": "c484b3612f08c5a5e1690940e188ccaf",
+    "first_26_digest_after": "c484b3612f08c5a5e1690940e188ccaf"
+  }
+}

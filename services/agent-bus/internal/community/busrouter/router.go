@@ -37,7 +37,7 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 		panic("community Bus dependencies required")
 	}
 	authT := func(handler http.Handler) http.Handler {
-		return auth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(membership)(handler)))
+		return auth(middleware.RequirePasswordValid(middleware.RequireTenant(middleware.RequireActiveTenantMembership(membership)(handler))))
 	}
 	if h.Files != nil {
 		h.Files.Register(mux, authT)
@@ -100,11 +100,11 @@ func (h Handlers) Register(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.HandleFunc("GET  /api/agent-bus/v1/auth/captcha", h.Session.Captcha)
 	mux.HandleFunc("POST /api/agent-bus/v1/auth/login/password", h.Session.LoginPassword)
 	mux.HandleFunc("POST /api/agent-bus/v1/auth/token/refresh", h.Session.Refresh)
-	mux.Handle("POST /api/agent-bus/v1/auth/logout", authT(http.HandlerFunc(h.Session.Logout)))
+	mux.Handle("POST /api/agent-bus/v1/auth/logout", auth(http.HandlerFunc(h.Session.Logout)))
 	mux.Handle("GET  /api/agent-bus/v1/auth/me", auth(http.HandlerFunc(h.Session.Me)))
-	mux.Handle("POST /api/agent-bus/v1/auth/scope/switch", auth(http.HandlerFunc(h.Session.SwitchScope)))
+	mux.Handle("POST /api/agent-bus/v1/auth/scope/switch", auth(middleware.RequirePasswordValid(http.HandlerFunc(h.Session.SwitchScope))))
 	mux.Handle("GET  /api/agent-bus/v1/auth/menu", authT(http.HandlerFunc(h.Session.Menu)))
-	mux.Handle("POST /api/agent-bus/v1/auth/password/change", authT(http.HandlerFunc(h.Session.ChangePassword)))
+	mux.Handle("POST /api/agent-bus/v1/auth/password/change", auth(http.HandlerFunc(h.Session.ChangePassword)))
 	mux.Handle("GET  /api/agent-bus/v1/contacts/tree", authT(http.HandlerFunc(h.Contacts.ContactsTree)))
 	mux.Handle("GET  /api/agent-bus/v1/contacts", authT(http.HandlerFunc(h.Contacts.ContactsList)))
 	mux.Handle("GET  /api/agent-bus/v1/contacts/agents", authT(http.HandlerFunc(h.Contacts.ContactsAgents)))

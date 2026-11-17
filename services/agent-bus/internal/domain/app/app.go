@@ -68,12 +68,13 @@ type AppRepo interface {
 
 // AppListFilter ListByTenant 过滤条件。
 type AppListFilter struct {
-	CategoryID *int64 // 可选: 限定分类
-	Status     string // 可选: 仅返指定 status
-	Keyword    string // 可选: 模糊匹配 name / code
-	UsageScope string // 可选: all | end_user | agent
-	Limit      int
-	Offset     int
+	WorkspaceOnly bool   // tenant enabled + universal end-user apps, with normal server pagination
+	CategoryID    *int64 // 可选: 限定分类
+	Status        string // 可选: 仅返指定 status
+	Keyword       string // 可选: 模糊匹配 name / code
+	UsageScope    string // 可选: all | end_user | agent
+	Limit         int
+	Offset        int
 }
 
 // =====================================================

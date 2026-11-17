@@ -142,7 +142,7 @@ WITH effective AS (
 		r.code AS role_code,
 		p.code AS perm_code
 	FROM role_assignments ra
-	JOIN roles r ON r.id = ra.role_id
+	JOIN roles r ON r.id = ra.role_id AND r.deleted_at IS NULL
 	LEFT JOIN role_permissions rp ON rp.role_id = r.id
 	LEFT JOIN permissions p ON p.id = rp.permission_id
 	WHERE ra.account_id = $1
@@ -156,7 +156,7 @@ SELECT
 	e.workspace_id,
 	array_agg(DISTINCT e.role_code ORDER BY e.role_code) AS roles,
 	COALESCE(array_agg(DISTINCT e.perm_code ORDER BY e.perm_code) FILTER (WHERE e.perm_code IS NOT NULL), ARRAY[]::text[]) AS perms,
-	bool_or(e.role_code IN ('platform.admin','tenant.admin','tenant.operator')) AS is_admin
+	bool_or(e.role_code IN ('platform.admin','tenant.admin','tenant.operator') OR e.perm_code IS NOT NULL) AS is_admin
 FROM effective e
 GROUP BY e.scope_kind, e.tenant_id, e.workspace_id
 ORDER BY
@@ -193,7 +193,9 @@ func (r *Repo) HasAdminRole(ctx context.Context, accountID int64) (bool, error) 
 			WHERE ra.account_id = $1
 			  AND ra.deleted_at IS NULL
 			  AND (ra.expires_at IS NULL OR ra.expires_at > now())
-			  AND r.code IN ('platform.admin','tenant.admin','tenant.operator')
+			  AND r.deleted_at IS NULL
+              AND (r.code IN ('platform.admin','tenant.admin','tenant.operator')
+                   OR EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE rp.role_id=r.id))
 		)`, accountID).Scan(&ok)
 	return ok, err
 }

@@ -28,7 +28,7 @@ import {
   type TenantSkill,
 } from '../lib/api'
 import type { PositionsFieldValue } from '../components/PositionsField'
-import { Button, ConfirmDialog } from '../components/ui'
+import { Button, ConfirmDialog, EmptyState, PageHeader } from '../components/ui'
 import {
   AgentAbilitiesSection,
   AgentBasicSection,
@@ -83,6 +83,7 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
   const [kbUuids, setKbUuids] = useState<string[]>([])
   const [lockedKBBindings, setLockedKBBindings] = useState<Array<Pick<AgentKBBinding, 'kb_uuid' | 'kb_name'> & Partial<Pick<AgentKBBinding, 'kb_status'>>>>([])
   const [err, setErr] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(!isCreate)
   const [saving, setSaving] = useState(false)
@@ -97,13 +98,20 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
         setAgent(res.agent)
         setDraft(fromAgent(res.agent))
       })
-      .catch((e: Error) => setErr(e.message))
+      .catch((e: Error) => setLoadError(e.message))
       .finally(() => setLoading(false))
   }, [isCreate, uuid])
 
   useEffect(() => {
     AgentModelOptions.tenant()
-      .then((r) => setModelOptions(normalizeAgentModelOptions(r.items || [])))
+      .then((r) => {
+        const options = normalizeAgentModelOptions(r.items || [])
+        setModelOptions(options)
+        if (isCreate) {
+          const preferred = options.find((item) => item.default) || options[0]
+          if (preferred) setDraft((current) => current.ModelPrimary === emptyAgentDraft().ModelPrimary ? { ...current, ModelPrimary: preferred.value } : current)
+        }
+      })
       .catch(() => setModelOptions(normalizeAgentModelOptions()))
     Departments.list().then((r) => setDepartments(r.items || [])).catch(() => {})
     Positions.list('', 200, 0).then((r) => setPositions(r.items || [])).catch(() => {})
@@ -123,7 +131,7 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
     TenantKB.list()
       .then((r) => setKbsOpts((r.items || []).filter(isUsableKB)))
       .catch(() => {})
-  }, [])
+  }, [isCreate])
 
   useEffect(() => {
     if (!agent?.ID) return
@@ -247,6 +255,7 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
   }, [isCreate, templateUuid])
 
   const save = async ({ publish = false }: { publish?: boolean } = {}) => {
+    if (!isCreate && !agent) return
     if (!draft.Name.trim()) {
       setErr('请填写名称')
       setTab('basic')
@@ -331,6 +340,20 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
   }
 
   if (loading) return <div className="text-[13px] text-[var(--color-text-mute)]">加载中...</div>
+  if (!isCreate && !agent) {
+    const description = /forbidden|403/i.test(loadError)
+      ? '当前租户无法访问这个数字员工。请返回列表，或切换到有权限的租户。'
+      : /not.found|404/i.test(loadError)
+        ? '这个数字员工不存在或已移除，请返回列表重新选择。'
+        : '暂时无法读取数字员工配置，请返回列表后重试。'
+    return (
+      <>
+        <PageHeader title="数字员工" subtitle="查看和维护当前租户的数字员工。" />
+        <EmptyState title="无法打开数字员工" description={description} tone="danger"
+          action={<Button variant="secondary" onClick={() => nav('/agents')}>返回数字员工列表</Button>} />
+      </>
+    )
+  }
 
   const pageSubtitle = isCreate
     ? '按步骤填写资料、绑定运行环境与能力；完成配置后可保存草稿或直接发布。'
@@ -340,6 +363,7 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
 
   return (
     <AgentEditorShell
+      showFinalActionsOnAllSteps={!isCreate}
       title={isCreate ? '新建数字员工' : '编辑数字员工'}
       subtitle={pageSubtitle}
       tab={activeTab}
@@ -400,6 +424,7 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
           locked={locked}
           runtimeOptions={runtimeOptions}
           context="tenantAgent"
+          allowExecutionChoice={isCreate}
         />
       )}
       {activeTab === 'abilities' && (
@@ -426,9 +451,9 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
       )}
       {showSaveConfirm && (
         <ConfirmDialog
-          title="确认保存并下发更新？"
-          description="保存后，系统会生成新的数字员工配置，并向当前租户下已启动的用户运行实例下发更新任务。在线用户或下次使用该数字员工时，右下角任务面板会显示更新进度。更新完成后，新会话将使用最新配置；历史会话内容不会被修改。"
-          confirmLabel="保存并下发"
+          title={draft.ExecutionLocus === 'local' ? '保存员工配置？' : '确认保存并下发更新？'}
+          description={draft.ExecutionLocus === 'local' ? '保存后，成员下次使用该数字员工时会获取最新配置。各自电脑上的工作目录、模型和运行权限保持不变。' : '保存后，系统会生成新的数字员工配置，并向当前租户下已启动的用户运行实例下发更新任务。在线用户或下次使用该数字员工时，右下角任务面板会显示更新进度。更新完成后，新会话将使用最新配置；历史会话内容不会被修改。'}
+          confirmLabel={draft.ExecutionLocus === 'local' ? '保存' : '保存并下发'}
           tone="info"
           onClose={() => setShowSaveConfirm(false)}
           onConfirm={async () => {

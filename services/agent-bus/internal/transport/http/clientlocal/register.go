@@ -25,6 +25,7 @@ func (h *Handlers) Register(mux *http.ServeMux, authT func(http.Handler) http.Ha
 	mux.HandleFunc("POST "+base+"/runs/{run}/authorize", h.localAuthorize)
 	mux.HandleFunc("POST "+base+"/runs/{run}/model/{protocol...}", h.localModel)
 	mux.HandleFunc("POST "+base+"/runs/{run}/files/{operation}", h.localOutput)
+	mux.HandleFunc("GET "+base+"/runs/{run}/skills/{skill}/package", h.localSkillPackage)
 	mux.HandleFunc("PUT "+svcdrive.LocalUploadPath, h.localUpload)
 	mux.HandleFunc("POST "+base+"/runs/{run}/images", h.localImage)
 	mux.HandleFunc("POST "+base+"/runs/{run}/search", h.localSearch)

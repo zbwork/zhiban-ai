@@ -11,7 +11,7 @@ import { writeWorkspaceBytes } from './workspace-files.js';
 
 export interface LocalContextInput { blocks?: unknown; skills?: unknown; knowledge?: unknown; metadata?: Record<string, unknown> }
 export class DesktopContext {
-  constructor(private readonly opts: { privateRoot: string; skillsRoot: string; brokerPort: number; allowHttpStorage?: () => boolean; download?: typeof downloadResource }) {}
+  constructor(private readonly opts: { privateRoot: string; skillsRoot: string; brokerPort: number; allowHttpStorage?: () => boolean; download?: typeof downloadResource; downloadSkill?: (run: ActiveLocalRun, skillID: string, maxBytes: number, signal: AbortSignal) => Promise<Buffer> }) {}
 
   /** Called only after durable server acceptance; URLs remain host-only and are discarded after use. */
   async prepare(run: ActiveLocalRun): Promise<void> {
@@ -53,7 +53,10 @@ export class DesktopContext {
       signal.throwIfAborted();
       try {
         if (packagesSize >= 64 * 1024 * 1024 || expandedSize >= 64 * 1024 * 1024) throw new LocalError('local.skill_limit');
-        const bytes = await download(skill.package_url, Math.min(20 * 1024 * 1024, 64 * 1024 * 1024 - packagesSize), signal, { allowHttpStorage: this.opts.allowHttpStorage?.() });
+        const maxBytes = Math.min(20 * 1024 * 1024, 64 * 1024 * 1024 - packagesSize);
+        const bytes = this.opts.downloadSkill
+          ? await this.opts.downloadSkill(run, skill.skill_id, maxBytes, signal)
+          : await download(skill.package_url, maxBytes, signal, { allowHttpStorage: this.opts.allowHttpStorage?.() });
         packagesSize += bytes.length;
         if (createHash('sha256').update(bytes).digest('hex') !== skill.package_sha256) throw new LocalError('local.skill_hash_mismatch');
         expandedSize += await extractSkillPackage(bytes, join(dir, skill.code), { signal, maxBytes: 64 * 1024 * 1024 - expandedSize });

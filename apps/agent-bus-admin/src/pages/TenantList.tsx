@@ -1,11 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Auth, Billing, Tenants, type BillingPlan, type Tenant, type TenantProvisionInput, type TenantProvisionResult } from '../lib/api'
-import { TenantBenefitsDialog } from './tenant/TenantBenefitsDialog'
-import { BeeBridgeInfoDialog } from './tenant/BeeBridgeInfoDialog'
+import { Tenants, type Tenant, type TenantProvisionInput, type TenantProvisionResult } from '../lib/api'
 import { notifyError } from '../lib/toast'
-import { Eye, X, MessageSquareText } from 'lucide-react'
-import { Button, ConfirmDialog, InlineAlert, PageHeader, Pagination, PrimaryButton, RowActions, SearchInput, Select, Toolbar, stickyRightTdCls } from '../components/ui'
+import { X, MessageSquareText } from 'lucide-react'
+import { ConfirmDialog, InlineAlert, PageHeader, Pagination, PrimaryButton, RowActions, SearchInput, Select, Toolbar, stickyRightTdCls } from '../components/ui'
 
 const STATUS_LABEL: Record<string, string> = {
   trial: '试用',
@@ -21,40 +18,21 @@ const STATUS_OPTIONS = [
 ]
 
 export function TenantList() {
-  const navigate = useNavigate()
   const [items, setItems] = useState<Tenant[]>([])
   const [total, setTotal] = useState(0)
-  const [plans, setPlans] = useState<BillingPlan[]>([])
   const [err, setErr] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [tick, setTick] = useState(0)
-  const [viewingBeeBridge, setViewingBeeBridge] = useState<Tenant | null>(null)
-  const [canReadBeeBridge, setCanReadBeeBridge] = useState(false)
-  const [canManageBilling, setCanManageBilling] = useState(false)
-  const [operatorId, setOperatorId] = useState(0)
 
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Tenant | null>(null)
   const [editingLoading, setEditingLoading] = useState(false)
-  const [changingPlan, setChangingPlan] = useState<Tenant | null>(null)
   const [deleting, setDeleting] = useState<Tenant | null>(null)
   // Batch 2B T2B.1: 创建租户成功后用此 state 显示一次性凭据对话框
   const [credential, setCredential] = useState<TenantProvisionResult | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    Auth.permissions()
-      .then((codes) => { if (!cancelled) {
-        setCanReadBeeBridge((codes ?? []).includes('platform.tenant.credentials.read'))
-        setCanManageBilling((codes ?? []).includes('platform.billing.manage'))
-      } })
-      .catch(() => { if (!cancelled) setCanReadBeeBridge(false) })
-    Auth.me().then((me) => { if (!cancelled) setOperatorId(me.account.id) }).catch(() => {})
-    return () => { cancelled = true }
-  }, [])
 
   useEffect(() => {
     Tenants.list(statusFilter, q, pageSize, (page - 1) * pageSize)
@@ -66,17 +44,11 @@ export function TenantList() {
       .catch((e: Error) => setErr(e.message))
   }, [statusFilter, q, page, pageSize, tick])
 
-  useEffect(() => {
-    Billing.listPlans({ is_active: 'true', limit: 200, offset: 0 })
-      .then((r) => setPlans(r.items || []))
-      .catch(() => {})
-  }, [])
-
   const refresh = () => setTick((x) => x + 1)
 
   return (
     <div>
-      <PageHeader title="租户管理" subtitle="管理平台租户、套餐、状态和开通管理员。" />
+      <PageHeader title="租户管理" subtitle="管理平台租户、状态和开通管理员。" />
 
       <Toolbar
         search={
@@ -106,16 +78,15 @@ export function TenantList() {
       {err && <Err msg={err} />}
 
       <div className="overflow-x-auto rounded-lg bg-white card-shadow">
-        <table className="w-full min-w-[1410px] table-fixed text-[13px]">
+        <table className="w-full min-w-[1106px] table-fixed text-[13px]">
           <colgroup>
             <col className="w-[220px]" />
             <col className="w-[84px]" />
             <col className="w-[240px]" />
             <col className="w-[96px]" />
-            <col className="w-[104px]" />
             <col className="w-[96px]" />
             <col className="w-[150px]" />
-            <col className="w-[420px]" />
+            <col className="w-[220px]" />
           </colgroup>
           <thead>
             <tr className="text-left bg-[var(--color-bg-sub)]">
@@ -123,7 +94,6 @@ export function TenantList() {
               <Th>租户 ID</Th>
               <Th>租户标识</Th>
               <Th>行业</Th>
-              <Th>套餐</Th>
               <Th>状态</Th>
               <Th>创建时间</Th>
               <Th className="sticky right-0 z-10 bg-[var(--color-bg-sub)]">操作</Th>
@@ -132,7 +102,7 @@ export function TenantList() {
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-[var(--color-text-mute)]">
+                <td colSpan={7} className="px-4 py-10 text-center text-[var(--color-text-mute)]">
                   没有匹配的租户
                 </td>
               </tr>
@@ -145,34 +115,10 @@ export function TenantList() {
                   <Td className="whitespace-nowrap"><code className="font-mono text-[12px]">{t.ID}</code></Td>
                   <Td><code className="block truncate font-mono text-[12px]" title={t.Slug}>{t.Slug}</code></Td>
                   <Td className="truncate text-[var(--color-text-sub)]" title={t.Industry}>{t.Industry}</Td>
-                  <Td>
-                    {t.EffectivePlanName ? (
-                      <span className="block truncate" title={t.EffectivePlanCode || t.EffectivePlanName}>
-                        {t.EffectivePlanName}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--color-text-mute)]">—</span>
-                    )}
-                  </Td>
                   <Td><StatusPill status={t.Status} /></Td>
                   <Td className="whitespace-nowrap text-[12px] text-[var(--color-text-mute)] font-mono">{new Date(t.CreatedAt).toLocaleString()}</Td>
                   <Td className={`whitespace-nowrap ${stickyRightTdCls}`}>
                     <RowActions
-                      extras={
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/tenants/${t.ID}`)}
-                            title="查看详情"
-                            className="inline-flex h-8 items-center justify-center whitespace-nowrap rounded-md px-3 text-[13px] font-medium text-[var(--color-brand)] transition hover:bg-[var(--color-brand-soft)] hover:text-[var(--color-brand-hover)]"
-                          >
-                            <Eye size={14} className="mr-1" />
-                            详情
-                          </button>
-                          {canManageBilling && operatorId > 0 && <Button variant="ghost" size="sm" className="!text-[var(--color-brand)]" onClick={() => setChangingPlan(t)}>权益套餐</Button>}
-                          {canReadBeeBridge && <Button variant="ghost" size="sm" onClick={() => setViewingBeeBridge(t)}>查看蜂桥信息</Button>}
-                        </>
-                      }
                       onEdit={() => {
                         // 先用列表行数据立即开窗，再异步合并详情里的 OwnerInfo（列表接口不带，避免 N+1）。
                         setEditing(t)
@@ -199,11 +145,9 @@ export function TenantList() {
         onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
       />
 
-      {viewingBeeBridge && <BeeBridgeInfoDialog key={viewingBeeBridge.ID} tenant={viewingBeeBridge} onClose={() => setViewingBeeBridge(null)} />}
       {creating && (
         <TenantFormModal
           title="新建租户"
-          plans={plans}
           onClose={() => setCreating(false)}
           onSubmit={async (body) => {
             const result = await Tenants.create(body as TenantProvisionInput)
@@ -220,25 +164,12 @@ export function TenantList() {
       {editing && (
         <TenantFormModal
           title={`编辑租户：${editing.Name}`}
-          plans={plans}
           initial={editing}
           ownerLoading={editingLoading}
           onClose={() => setEditing(null)}
           onSubmit={async (body) => {
             await Tenants.update(editing.ID, body)
             setEditing(null)
-            refresh()
-          }}
-        />
-      )}
-      {changingPlan && (
-        <TenantBenefitsDialog
-          key={changingPlan.ID}
-          operatorId={operatorId}
-          tenant={changingPlan}
-          plans={plans}
-          onClose={() => setChangingPlan(null)}
-          onChanged={() => {
             refresh()
           }}
         />
@@ -284,14 +215,12 @@ const CREATE_STAGES = [
 
 function TenantFormModal({
   title,
-  plans,
   initial,
   ownerLoading = false,
   onClose,
   onSubmit,
 }: {
   title: string
-  plans: BillingPlan[]
   initial?: Tenant
   ownerLoading?: boolean
   onClose: () => void
@@ -304,8 +233,7 @@ function TenantFormModal({
   const [adminDisplayName, setAdminDisplayName] = useState('')
   const [industry, setIndustry] = useState(initial?.Industry || '')
   const [description, setDescription] = useState(initial?.Description || '')
-  const [status, setStatus] = useState(initial?.Status || 'trial')
-  const [initialPlanID, setInitialPlanID] = useState<number | ''>('')
+  const [status, setStatus] = useState(initial?.Status || 'active')
   const [busy, setBusy] = useState(false)
   // 创建向导阶段进度（仅 create path）。stageIdx 在请求期间由定时器推进，做假进度；不代表后端真实进度。
   const [stageIdx, setStageIdx] = useState(0)
@@ -323,7 +251,7 @@ function TenantFormModal({
   const submit = async () => {
     if (!name.trim()) { notifyError('请填名称'); return }
     if (!initial && !slug.trim()) { notifyError('请填写租户标识'); return }
-    if (!initial && !adminMobile.trim()) { notifyError('请填写租户管理员手机号'); return }
+    if (!initial && !adminMobile.trim() && !adminEmail.trim()) { notifyError('请填写已有管理员邮箱或手机号'); return }
     setBusy(true)
     // 仅 create path 启动阶段推进：约每 2.6s 前进一档，封顶在最后一档（等后端真返回再收尾）。
     if (!initial) {
@@ -348,7 +276,6 @@ function TenantFormModal({
             },
           }
       if (!initial) body.Slug = slug
-      if (!initial && initialPlanID) body.InitialPlanID = Number(initialPlanID)
       await onSubmit(body)
     } catch {
       // API 错误已被 api.ts 的 notifyError 提示，无需重复处理
@@ -391,10 +318,6 @@ function TenantFormModal({
                 label="管理员邮箱"
                 value={initial.OwnerInfo?.email || (ownerLoading ? '加载中…' : '—')}
               />
-              <ReadOnlyInfo
-                label="当前套餐"
-                value={initial.EffectivePlanName || '暂无有效订阅'}
-              />
             </div>
             <p className="mt-3 text-[12px] leading-5 text-[var(--color-text-mute)]">
               租户标识用于登录域名和路径，创建后不建议修改。开通管理员账号、角色和密码请到“成员 / 权限与角色”中维护。
@@ -414,7 +337,7 @@ function TenantFormModal({
           <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-sub)] p-3">
             <div className="mb-3 text-[13px] font-medium text-[var(--color-text)]">租户管理员</div>
             <div className="grid grid-cols-2 gap-3">
-                <FormField label="管理员手机号">
+                <FormField label="管理员手机号（可选）">
                   <input
                     value={adminMobile}
                     onChange={(e) => setAdminMobile(e.target.value.replace(/[^\d+ -]/g, ''))}
@@ -437,12 +360,12 @@ function TenantFormModal({
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
                     className={inputCls}
-                    placeholder="可选"
+                    placeholder="已设置密码的管理员邮箱"
                   />
                 </FormField>
               </div>
               <p className="mt-3 text-[12px] leading-5 text-[var(--color-text-mute)]">
-                创建后系统会自动生成一次性初始密码；保存成功时仅本次显示一次，请立即复制给租户管理员。首次登录将强制改密。
+                使用邮箱时，请填写已有且已设置密码的账号，创建后沿用原登录凭据。手机号接入需要已配置短信服务；系统不会生成临时密码。
               </p>
           </div>
         )}
@@ -458,18 +381,6 @@ function TenantFormModal({
             </Select>
           </FormField>
         </div>
-        {!initial && (
-          <FormField label="初始套餐" hint="未选择时，系统会自动开通启用中的免费版套餐">
-            <Select value={initialPlanID} onChange={(e) => setInitialPlanID(e.target.value ? Number(e.target.value) : '')}>
-              <option value="">默认免费版</option>
-              {plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {formatPlanOption(p)}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-        )}
         <FormField label="描述">
           <textarea
             value={description}
@@ -508,12 +419,6 @@ function TenantFormModal({
       </div>
     </Modal>
   )
-}
-
-function formatPlanOption(plan: BillingPlan) {
-  const monthly = plan.prices?.find((price) => price.is_active && price.billing_cycle === 'monthly')
-  const price = monthly?.amount ?? plan.price_monthly ?? 0
-  return `${plan.name} (${plan.code}) · ${price > 0 ? `¥${price}/月` : '免费'}`
 }
 
 /* ---------- modal: delete confirm ---------- */
@@ -642,7 +547,7 @@ function InitialCredentialModal({ result, onClose }: { result: TenantProvisionRe
         </div>
         {reused ? (
           <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-sub)] px-3 py-3 text-[13px] leading-6 text-[var(--color-text-sub)]">
-            该手机号已经存在账号，请联系该账号本人用原有方式（密码或短信验证码）登入新租户。
+            已复用现有管理员账号，请使用该账号原有的登录方式进入新租户。
           </div>
         ) : (
           <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-3 text-[13px] leading-6 text-blue-900 flex gap-2">

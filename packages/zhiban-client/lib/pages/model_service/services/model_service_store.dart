@@ -58,9 +58,21 @@ class ModelServiceStore {
   }
 
   Future<String> _scope() async {
-    if (AppConfig.communityEdition) return 'community-local';
+    final serverWorkspace = AppConfig.serverWorkspace;
+    final origin = AppConfig.apiUrl();
+    final epoch = AppConfig.connectionEpoch;
+    if (AppConfig.communityEdition && !serverWorkspace) {
+      return 'community-local';
+    }
     final aid = await _sessionService.getAccountId();
-    return (aid == null || aid.isEmpty) ? _anonymousScope : aid;
+    if (AppConfig.connectionEpoch != epoch || AppConfig.apiUrl() != origin) {
+      throw StateError('服务器已变化，未保存模型配置');
+    }
+    if (aid == null || aid.isEmpty) return _anonymousScope;
+    if (AppConfig.communityEdition && serverWorkspace) {
+      return 'server.${base64Url.encode(utf8.encode(origin))}.$aid';
+    }
+    return aid;
   }
 
   Future<List<AiProviderConfig>> loadManagedProviders(
@@ -76,6 +88,9 @@ class ModelServiceStore {
         .map(AiProviderConfig.fromJson)
         .toList();
   }
+
+  /// Captured preference partition; includes the server origin in community server mode.
+  Future<String> configurationScope() => _scope();
 
   Future<List<AiProviderConfig>> loadProviders() async {
     final prefs = await SharedPreferences.getInstance();

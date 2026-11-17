@@ -121,3 +121,30 @@
 本机自动任务失败进一步定位：调用模型前 GetSkillRail 查询 `tenant_skill_disables` / `user_agent_skill_overrides` 失败。下一追加迁移复用上游技能文件、标签及个人/租户覆盖依赖的表、外键和索引；保留禁用与权限策略，不跳过技能读取。
 
 技能管理验收补充：原社区种子遗漏 platform.skill / tenant.skill 权限，导致原管理接口拒绝初始化技能。仅导出上游已有技能权限码，并赋予原 platform.admin/tenant.admin 对应 scope 的权限；不授予普通成员，不允许客户端调用 Admin API。验证匿名与跨租户拒绝及真实装配。
+
+
+## 里程碑二修复范围（2026-11-13）
+
+此前“停止补齐”的章节是当时暂停范围；用户现要求继续完成开源后台实际管理闭环。先补当前公开路由使用的原 RBAC 权限种子（追加 18），只赋原系统管理员角色；原 1–17 字节保持不变。员工管理改接已有 Agent service 的完整 DTO/原保存流程（兼容版本 499ae8922），旧简化嵌入式员工适配不再作为 Admin 入口。缺表继续按真实失败逐项导出原正式定义，记录追加迁移和实际 UI 证据；不重建数据库、不改权限校验、不用商业依赖填空。
+
+权限恢复后真实概览返回 SQLSTATE 42P01：emp_block_registry 缺表；只读核对 agent_runs/alerts 同样缺失。追加 19 原 EMP 注册表定义与公共 schema 种子、原 88 运行轨迹表、原 90 告警表，保留原列/检查/索引/分区及原 DSH/本地引擎枚举扩展。使用真实查询统计，不制造计数。
+
+真实概览继续定位 runtime_instances 缺表。对已导出的 service/repository/HTTP SQL 做原表引用核对，追加 20 原运行实例、A2A/编排、SDK/API Key、单点登录与相关绑定表定义（a2a_approval_requests, a2a_call_edges, a2a_call_edges_default, agent_callable_whitelist, agent_cron_runtime_bindings, agent_orchestration_steps, agent_orchestrations, agent_sdk_credentials, api_keys, client_builtin_handshakes, runtime_instances, session_tokens, speaker_policies, tenant_identity_providers），包含其原分区、约束、索引与注释；不带业务数据。仅存在于未导出商业路径的 tenant_plans/background_skills/mcp_servers 不在本次补表中。
+
+组织本地员工首次 UI 保存命中 digital_employees_local_scope_check（23514）：原基线只允许个人私有/平台模板。用户已确认组织分发，追加 22 保留两条原分支并新增同租户 enterprise 分支（tenant/workspace/private），仍要求无云端环境、有效创建者及 agent_key；引擎枚举/不可变约束和部门范围约束保留。
+
+2026-11-16 真管理台凭证页复现 PostgreSQL column scope does not exist。追加 24 复用原 000050 Runtime Access Token context 与 000053 租户授权范围约束；保留默认 tenant、platform 必须绑定运行环境及 allowlist/all_enabled 原规则，不改 20 已执行内容。
+
+### 000025：管理员创建成员权限
+
+补齐上游已有 tenant.member.invite 权限种子；社区旧 RBAC 导出遗漏此码。仅给系统 tenant.admin 角色绑定；普通成员及自定义角色不自动获得权限。不新增账号/密码表，继续沿用 accounts、admin_accounts、tenant_memberships 和 role_assignments。已执行的 1–24 迁移字节及校验值保持不变。
+
+### 000026：知识库召回测试权限
+
+补齐上游原有 tenant.kb.recall 权限；租户管理台已有召回试问 UI，但导出路由和种子遗漏。仅系统 tenant.admin 默认获得此权限，复用原 SearchManagedKnowledgeBase 与知识库作用域检查。
+
+### 000027：租户企业登录会话边界（2026-11-17）
+
+只追加 login_sessions.auth_tenant_id：引用原 tenants，允许 NULL 保留密码登录及既有会话语义；非空值必须大于零。租户 OIDC 登录从已有 membership 建立该租户会话，刷新/切范围保持此边界，不因账号另有平台或其他租户角色而扩张。复用原 OIDC provider、Redis state/nonce、session 仓储和授权撤销监听；IdP SQL 查询放回 repository。行业与取舍见 requirements/server-workspace 及 ADR-0003。
+
+本机独立库运行器执行至 27 条；追加前后前 26 条账本摘要均为 `c484b3612f08c5a5e1690940e188ccaf`。未修改旧脚本/账本、未清库；不适用于商业库。私有 Compose 的 migrate 服务原来仍引用旧镜像，需与待验收 Bus/Admin 镜像一致，单看 migrate 退出成功不能证明新版本已应用。

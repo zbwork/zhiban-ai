@@ -1,0 +1,63 @@
+{
+  "migration_rows": 26,
+  "previous_25_checksums_unchanged": true,
+  "skill_package": {
+    "matchCount": 1,
+    "size": 330,
+    "sha256": "439e4bde04ba5d4b3b85b2cfc26fb7310e08785ea2902e394a209c7f6137ab4e"
+  },
+  "native_download": {
+    "downloaded_bytes": 20,
+    "sha256": "11b3f708db6eaff5c19a08e3d1eca4a55e1ff5b208902b43b7a7581ee291056a",
+    "content_matches": true,
+    "modified_at_epoch": 1794818154.4972644
+  },
+  "temporary_password": {
+    "fixtureOnly": true,
+    "temporary": true,
+    "meStatus": 200,
+    "refreshPreservesRequiredAction": true,
+    "blocked": [
+      {
+        "method": "GET",
+        "path": "/contacts",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/agents",
+        "status": 403
+      },
+      {
+        "method": "POST",
+        "path": "/im/credentials",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/runtime-environments",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/conversations/stream",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "path": "/chat/conversations",
+        "status": 403
+      },
+      {
+        "method": "POST",
+        "path": "/drive:bootstrap",
+        "status": 403
+      },
+      {
+        "method": "POST",
+        "path": "/auth/scope/switch",
+        "status": 403
+      }
+    ]
+  }
+}

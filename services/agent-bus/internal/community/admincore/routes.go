@@ -1,6 +1,7 @@
 package admincore
 
 import (
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminapps"
 	"net/http"
 
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
@@ -9,6 +10,20 @@ import (
 // Register preserves the original admin URLs and permission codes.
 func (h *Handlers) Register(mux *http.ServeMux, adminAuth func(http.Handler) http.Handler, platformPerm, tenantPerm func(string, http.Handler) http.Handler) {
 	h.registerPages(mux, adminAuth, platformPerm, tenantPerm)
+	if h.App != nil {
+		(&adminapps.Handlers{App: h.App, Agent: h.Agent}).RegisterAgentBindings(mux, tenantPerm, h.requireTenantEditableAgent)
+	}
+	mux.Handle("GET /api/admin/v1/tenant/agent-templates", tenantPerm("tenant.agent.create", http.HandlerFunc(h.listTenantAgentTemplates)))
+	mux.Handle("GET /api/admin/v1/tenant/agent-templates/{uuid}", tenantPerm("tenant.agent.create", http.HandlerFunc(h.getTenantAgentTemplate)))
+	mux.Handle("GET /api/admin/v1/tenant/agents", tenantPerm("tenant.agent.read", http.HandlerFunc(h.listAgents)))
+	mux.Handle("GET /api/admin/v1/tenant/agents/creator-distribution", tenantPerm("tenant.agent.read", http.HandlerFunc(h.agentCreatorDistribution)))
+	mux.Handle("POST /api/admin/v1/tenant/agents", tenantPerm("tenant.agent.create", http.HandlerFunc(h.createAgent)))
+	mux.Handle("GET /api/admin/v1/tenant/agents/{uuid}", tenantPerm("tenant.agent.read", http.HandlerFunc(h.getAgent)))
+	mux.Handle("GET /api/admin/v1/tenant/agent-model-options", tenantPerm("tenant.agent.read", http.HandlerFunc(h.listAgentModelOptions)))
+	mux.Handle("PUT /api/admin/v1/tenant/agents/{uuid}", tenantPerm("tenant.agent.update", h.requireTenantEditableAgent(http.HandlerFunc(h.updateAgent))))
+	mux.Handle("DELETE /api/admin/v1/tenant/agents/{uuid}", tenantPerm("tenant.agent.delete", h.requireTenantEditableAgent(http.HandlerFunc(h.deleteAgent))))
+	mux.Handle("POST /api/admin/v1/tenant/agents/{uuid}/publish", tenantPerm("tenant.agent.publish", h.requireTenantEditableAgent(http.HandlerFunc(h.publishAgent))))
+	mux.Handle("POST /api/admin/v1/tenant/agents/{uuid}/unpublish", tenantPerm("tenant.agent.publish", h.requireTenantEditableAgent(http.HandlerFunc(h.unpublishAgent))))
 	if h.Platform == nil || h.Position == nil || h.RBAC == nil || h.RuntimeEnv == nil || h.Agent == nil || h.Membership == nil {
 		panic("community admin core dependencies required")
 	}

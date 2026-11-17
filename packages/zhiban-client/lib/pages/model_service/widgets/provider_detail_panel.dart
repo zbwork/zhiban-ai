@@ -83,6 +83,8 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
   String? _localId;
   String _lastSavedApiKey = '';
   int _keyLoadRevision = 0;
+  Future<String>? _materialization;
+  String? _materializingCatalogId;
   final Set<String> _collapsedModelGroups = <String>{};
 
   String get _selectionIdentity =>
@@ -115,7 +117,16 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
     final oldIdentity =
         oldWidget.providerId ?? 'catalog:${oldWidget.catalogEntry!.id}';
     if (oldIdentity != _selectionIdentity) {
+      final sameDraft = oldWidget.catalogEntry != null &&
+          widget.providerId != null &&
+          _materializingCatalogId == oldWidget.catalogEntry!.id &&
+          _findLocalProvider(widget.providerId!)?.catalogId ==
+              _materializingCatalogId;
       _localId = widget.providerId;
+      _materializingCatalogId = null;
+      // Saving this catalog draft creates its ID; it is still the same form.
+      // Reading an empty stored key here would erase text the user just typed.
+      if (sameDraft) return;
       _obscureApiKey = true;
       _baseUrlController.text = '';
       _modelSearchController.clear();
@@ -252,16 +263,30 @@ class _ProviderDetailPanelState extends ConsumerState<ProviderDetailPanel> {
   }
 
   /// 本地已有这条记录就直接用；第一次真正需要落地时才创建。
-  Future<String> _ensureLocalId() async {
+  Future<String> _ensureLocalId() {
     final existing = _localId;
-    if (existing != null) return existing;
-    final createdId = await ref
-        .read(modelProvidersProvider.notifier)
-        .materializeFromCatalog(widget.catalogEntry!);
-    if (!mounted) return createdId;
-    setState(() => _localId = createdId);
-    widget.onMaterialized(createdId);
-    return createdId;
+    if (existing != null) return Future.value(existing);
+    return _materialization ??= _materializeDraft();
+  }
+
+  Future<String> _materializeDraft() async {
+    final entry = widget.catalogEntry!;
+    final selection = _selectionIdentity;
+    _materializingCatalogId = entry.id;
+    try {
+      final createdId = await ref
+          .read(modelProvidersProvider.notifier)
+          .materializeFromCatalog(entry);
+      if (!mounted ||
+          (_selectionIdentity != selection && _localId != createdId)) {
+        return createdId;
+      }
+      setState(() => _localId = createdId);
+      widget.onMaterialized(createdId);
+      return createdId;
+    } finally {
+      _materialization = null;
+    }
   }
 
   /// 只在值真的变了才落地——避免"只是点进字段又点出去，什么都没改"也触发

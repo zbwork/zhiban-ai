@@ -76,6 +76,10 @@ func TestCoreRoutesAuthorizationAndRoleIsolation(t *testing.T) {
 		admin, mustChange, anonymous          bool
 		want                                  int
 	}{
+		{"anonymous employee create", "POST", "/tenant/agents", "tenant", "tenant.agent.create", true, false, true, 401},
+		{"ordinary member employee create", "POST", "/tenant/agents", "tenant", "tenant.agent.create", false, false, false, 403},
+		{"missing employee write permission", "PUT", "/tenant/agents/test", "tenant", "tenant.agent.read", true, false, false, 403},
+		{"wrong employee scope", "POST", "/tenant/agents", "platform", "tenant.agent.create", true, false, false, 403},
 		{"anonymous overview", "GET", "/platform/overview", "platform", "platform.overview.read", true, false, true, 401},
 		{"ordinary member", "GET", "/tenant/positions", "tenant", "tenant.position.read", false, false, false, 403},
 		{"missing permission", "GET", "/tenant/positions", "tenant", "", true, false, false, 403},

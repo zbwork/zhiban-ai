@@ -1,6 +1,7 @@
 abstract final class RoutePaths {
   static const chatAttachmentPreview = '/chat/attachment-preview';
   static const String login = '/login';
+  static const String initialPassword = '/login/initial-password';
   static const String tenantPicker = '/login/tenant-picker';
   static const String chat = '/chat';
   static const String contacts = '/contacts';

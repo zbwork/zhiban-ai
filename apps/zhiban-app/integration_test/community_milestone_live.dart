@@ -1,3 +1,7 @@
+import 'package:zhiban_client/app_bootstrap.dart' show MyApp;
+import 'package:zhiban_client/config/app_config.dart';
+import 'package:zhiban_client/services/session_service.dart';
+import 'package:nexwork/routes/app_router.dart';
 // Opt-in UI-only acceptance for two independent native clients.
 import 'dart:convert';
 import 'dart:io';
@@ -39,13 +43,34 @@ class _NativeNotificationAudit with LocalNotificationListener {
 Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   final screen = GlobalKey();
-  final role = Platform.environment['COMMUNITY_UI_ROLE'] ?? 'member';
-  final base = Directory('/tmp/community-milestone-recheck-20261113/$role');
+  const compiledRole = String.fromEnvironment('COMMUNITY_UI_ROLE');
+  final role = compiledRole.isNotEmpty
+      ? compiledRole
+      : Platform.environment['COMMUNITY_UI_ROLE'] ?? 'member';
+  const outputRoot = String.fromEnvironment('COMMUNITY_UI_OUTPUT_ROOT',
+      defaultValue: '/tmp/community-milestone-recheck-20261113');
+  final base = Directory('$outputRoot/$role');
   await base.create(recursive: true);
   localNotifier.addListener(_NativeNotificationAudit(
       File('${base.path}/native-notifications.jsonl')));
   await WindowController.instance.init(hasToken: true);
-  runApp(RepaintBoundary(key: screen, child: const CommunityWorkspaceApp()));
+  const reuseSession = bool.fromEnvironment('COMMUNITY_UI_REUSE_SESSION');
+  if (reuseSession) {
+    const path = String.fromEnvironment('COMMUNITY_UI_FIXTURE');
+    final fixture = jsonDecode(await File(path).readAsString()) as Map;
+    AppConfig.serverApiUrl = '${fixture['busUrl']}/api/agent-bus/v1';
+    if (!await const SessionService().hasValidSession()) {
+      throw StateError('No valid independent test session to resume');
+    }
+  }
+  runApp(RepaintBoundary(
+      key: screen,
+      child: reuseSession
+          ? MyApp(
+              initialLocation: '/chat',
+              hasToken: true,
+              routerFactory: createAppRouter)
+          : const CommunityWorkspaceApp()));
   await AppNotificationService.bringToFront();
   final uiController = LiveWidgetController(binding);
   debugPrint('M1_UI_STARTED role=$role');
@@ -59,8 +84,9 @@ Future<void> main() async {
 
   Future<void> tap(Finder f) async {
     await waitFor(f);
-    await uiController.ensureVisible(f);
-    await uiController.tap(f);
+    final target = f.first;
+    await uiController.ensureVisible(target);
+    await uiController.tap(target);
     await uiController.pump(const Duration(milliseconds: 200));
   }
 
@@ -126,15 +152,39 @@ Future<void> main() async {
             .readAsString()) as Map
         : null;
     debugPrint('M1_UI_LOGIN_BEGIN role=$role');
-    await tap(find.byType(SidebarUserMini));
-    await tap(find.text('连接服务器'));
-    await type(input('https://ai.example.com'), admin['busUrl'] as String);
-    await tap(find.text('检测并连接'));
-    await type(input('邮箱 / 手机号 / 用户名'),
-        (member?['Email'] ?? admin['email']) as String);
-    await type(
-        input('请输入密码'), (member?['Password'] ?? admin['password']) as String);
-    await tap(find.text('登录'));
+    if (!reuseSession) {
+      await tap(find.byType(SidebarUserMini));
+      await tap(find.text('连接服务器'));
+      await type(input('https://ai.example.com'), admin['busUrl'] as String);
+      await tap(find.text('检测并连接'));
+      await type(input('邮箱 / 手机号 / 用户名'),
+          (member?['Email'] ?? admin['email']) as String);
+      await type(
+          input('请输入密码'), (member?['Password'] ?? admin['password']) as String);
+      await tap(find.text('登录'));
+      const tenantName = String.fromEnvironment('COMMUNITY_UI_TENANT_NAME');
+      if (tenantName.isNotEmpty) {
+        final deadline = DateTime.now().add(const Duration(seconds: 40));
+        while (find.text('通讯录').evaluate().isEmpty &&
+            find.text(tenantName).evaluate().isEmpty &&
+            DateTime.now().isBefore(deadline)) {
+          await uiController.pump(const Duration(milliseconds: 100));
+        }
+        if (find.text('通讯录').evaluate().isEmpty &&
+            find.text(tenantName).evaluate().isNotEmpty) {
+          await tap(find.text(tenantName));
+        }
+      }
+      if (find.text('设置你的密码').evaluate().isNotEmpty) {
+        await File('${base.path}/password-required.json').writeAsString(
+            jsonEncode({'status': 'requires-user-password', 'role': role}));
+        final deadline = DateTime.now().add(const Duration(minutes: 20));
+        while (find.text('通讯录').evaluate().isEmpty &&
+            DateTime.now().isBefore(deadline)) {
+          await uiController.pump(const Duration(milliseconds: 200));
+        }
+      }
+    }
     await waitFor(find.text('通讯录'));
     debugPrint('M1_UI_READY role=$role');
     await File('${base.path}/ready.json')
@@ -154,7 +204,7 @@ Future<void> main() async {
           final f = data['contains'] == true
               ? find.textContaining(data['text'] as String)
               : find.text(data['text'] as String);
-          return f.at((data['index'] as int?) ?? 0);
+          return data['index'] == null ? f : f.at(data['index'] as int);
         }
 
         if (action == 'nav') {
@@ -203,6 +253,8 @@ Future<void> main() async {
   } catch (error, stack) {
     await File('${base.path}/ready.json').writeAsString(
         jsonEncode({'status': 'failed', 'error': error.toString()}));
+    await File('${base.path}/setup-snapshot.json')
+        .writeAsString(jsonEncode(snapshot()));
     debugPrint('UI setup failed: $error\n$stack');
     // Leave setup failure visible; do not overwrite it with capture errors.
   }

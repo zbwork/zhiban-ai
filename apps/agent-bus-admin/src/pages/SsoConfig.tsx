@@ -40,8 +40,8 @@ export function SsoConfigPage() {
   return (
     <div>
       <PageHeader
-        title="SSO 接入 (IdP 配置)"
-        subtitle="把企业 IdP (Azure AD / Okta / Keycloak / Google) 接进来, 用户用企业账号扫码登 admin。支持 OIDC 协议; SAML/LDAP/SCIM 后续 milestone 落地。"
+        title="企业单点登录"
+        subtitle="配置企业账号登录服务，让已加入本企业的成员使用企业账号登录管理后台。目前支持 OIDC。"
         actions={<PrimaryButton onClick={() => setCreating(true)}>接入新 IdP</PrimaryButton>}
       />
 

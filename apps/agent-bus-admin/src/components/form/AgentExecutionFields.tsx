@@ -8,7 +8,7 @@ const engineNames: Record<string, string> = {
   dsh: 'DSH', openclaw: 'OpenClaw', hermes: 'Hermes', zap: '自定义 Agent（ZAP）',
 }
 
-export function AgentExecutionFields({ draft, onChange, disabled, template, runtimes, required, allowCreateRuntime, allowTemplateCloudToLocal = false }: {
+export function AgentExecutionFields({ draft, onChange, disabled, template, runtimes, required, allowCreateRuntime, allowTemplateCloudToLocal = false, allowExecutionChoice = false }: {
   draft: AgentDraft
   onChange: (patch: Partial<AgentDraft>) => void
   disabled: boolean
@@ -17,6 +17,7 @@ export function AgentExecutionFields({ draft, onChange, disabled, template, runt
   required: boolean
   allowCreateRuntime: boolean
   allowTemplateCloudToLocal?: boolean
+  allowExecutionChoice?: boolean
 }) {
   const [engineFilter, setEngineFilter] = useState('')
   const selected = runtimes.find((r) => r.ID === draft.RuntimeEnvironmentID)
@@ -26,24 +27,24 @@ export function AgentExecutionFields({ draft, onChange, disabled, template, runt
   const selectable = runtimes.filter(isBindable).filter((r) => !engine || r.Framework === engine)
   const local = draft.ExecutionLocus === 'local'
   return <>
-    {(template || local) && <FormField label="运行位置" as="div">
+    {(template || local || allowExecutionChoice) && <FormField label="运行位置" as="div">
       <SegmentedControl
         value={draft.ExecutionLocus}
         options={[
-          { value: 'local', label: '用户电脑', disabled: disabled || !template || (!cloudAgentTemplateCreationEnabled && !local && !allowTemplateCloudToLocal) },
-          { value: 'cloud', label: template && !cloudAgentTemplateCreationEnabled ? '云端（暂未开放）' : '云端', disabled: disabled || !template || !cloudAgentTemplateCreationEnabled },
+          { value: 'local', label: '用户电脑', disabled: disabled || (!template && !allowExecutionChoice) || (!allowExecutionChoice && !cloudAgentTemplateCreationEnabled && !local && !allowTemplateCloudToLocal) },
+          { value: 'cloud', label: template && !allowExecutionChoice && !cloudAgentTemplateCreationEnabled ? '云端（暂未开放）' : '云端', disabled: disabled || (!template && !allowExecutionChoice) || (!allowExecutionChoice && !cloudAgentTemplateCreationEnabled) },
         ]}
         onChange={(value) => {
-          if (disabled || !template || value === draft.ExecutionLocus) return
-          if (value === 'cloud' && !cloudAgentTemplateCreationEnabled) return
-          if (value === 'local' && !cloudAgentTemplateCreationEnabled && !allowTemplateCloudToLocal) return
+          if (disabled || (!template && !allowExecutionChoice) || value === draft.ExecutionLocus) return
+          if (value === 'cloud' && !allowExecutionChoice && !cloudAgentTemplateCreationEnabled) return
+          if (value === 'local' && !allowExecutionChoice && !cloudAgentTemplateCreationEnabled && !allowTemplateCloudToLocal) return
           onChange({ ExecutionLocus: value as 'local' | 'cloud', RuntimeEnvironmentID: null, AgentKey: '', LocalEngine: value === 'local' ? 'dsh' : '' })
         }}
       />
     </FormField>}
     {local ? <>
       <FormField label="本地引擎">
-        <Select aria-label="本地引擎" value={draft.LocalEngine || 'dsh'} disabled={disabled || !template}
+        <Select aria-label="本地引擎" value={draft.LocalEngine || 'dsh'} disabled={disabled || (!template && !allowExecutionChoice)}
           onChange={(e) => onChange({ LocalEngine: e.target.value as AgentDraft['LocalEngine'] })}>
           <option value="dsh">DeepSeek Harness</option>
           <option value="codex_app_server">Codex App Server</option>

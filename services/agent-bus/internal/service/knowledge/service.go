@@ -1549,6 +1549,11 @@ func (s *impl) UploadDocument(ctx context.Context, accountID, tenantID int64, pe
 		return s.uploadDocumentToRagflowSync(ctx, accountID, tenantID, kb, doc, title, mime, req.Content, len(chunks))
 	}
 
+	return s.ingestProviderDocument(ctx, accountID, tenantID, kb, doc, chunks)
+}
+
+// Shared by client ingestion and authorized Admin ingestion/retry after original storage succeeds.
+func (s *impl) ingestProviderDocument(ctx context.Context, accountID, tenantID int64, kb *domkb.KnowledgeBase, doc *domkb.Document, chunks []string) (*DocumentDTO, error) {
 	// Phase 2: 调 provider; **不**持有 PG tx.
 	ing, ingErr := s.provider.IngestChunks(ctx, provider.IngestReq{
 		TenantID: tenantID, KBID: kb.ID, DocumentID: doc.ID,
@@ -1558,7 +1563,7 @@ func (s *impl) UploadDocument(ctx context.Context, accountID, tenantID int64, pe
 		// Phase 3b: 失败 finalize.
 		_ = s.runTx(ctx, func(tx pgx.Tx) error {
 			_ = s.repo.MarkDocumentFailed(ctx, tx, doc.ID, truncateErrMsg(ingErr.Error()))
-			_ = s.releaseKnowledgeQuota(ctx, tx, tenantID, doc.FileSize)
+			_ = s.releaseQuotaForKB(ctx, tx, kb, tenantID, doc.FileSize)
 			s.publishAuditTx(ctx, tx, "audit.kb.ingest_failed", tenantID, map[string]any{
 				"account_id":    accountID,
 				"kb_uuid":       kb.UUID,
@@ -1588,7 +1593,7 @@ func (s *impl) UploadDocument(ctx context.Context, accountID, tenantID int64, pe
 			"kb_uuid":       kb.UUID,
 			"document_uuid": doc.UUID,
 			"chunk_count":   ing.ChunkCount,
-			"file_size":     int64(len(req.Content)),
+			"file_size":     doc.FileSize,
 		})
 		d := *doc
 		d.ChunkCount = ing.ChunkCount

@@ -99,6 +99,13 @@ func (s *Service) ListConversationApps(ctx context.Context, in dom.ConversationA
 			if !canUseInAgentBinding(a) {
 				continue
 			}
+			enabled, err := s.agentAppEnabled(ctx, in.TenantID, a.ID)
+			if err != nil {
+				return nil, err
+			}
+			if !enabled {
+				continue
+			}
 			out = append(out, buildItem(*a, "agent_bound", agentUUID, b.SortOrder, catByID))
 			seenAppID[a.ID] = true
 		}
@@ -213,10 +220,21 @@ func (s *Service) Launch(ctx context.Context, in dom.LaunchInput) (*dom.LaunchRe
 		}
 		conversationID = &convID
 	}
-	// 没 conversation_uuid (v0.2 工作台外启动) — v0.1 暂不允许
+	// Workbench access uses explicit tenant enablement, never a fabricated conversation.
 	if conversationID == nil && in.ConversationUUID == "" {
-		// v0.1: 必须挂 conversation
-		return nil, apperr.ErrInvalidParams.Withf("conversation_uuid required (v0.1; v0.2 will support workbench launch)")
+		if in.TenantID <= 0 || in.AccountID <= 0 || !canUseInEndUserEntry(a) || (a.TenantID != 0 && a.TenantID != in.TenantID) || (a.TenantID == 0 && (!a.IsSystem || !a.OpenToTenants)) {
+			return nil, apperr.ErrForbidden.Withf("应用未向当前工作台开放")
+		}
+		setting, err := s.deps.Settings.GetByTenantApp(ctx, in.TenantID, a.ID)
+		if err != nil {
+			if errors.Is(err, apperr.ErrNotFound) {
+				return nil, apperr.ErrForbidden.Withf("应用未启用")
+			}
+			return nil, err
+		}
+		if setting == nil || setting.TenantID != in.TenantID || !setting.IsEnabled || !setting.IsUniversal {
+			return nil, apperr.ErrForbidden.Withf("应用未向当前工作台开放")
+		}
 	}
 
 	// 生成 code (32 base62)

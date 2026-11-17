@@ -1,3 +1,4 @@
+import 'package:zhiban_client/services/conversation_models.dart';
 import '../../../config/app_config.dart';
 import 'package:zhiban_client/services/session_service.dart';
 import 'dart:convert';
@@ -114,11 +115,16 @@ class ModelProvidersNotifier extends AsyncNotifier<List<AiProviderConfig>> {
   Future<void> _publishConfiguration(
       List<AiProviderConfig> changes, String? token) async {
     try {
-      if (AppConfig.communityEdition || token == null || !ref.mounted) return;
-      await ConversationModelSources().sync(
+      if ((AppConfig.communityEdition && !AppConfig.serverWorkspace) ||
+          token == null ||
+          !ref.mounted) {
+        return;
+      }
+      final models = await ConversationModelSources(store: _store).sync(
           publishLocalConfiguration: true,
           changes: changes,
           expectedToken: token);
+      if (ref.mounted) ConversationModels.instance.applyCatalog(models);
     } catch (_) {
       BotToast.showText(text: '配置已保存在本机，服务端同步失败，请重新保存后再使用');
     }

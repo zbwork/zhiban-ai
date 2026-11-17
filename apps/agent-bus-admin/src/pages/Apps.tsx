@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { AppWindow, CheckCircle2, Copy, Eye, Globe } from 'lucide-react'
 
 import { AppCategories, Apps, PlatformAppCategories, PlatformApps, type App, type AppCategory, type CreateAppResult } from '../lib/api'
@@ -65,7 +65,8 @@ type AppFormFieldsState = {
 type AppFormFieldKey = keyof AppFormFieldsState
 type AppCrudApi = Pick<typeof Apps, 'create' | 'get' | 'patch' | 'delete' | 'rotateSecret' | 'launchTest'>
 
-export function AppsPage() {
+export function AppsPage({ workspaceView = false }: { workspaceView?: boolean }) {
+  const navigate = useNavigate()
   const { actScope, switchingScope } = useOutletContext<LayoutOutletContext>()
   const isTenantScope = actScope?.kind === 'tenant' || actScope?.kind === 'workspace'
   const isPlatformScope = actScope?.kind === 'platform'
@@ -75,6 +76,7 @@ export function AppsPage() {
   const [categories, setCategories] = useState<AppCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [readOnlyReason, setReadOnlyReason] = useState('')
   const [tick, setTick] = useState(0)
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<App | null>(null)
@@ -97,11 +99,12 @@ export function AppsPage() {
       }
       setLoading(true)
       return Promise.all([
-        appApi.list({ keyword: filterKeyword || undefined, limit: pageSize, offset: (page - 1) * pageSize }),
+        appApi.list({ keyword: filterKeyword || undefined, workspaceOnly: workspaceView || undefined, limit: pageSize, offset: (page - 1) * pageSize }),
         categoryApi.list({ limit: 200, offset: 0 }),
       ]).then(([appResp, catResp]) => {
         if (cancelled) return
         setItems(appResp.items || [])
+        setReadOnlyReason(appResp.readOnlyReason || '')
         setTotal(appResp.total || 0)
         setCategories(catResp.items || [])
         setErr('')
@@ -112,7 +115,7 @@ export function AppsPage() {
       })
     })
     return () => { cancelled = true }
-  }, [tick, filterKeyword, page, pageSize, isTenantScope, isPlatformScope, appApi, categoryApi])
+  }, [tick, filterKeyword, page, pageSize, isTenantScope, isPlatformScope, appApi, categoryApi, workspaceView])
 
   const refresh = () => setTick((t) => t + 1)
   const catByUuid = Object.fromEntries(categories.map((c) => [c.uuid, c.name]))
@@ -150,8 +153,8 @@ export function AppsPage() {
   return (
     <div>
       <PageHeader
-        title="应用管理"
-        subtitle={isPlatformScope
+        title={workspaceView ? '工作台应用' : '应用管理'}
+        subtitle={workspaceView ? '展示本租户已启用且设为通用的用户应用；配置、启停与应用管理保持一致。' : isPlatformScope
           ? '管理平台预置 H5 应用、OAuth2 SSO 凭证，并选择是否开放给租户使用。'
           : '管理租户自建 H5 应用、OAuth2 SSO 凭证、通用入口和数字员工可用应用。'}
       />
@@ -165,13 +168,14 @@ export function AppsPage() {
           />
         }
         actions={
-          <PrimaryButton onClick={() => setCreating(true)}>
-            {isPlatformScope ? '新建平台应用' : '新建应用'}
+          <PrimaryButton disabled={loading || !!readOnlyReason} onClick={() => workspaceView ? navigate('/apps') : setCreating(true)}>
+            {workspaceView ? '管理全部应用' : isPlatformScope ? '新建平台应用' : '新建应用'}
           </PrimaryButton>
         }
       />
 
       {err && <InlineAlert>{err}</InlineAlert>}
+      {readOnlyReason && <InlineAlert tone="info">{readOnlyReason}</InlineAlert>}
 
       <DataTable
         headers={isPlatformScope
@@ -182,7 +186,7 @@ export function AppsPage() {
           <EmptyState
             icon={<AppWindow size={22} />}
             title="还没有应用"
-            description="新建应用后会一次性展示 client_secret，请立即复制保存。"
+            description={workspaceView ? '在应用管理中启用应用并打开通用开关后，会显示在这里。' : '新建应用后会一次性展示 client_secret，请立即复制保存。'}
           />
         ) : undefined}
       >
@@ -207,15 +211,15 @@ export function AppsPage() {
             <td className="px-4 py-3">{USAGE_SCOPE_LABEL[a.usageScope || 'all'] || a.usageScope}</td>
             {isPlatformScope ? (
               <td className="px-4 py-3">
-                <Switch checked={!!a.openToTenants} onChange={(checked) => setOpenToTenants(a, checked)} />
+                <Switch disabled={!!readOnlyReason} checked={!!a.openToTenants} onChange={(checked) => setOpenToTenants(a, checked)} />
               </td>
             ) : (
               <>
                 <td className="px-4 py-3">
-                  <Switch checked={!!a.isUniversal} onChange={(checked) => setUniversal(a, checked)} />
+                  <Switch disabled={!!readOnlyReason} checked={!!a.isUniversal} onChange={(checked) => setUniversal(a, checked)} />
                 </td>
                 <td className="px-4 py-3">
-                  <Switch checked={a.isEnabled !== false} onChange={(checked) => setEnabled(a, checked)} />
+                  <Switch disabled={!!readOnlyReason} checked={a.isEnabled !== false} onChange={(checked) => setEnabled(a, checked)} />
                 </td>
               </>
             )}
@@ -228,14 +232,14 @@ export function AppsPage() {
               <RowActions
                 extras={
                   <>
-                    <Button variant="ghost" size="sm" onClick={() => runLaunchTest(a)}>连通性测试</Button>
-                    {(!a.isSystem || isPlatformScope) && (
+                    <Button variant="ghost" size="sm" disabled={!!readOnlyReason} onClick={() => runLaunchTest(a)}>检查启动配置</Button>
+                    {!readOnlyReason && (!a.isSystem || isPlatformScope) && (
                       <Button variant="ghost" size="sm" onClick={() => setRotating(a)}>重置 secret</Button>
                     )}
                   </>
                 }
-                onEdit={(!a.isSystem || isPlatformScope) ? () => setEditing(a) : undefined}
-                onDelete={(!a.isSystem || isPlatformScope) ? () => setDeleting(a) : undefined}
+                onEdit={(!readOnlyReason && (!a.isSystem || isPlatformScope)) ? () => setEditing(a) : undefined}
+                onDelete={(!readOnlyReason && (!a.isSystem || isPlatformScope)) ? () => setDeleting(a) : undefined}
               />
             </td>
           </tr>
@@ -587,7 +591,7 @@ function DeleteAppDialog(props: { app: App; appApi: AppCrudApi; onClose: () => v
 
 function LaunchTestDialog(props: { data: { app: App; launchUrl: string }; onClose: () => void }) {
   return (
-    <DialogShell title="连通性测试通过" subtitle={`应用「${props.data.app.name}」当前可用于客户端启动。`} icon={<CheckCircle2 size={18} />} onClose={props.onClose} footer={<Button onClick={props.onClose}>关闭</Button>}>
+    <DialogShell title="启动配置检查通过" subtitle={`应用「${props.data.app.name}」的配置和凭据状态正常；尚未检查外部应用连通性或登录回跳。`} icon={<CheckCircle2 size={18} />} onClose={props.onClose} footer={<Button onClick={props.onClose}>关闭</Button>}>
       <CodeRow label="启动地址" value={props.data.launchUrl} />
     </DialogShell>
   )

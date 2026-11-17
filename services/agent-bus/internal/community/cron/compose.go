@@ -22,7 +22,7 @@ import (
 
 func Compose(ctx context.Context, pool *pgxpool.Pool, chatSvc chat.Service, visibility svc.ContactsVisibility, direct svc.DirectConversationEnsurer) svc.Service {
 	runner := &chatRunner{ctx: ctx, chat: chatSvc}
-	service := svc.New(svc.Deps{Repo: repo.NewCommunity(pool), Agents: agent.New(pool), Conversations: conversation.New(pool), Messages: message.New(pool), Visibility: activeVisibility{visibility, account.New(pool)}, Runtime: communitychat.NewFrameworkLookup(pool), Rooms: room.New(pool), DirectConversations: direct, Runner: runner, NodeID: "community-" + uuid.NewString(), Config: svc.Config{DisableRuntimeProjection: true}})
+	service := svc.New(svc.Deps{Repo: repo.NewCommunity(pool), PromptTemplates: repo.NewCommunity(pool), Agents: agent.New(pool), Conversations: conversation.New(pool), Messages: message.New(pool), Visibility: activeVisibility{visibility, account.New(pool)}, Runtime: communitychat.NewFrameworkLookup(pool), Rooms: room.New(pool), DirectConversations: direct, Runner: runner, NodeID: "community-" + uuid.NewString(), Config: svc.Config{DisableRuntimeProjection: true}})
 	runner.service = service
 	return service
 }

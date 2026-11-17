@@ -47,7 +47,11 @@ func normalizeExecutionLocus(e, existing *dom.DigitalEmployee) error {
 		if e.RuntimeEnvironmentID != nil {
 			return apperr.ErrInvalidParams.Withf("本地员工不能绑定云端运行环境")
 		}
-		e.Visibility = "private"
+		if e.Source == "personal" {
+			e.Visibility = "private"
+		} else if e.Visibility == "" {
+			e.Visibility = "tenant"
+		}
 		// Never trust a caller-supplied key or collide on a nullable environment ID.
 		key := ""
 		if existing != nil && existing.ExecutionLocus == "local" {

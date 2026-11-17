@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
+	accountrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/account"
 )
 
 // Service 是 M2 通讯录的对外接口。
@@ -418,7 +419,8 @@ func (s *impl) fetchHumans(ctx context.Context, caller CallerCtx, policy Contact
 		return nil, err
 	}
 	defer rows.Close()
-	out := []HumanContact{}
+	people := []humanRow{}
+	accountIDs := []int64{}
 	for rows.Next() {
 		var r humanRow
 		if err := rows.Scan(&r.AccID, &r.AccUUID, &r.DisplayName, &r.AvatarURL,
@@ -426,9 +428,25 @@ func (s *impl) fetchHumans(ctx context.Context, caller CallerCtx, policy Contact
 			&r.DeptID, &r.DeptUUID, &r.DeptName, &r.MetaJSON); err != nil {
 			return nil, err
 		}
-		out = append(out, s.buildHuman(ctx, caller, policy, r))
+		people = append(people, r)
+		accountIDs = append(accountIDs, r.AccID)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	labels, err := accountrepo.New(s.pool).ContactPositionLabels(ctx, caller.TenantID, accountIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]HumanContact, 0, len(people))
+	for _, person := range people {
+		if label, ok := labels[person.AccID]; ok {
+			person.Title = label
+		}
+		out = append(out, s.buildHuman(ctx, caller, policy, person))
+	}
+	return out, nil
 }
 
 func (s *impl) buildHuman(ctx context.Context, caller CallerCtx, policy ContactPolicy, r humanRow) HumanContact {
@@ -1013,6 +1031,13 @@ func (s *impl) GetMember(ctx context.Context, caller CallerCtx, accountUUID stri
 			return nil, apperr.ErrNotFound
 		}
 		return nil, err
+	}
+	labels, err := accountrepo.New(s.pool).ContactPositionLabels(ctx, caller.TenantID, []int64{r.AccID})
+	if err != nil {
+		return nil, err
+	}
+	if label, ok := labels[r.AccID]; ok {
+		r.Title = label
 	}
 	hc := s.buildHuman(ctx, caller, policy, r)
 	return &hc, nil

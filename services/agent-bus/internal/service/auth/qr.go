@@ -254,7 +254,7 @@ func (s *QRService) Confirm(ctx context.Context, ac AuthContext, accountID int64
 		if err != nil {
 			return apperr.ErrInternal.Wrap(err)
 		}
-		tok, err := s.auth.issueAccessToken(acc, sessRow.UUID, scope)
+		tok, err := s.auth.issueAccessToken(ctx, acc, sessRow.UUID, scope)
 		if err != nil {
 			return err
 		}

@@ -31,15 +31,20 @@ type agentReader interface {
 // Models resolves only member model platform references synced from the client
 // model service (ADR-0042). Provider keys stay encrypted in Bus and are used only
 // by the proxy; the desktop receives a run-scoped capability, never the key.
+type AgentVisibility interface {
+	AssertAgentVisible(context.Context, int64, int64, string) error
+}
+
 type Models struct {
+	visibility AgentVisibility
 	sources    *svcsource.Service
 	agents     agentReader
 	bindingKey []byte
 	guard      *svcruntime.SSRFGuard
 }
 
-func NewModels(sources *svcsource.Service, agents agentReader, bindingKey []byte) *Models {
-	return &Models{sources: sources, agents: agents, bindingKey: bindingKey, guard: &svcruntime.SSRFGuard{}}
+func NewModels(sources *svcsource.Service, agents agentReader, bindingKey []byte, visibility AgentVisibility) *Models {
+	return &Models{sources: sources, agents: agents, bindingKey: bindingKey, visibility: visibility, guard: &svcruntime.SSRFGuard{}}
 }
 
 type modelRoute struct {
@@ -55,7 +60,7 @@ func (m *Models) resolve(ctx context.Context, scope dom.Scope, employeeID int64,
 
 func (m *Models) route(ctx context.Context, scope dom.Scope, employeeID int64, hint string) (modelRoute, error) {
 	employee, err := m.agents.GetByID(ctx, employeeID)
-	if err != nil || !runnableInScope(employee, scope) || m.sources == nil || !svcsource.IsReference(hint) || len(m.bindingKey) < 32 {
+	if err != nil || !m.authorizeEmployee(ctx, employee, scope) || m.sources == nil || !svcsource.IsReference(hint) || len(m.bindingKey) < 32 {
 		return modelRoute{}, dom.ErrDenied
 	}
 	route, err := m.sources.Resolve(ctx, domsource.Scope{TenantID: scope.TenantID, AccountID: scope.AccountID}, hint)
@@ -90,8 +95,18 @@ func (m *Models) route(ctx context.Context, scope dom.Scope, employeeID int64, h
 }
 
 func runnableInScope(employee *domagent.DigitalEmployee, scope dom.Scope) bool {
-	return employee != nil && !employee.IsDeleted && employee.ExecutionLocus == "local" && employee.Status == "published" &&
-		employee.Source == "personal" && employee.Visibility == "private" && employee.TenantID == scope.TenantID && employee.CreatorID == scope.AccountID
+	return employee != nil && !employee.IsDeleted && employee.DeletedAt == nil && employee.ExecutionLocus == "local" && employee.Status == "published" && employee.TenantID == scope.TenantID && (employee.Source == "enterprise" || (employee.Source == "personal" && employee.Visibility == "private" && employee.CreatorID == scope.AccountID))
+}
+
+// Organization employees must pass the same authoritative visibility policy as chat and contacts.
+func (m *Models) authorizeEmployee(ctx context.Context, employee *domagent.DigitalEmployee, scope dom.Scope) bool {
+	if !runnableInScope(employee, scope) {
+		return false
+	}
+	if employee.Source == "enterprise" {
+		return m.visibility != nil && m.visibility.AssertAgentVisible(ctx, scope.AccountID, scope.TenantID, employee.UUID) == nil
+	}
+	return true
 }
 
 // PrepareLocalModel binds a fresh selection for new work only; runs stay strict.
@@ -128,12 +143,12 @@ func (m *Models) ProxyLocalModel(ctx context.Context, task *dom.Task, protocol s
 // Compose builds the local runtime and the model platform service. The JWT key file
 // only supplies domain-separated HMAC material; when the model platform cipher is
 // not configured, platform sync and every model call fail closed.
-func Compose(pool *pgxpool.Pool, jwtKeyFile string, sources *svcsource.Service) (*svc.Service, *Models, error) {
+func Compose(pool *pgxpool.Pool, jwtKeyFile string, sources *svcsource.Service, visibility AgentVisibility) (*svc.Service, *Models, error) {
 	pem, err := os.ReadFile(jwtKeyFile)
 	if err != nil {
 		return nil, nil, errors.New("JWT private key cannot be read")
 	}
-	models := NewModels(sources, agentrepo.New(pool), pem)
+	models := NewModels(sources, agentrepo.New(pool), pem, visibility)
 	local, err := svc.New(repo.New(pool), pem, models)
 	return local, models, err
 }

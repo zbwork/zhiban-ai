@@ -156,7 +156,9 @@ export function AgentBasicSection({
             <FormField
               label="人设（系统提示词）"
               hint={
-                isDshFramework(runtimeFramework)
+                draft.ExecutionLocus === 'local'
+                  ? '作为 DSH 或 Codex 本地员工的人设。留空时根据名称和主要职责生成基础人设。'
+                  : isDshFramework(runtimeFramework)
                   ? '随数字员工注册下发给知办通用运行时。留空时按名称、职位、主要职责、欢迎语自动生成一份基础人设。'
                   : '仅知办通用运行时（dsh）使用；OpenClaw / Hermes 运行时按名称、职位、主要职责自动生成身份文件，不读取此字段。'
               }
@@ -231,6 +233,7 @@ export function AgentRuntimeSection({
   emptyMessage = '暂无可用运行环境。请先在「智能体托管环境」启用平台环境、新增外部智能体接入，或完成连通性测试。',
   emptyAction,
   allowTemplateCloudToLocal = false,
+  allowExecutionChoice = false,
 }: {
   draft: AgentDraft
   patch: (p: Partial<AgentDraft>) => void
@@ -243,6 +246,7 @@ export function AgentRuntimeSection({
   emptyMessage?: string
   emptyAction?: { label: string; onClick: () => void }
   allowTemplateCloudToLocal?: boolean
+  allowExecutionChoice?: boolean
 }) {
   const currentRuntime = runtimeOptions.all.find((r) => r.ID === draft.RuntimeEnvironmentID) || null
   const visibleRuntimeOptions = {
@@ -259,12 +263,12 @@ export function AgentRuntimeSection({
   const selected = currentRuntime || null
 
   return (
-    <FormSection title="运行配置" description={description} className="border-0 bg-transparent p-0">
+    <FormSection title="运行配置" description={draft.ExecutionLocus === 'local' ? '由使用者的电脑执行，模型、工作目录与权限在客户端配置。' : description} className="border-0 bg-transparent p-0">
       <div className="max-w-3xl space-y-4">
         <AgentExecutionFields draft={draft} onChange={patch} disabled={locked}
           template={context === 'platformPreset'} runtimes={runtimeOptions.all}
           required={required} allowCreateRuntime={allowCreateRuntime}
-          allowTemplateCloudToLocal={allowTemplateCloudToLocal} />
+          allowTemplateCloudToLocal={allowTemplateCloudToLocal} allowExecutionChoice={allowExecutionChoice} />
 
         {/* Agent Key 系统托管：不在 UI 填写，由后端据运行环境自动生成 / 补默认。 */}
         {selected && currentRuntimeIsSelectable && (
@@ -943,7 +947,11 @@ function AgentAvatarUploader({
             type="file"
             accept="image/png,image/jpeg,image/gif,image/webp"
             className="hidden"
-            onChange={(e) => onFile(e.target.files?.[0])}
+            onChange={(e) => {
+              const file = e.currentTarget.files?.[0]
+              e.currentTarget.value = ''
+              void onFile(file)
+            }}
           />
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">

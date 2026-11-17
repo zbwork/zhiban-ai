@@ -9,6 +9,7 @@ import (
 
 // LoginSession 一次活跃登录的快照, 一行对应一个 refresh token。
 type LoginSession struct {
+	AuthTenantID     *int64 // Non-nil for tenant-bound SSO sessions.
 	ID               int64
 	UUID             string
 	AccountID        int64
@@ -41,6 +42,7 @@ type LoginSession struct {
 
 // CreateInput 新会话的入参。
 type CreateInput struct {
+	AuthTenantID      *int64
 	AccountID         int64
 	RefreshTokenHash  string
 	ExpiresAt         time.Time

@@ -14,6 +14,7 @@ export function AgentEditorShell<T extends string>({
   actions,
   backAction,
   finalActions,
+  showFinalActionsOnAllSteps = false,
   tab,
   steps,
   onTabChange,
@@ -30,6 +31,7 @@ export function AgentEditorShell<T extends string>({
     onClick: () => void
   }
   finalActions?: ReactNode
+  showFinalActionsOnAllSteps?: boolean
   tab: T
   steps: Array<AgentEditorStep<T>>
   onTabChange: (value: T) => void
@@ -89,14 +91,18 @@ export function AgentEditorShell<T extends string>({
               第 <span className="tabular-nums">{currentIndex + 1}</span> / <span className="tabular-nums">{steps.length}</span> 步
             </span>
             {nextStep ? (
-              <Button
-                type="button"
-                onClick={() => onTabChange(nextStep.value)}
-                className="sm:min-w-[96px]"
-              >
-                下一步
-                <ChevronRight size={14} />
-              </Button>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant={showFinalActionsOnAllSteps ? 'secondary' : 'primary'}
+                  onClick={() => onTabChange(nextStep.value)}
+                  className="sm:min-w-[96px]"
+                >
+                  下一步
+                  <ChevronRight size={14} />
+                </Button>
+                {showFinalActionsOnAllSteps && finalActions}
+              </div>
             ) : finalActions ? (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                 {finalActions}

@@ -1,3 +1,5 @@
+import 'package:go_router/go_router.dart';
+import 'package:zhiban_client/routes/route_paths.dart';
 import 'package:zhiban_client/network/user_refresh.dart';
 
 import 'package:zhiban_client/config/client_assets.dart';
@@ -153,6 +155,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             );
     if (!mounted || !outcome.success) return;
     _passwordController.clear();
+    if (outcome.mustChangePassword) {
+      context.go(RoutePaths.initialPassword);
+      return;
+    }
     await enterHomeWithTenantScope(context, outcome.tenantScopes);
   }
 

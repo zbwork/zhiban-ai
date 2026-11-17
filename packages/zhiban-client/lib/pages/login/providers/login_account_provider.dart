@@ -50,9 +50,13 @@ class LoginSmsCountdownNotifier extends Notifier<int> {
 /// 登录成功后供 UI 决定是否跳"选择租户"页。
 class LoginOutcome {
   final bool success;
+  final bool mustChangePassword;
   final List<ScopeOption>
       tenantScopes; // success=true 时填; 长度 1 直接进主页, ≥2 跳 picker。
-  const LoginOutcome({required this.success, this.tenantScopes = const []});
+  const LoginOutcome(
+      {required this.success,
+      this.tenantScopes = const [],
+      this.mustChangePassword = false});
 }
 
 final loginAccountProvider =
@@ -227,7 +231,13 @@ class LoginAccountNotifier extends Notifier<LoginAccountState> {
     }
     state = state.copyWith(isLoggingIn: true, clearError: true);
     try {
-      await loginWithPasswordApi(identifier: identifier, password: password);
+      final result = await loginWithPasswordApi(
+          identifier: identifier, password: password);
+      if (result.account['mustChangePassword'] == true) {
+        if (!ref.mounted) return const LoginOutcome(success: false);
+        state = state.copyWith(isLoggingIn: false, clearError: true);
+        return const LoginOutcome(success: true, mustChangePassword: true);
+      }
     } catch (error) {
       if (!ref.mounted) return const LoginOutcome(success: false);
       state = state.copyWith(isLoggingIn: false, error: formatError(error));

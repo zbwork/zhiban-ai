@@ -427,14 +427,18 @@ func (s *Service) ListAgentApps(ctx context.Context, tenantID, agentID int64) ([
 		if !agentAppVisible(a, tenantID) {
 			continue
 		}
+		a.IsEnabled, err = s.agentAppEnabled(ctx, tenantID, a.ID)
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, *a)
 	}
 	return out, nil
 }
 
 // ListAgentAppsByAgentIDs 批量版 ListAgentApps（客户端 /agents 列表 hydrate 用，
-// 见 pitfalls/client-api-list-hydrate-n-plus-one-remote-db-latency.md）：2 条 SQL 取全量
-// 绑定 + app 行后内存分桶。过滤口径与逐条版完全一致（软删跳过 / 跨租户防御性跳过 /
+// 见 pitfalls/client-api-list-hydrate-n-plus-one-remote-db-latency.md）：批量取全量
+// 绑定 + app 行后，按唯一应用读取当前租户启用设置并内存分桶。过滤口径与逐条版一致（软删跳过 / 跨租户防御性跳过 /
 // usage_scope 仅 all|agent）；桶内顺序 = 绑定 sort_order, id。
 func (s *Service) ListAgentAppsByAgentIDs(ctx context.Context, tenantID int64, agentIDs []int64) (map[int64][]dom.App, error) {
 	out := make(map[int64][]dom.App, len(agentIDs))
@@ -463,6 +467,10 @@ func (s *Service) ListAgentAppsByAgentIDs(ctx context.Context, tenantID int64, a
 	}
 	appsByID := make(map[int64]*dom.App, len(apps))
 	for i := range apps {
+		apps[i].IsEnabled, err = s.agentAppEnabled(ctx, tenantID, apps[i].ID)
+		if err != nil {
+			return nil, err
+		}
 		appsByID[apps[i].ID] = &apps[i]
 	}
 	for _, b := range bindings {
@@ -485,6 +493,22 @@ func agentAppVisible(a *dom.App, tenantID int64) bool {
 		return false // 不应发生, 防御性跳过
 	}
 	return canUseInAgentBinding(a)
+}
+
+// Missing settings preserve the original agent-binding default. An explicit
+// tenant disable must be respected by both catalog hydration and launch.
+func (s *Service) agentAppEnabled(ctx context.Context, tenantID, appID int64) (bool, error) {
+	if s.deps.Settings == nil {
+		return false, apperr.ErrInternal.Withf("app settings repo not wired")
+	}
+	setting, err := s.deps.Settings.GetByTenantApp(ctx, tenantID, appID)
+	if errors.Is(err, apperr.ErrNotFound) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return setting != nil && setting.TenantID == tenantID && setting.AppID == appID && setting.IsEnabled, nil
 }
 
 // =====================================================

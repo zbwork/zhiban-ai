@@ -47,6 +47,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/redact"
 	account "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/account"
 	agentrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agent"
+	agentkbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agentkb"
 	alertrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/alert"
 	apirepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/apikey"
 	repoaudit "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/audit"
@@ -65,11 +66,11 @@ import (
 	agentsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/agent"
 	apisvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/apikey"
 	authsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/auth"
-	communityagentsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/communityagent"
 	contactsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/contactpolicy"
 	cronsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/cron"
 	deptsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/department"
 	drivesvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/drive"
+	identitysvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/identity"
 	kbsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/knowledge"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/knowledge/provider/stub"
 	mediasvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/media"
@@ -88,7 +89,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminorg"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/adminsession"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/admintenant"
-	agenthttp "github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/communityagent"
+	authoidchttp "github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/authoidc"
 	"log"
 	"net/http"
 	"os"
@@ -124,7 +125,18 @@ func run(ctx context.Context, path string) error {
 	}
 	tenantRepo := tenant.New(pool)
 	rbacRepo := rbac.New(pool)
-	auth := authsvc.New(authsvc.Deps{Accounts: account.New(pool), Tenants: tenantRepo, RBAC: rbacRepo, Sessions: session.New(pool), AuditLog: audit.New(pool), Issuer: issuer, Captcha: captcha.New(redisClient), Revoke: authsvc.NewRedisRevoker(redisClient, 15*time.Minute), EventBus: authsvc.NewPgEventBus(pool)})
+	var identities *identitysvc.Registry
+	authDeps := authsvc.Deps{Accounts: account.New(pool), Tenants: tenantRepo, RBAC: rbacRepo, Sessions: session.New(pool), AuditLog: audit.New(pool), Issuer: issuer, Captcha: captcha.New(redisClient), Revoke: authsvc.NewRedisRevoker(redisClient, 15*time.Minute), EventBus: authsvc.NewPgEventBus(pool)}
+	if os.Getenv("AGBUS_SECRETBOX_KEY") != "" {
+		box, err := secretbox.New("production")
+		if err != nil {
+			return err
+		}
+		identities = identitysvc.NewRegistry(pool, box)
+		authDeps.IdentityRegistry = identities
+		authDeps.OIDCStateStore = identitysvc.NewStateStore(redisClient)
+	}
+	auth := authsvc.New(authDeps)
 	pub := event.New(pool)
 	tenantService := tenantsvc.New(tenantRepo, pool, pub, communityresources.Initialize(cfg.StorageQuotaBytes))
 	tenantsvc.AllowExistingEmailAdmin(tenantService)
@@ -185,7 +197,7 @@ func run(ctx context.Context, path string) error {
 		Alerts:                 &admincore.AlertsAdminHandler{Store: alertrepo.New(pool, pub), Audit: repoaudit.New(pool)},
 		OrgWebhook:             orgsvc.New(orgsvc.Deps{Repo: orgrepo.New(pool)}),
 		SysUser:                sysusersvc.New(pool),
-		Knowledge:              kbsvc.New(kbsvc.Deps{Repo: kbrepo.New(pool), Pool: pool, Provider: stub.New(pool), Audit: pub, ObjectStores: storage, Config: kbsvc.Config{PersistOriginals: true, ExtractDocuments: true}}),
+		Knowledge:              kbsvc.New(kbsvc.Deps{Repo: kbrepo.New(pool), Pool: pool, Provider: stub.New(pool), Audit: pub, AgentKBRepo: agentkbrepo.New(pool), ObjectStores: storage, Config: kbsvc.Config{PersistOriginals: true, ExtractDocuments: true}}),
 		PlatformType:           typesvc.New(),
 		Observability:          &admincore.ObservabilityCallLogsHandler{Pool: pool},
 		ObservabilityAgentRuns: &admincore.ObservabilityAgentRunsHandler{Pool: pool, EventPub: pub, Redactor: redact.New()},
@@ -193,9 +205,9 @@ func run(ctx context.Context, path string) error {
 		AdminOrchestrations:    &admincore.AdminOrchestrationsHandler{Pool: pool},
 		AdminSpeakerPolicies:   &admincore.AdminSpeakerPoliciesHandler{Pool: pool},
 		Auth:                   auth, ContactPolicy: contactsvc.New(pool),
-		Cron:  cronsvc.New(cronsvc.Deps{Repo: repocron.NewCommunity(pool), Agents: agentrepo.New(pool), Audit: pub, Config: cronsvc.Config{DisableRuntimeProjection: true}}),
+		Cron:  cronsvc.New(cronsvc.Deps{Repo: repocron.NewCommunity(pool), PromptTemplates: repocron.NewCommunity(pool), Agents: agentrepo.New(pool), Audit: pub, Config: cronsvc.Config{DisableRuntimeProjection: true}}),
 		Skill: skillService, Media: mediaService,
-		Membership: membersvc.New(pool, pub), Platform: platformsvc.New(pool), Position: positionsvc.New(pool), RBAC: rbacsvc.New(rbacRepo), RuntimeEnv: runtimeenvsvc.New(envrepo.New(pool), probeTokenIssuer), Agent: agentsvc.New(agentrepo.New(pool), nil, nil, pool, pub),
+		Membership: membersvc.New(pool, pub), Platform: platformsvc.NewCommunity(pool), Position: positionsvc.New(pool), RBAC: rbacsvc.New(rbacRepo), RuntimeEnv: runtimeenvsvc.New(envrepo.New(pool), probeTokenIssuer), Agent: agentsvc.New(agentrepo.New(pool), nil, nil, pool, pub),
 		DriveStorage:       &storagesvc.Service{Repo: repodrive.NewStorageRepo(pool), Secret: storagesvc.SecretResolver{AllowValue: true}, AllowValue: true},
 		DriveBrowse:        drivesvc.NewAdminBrowseSvc(pool),
 		DriveQuotaAdmin:    drivesvc.NewAdminQuotaSvc(pool, repodrive.NewQuotaRepo(pool)),
@@ -223,13 +235,15 @@ func run(ctx context.Context, path string) error {
 	handlers := adminrouter.Handlers{
 		Apps:        &adminapps.Handlers{App: appService},
 		AppReadOnly: cfg.AppIssuer == "",
-		Agents:      &agenthttp.Handlers{Service: &communityagentsvc.Service{Agents: agentsvc.New(agentrepo.New(pool), nil, nil, pool, pub), Environments: envrepo.New(pool)}, Provider: cfg.Model.Provider, Model: cfg.Model.Name},
 		Session:     &adminsession.Handlers{Auth: auth, RBAC: rbacsvc.New(rbacRepo)},
-		Org:         &adminorg.Handlers{Department: deptsvc.New(pool, pub), Membership: membersvc.New(pool, pub)},
+		Org:         &adminorg.Handlers{MemberCreator: membersvc.New(pool, pub), Department: deptsvc.New(pool, pub), Membership: membersvc.New(pool, pub)},
 		Tenant:      &admintenant.Handlers{Tenant: tenantService, AllowExistingEmailAdmin: true},
 		Core:        core,
 	}
 	mux := http.NewServeMux()
+	if identities != nil {
+		(&authoidchttp.Handlers{Auth: auth, Catalog: identities, AdminOnly: true}).Register(mux, "/api/admin/v1/auth")
+	}
 	handlers.Register(mux, middleware.Auth(issuer, auth, false))
 	server := &http.Server{Addr: cfg.HTTP, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan error, 1)

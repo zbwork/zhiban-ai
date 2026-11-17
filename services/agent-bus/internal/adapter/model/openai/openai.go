@@ -10,12 +10,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/adapter/model"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/httpcli"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/modelerror"
 )
 
 type Provider struct {
@@ -73,11 +75,18 @@ func (p *Provider) StreamChat(ctx context.Context, req model.ChatRequest) (model
 	httpReq.Header.Set("User-Agent", "agent-bus/0.1 (+go-http-client)")
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, context.Canceled) {
+			return nil, err
+		}
+		var timeout net.Error
+		if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &timeout) && timeout.Timeout()) {
+			return nil, &modelerror.Failure{Code: "model.timeout"}
+		}
+		return nil, &modelerror.Failure{Code: "model.connection_failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		resp.Body.Close()
-		return nil, fmt.Errorf("model gateway HTTP %d", resp.StatusCode)
+		return nil, modelerror.HTTPFailure(resp.StatusCode)
 	}
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 4096), 1<<20)
@@ -174,11 +183,11 @@ func (s *stream) Recv() (model.ChatChunk, error) {
 		var c chunkResp
 		if err := json.Unmarshal([]byte(raw), &c); err != nil {
 			s.done = true
-			return model.ChatChunk{Err: err}, nil
+			return model.ChatChunk{Err: &modelerror.Failure{Code: "model.response_failed"}}, nil
 		}
 		if len(c.Error) > 0 && string(c.Error) != "null" {
 			s.done = true
-			return model.ChatChunk{Err: errors.New("model gateway stream error")}, nil
+			return model.ChatChunk{Err: &modelerror.Failure{Code: "model.response_failed"}}, nil
 		}
 		if len(c.Choices) > 0 {
 			ch := c.Choices[0]
@@ -189,13 +198,13 @@ func (s *stream) Recv() (model.ChatChunk, error) {
 				switch *ch.FinishReason {
 				case "stop":
 				case "length":
-					finishErr = errors.New("model response exceeded length limit")
+					finishErr = &modelerror.Failure{Code: "model.response_incomplete"}
 				case "content_filter":
-					finishErr = errors.New("model response blocked by content filter")
+					finishErr = &modelerror.Failure{Code: "model.refused"}
 				case "tool_calls", "function_call":
-					finishErr = errors.New("model requested unsupported tool execution")
+					finishErr = &modelerror.Failure{Code: "model.tools_invalid"}
 				default:
-					finishErr = errors.New("model returned unsupported finish reason")
+					finishErr = &modelerror.Failure{Code: "model.response_failed"}
 				}
 				if finishErr != nil {
 					return model.ChatChunk{Err: finishErr}, nil
@@ -205,9 +214,16 @@ func (s *stream) Recv() (model.ChatChunk, error) {
 		}
 	}
 	if err := s.sc.Err(); err != nil {
-		return model.ChatChunk{}, err
+		var timeout net.Error
+		if errors.Is(err, context.Canceled) {
+			return model.ChatChunk{}, err
+		}
+		if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &timeout) && timeout.Timeout()) {
+			return model.ChatChunk{}, &modelerror.Failure{Code: "model.timeout"}
+		}
+		return model.ChatChunk{}, &modelerror.Failure{Code: "model.response_incomplete"}
 	}
-	return model.ChatChunk{}, io.ErrUnexpectedEOF
+	return model.ChatChunk{}, &modelerror.Failure{Code: "model.response_incomplete"}
 }
 
 func (s *stream) Close() error { return s.body.Close() }

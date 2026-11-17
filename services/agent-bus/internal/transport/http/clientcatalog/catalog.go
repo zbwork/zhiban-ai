@@ -110,6 +110,14 @@ func (h *AgentHandlers) view(ctx context.Context, accountID int64, e domagent.Di
 		if err != nil {
 			return nil, err
 		}
+		entries := make([]map[string]any, 0, len(apps))
+		for _, app := range apps {
+			if app.Status != "active" || !app.IsEnabled || (app.TenantID != 0 && app.TenantID != e.TenantID) {
+				continue
+			}
+			entries = append(entries, map[string]any{"uuid": app.UUID, "name": app.Name, "code": app.Code, "icon_url": app.IconURL})
+		}
+		out["apps"] = entries
 		uuids := make([]string, 0, len(apps))
 		labels := map[string]string{}
 		for _, app := range apps {

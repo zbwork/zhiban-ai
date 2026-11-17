@@ -31,6 +31,7 @@ type Handlers struct {
 	Images  *svcmedia.Service
 	Search  *svcsearch.Service
 	Outputs *svcdrive.ZAPSvc
+	Skills  LocalSkillReader
 }
 
 func localScope(r *http.Request) dom.Scope {

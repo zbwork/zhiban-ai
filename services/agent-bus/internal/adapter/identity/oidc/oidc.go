@@ -140,12 +140,13 @@ func (p *Provider) exchangeCodeImpl(ctx context.Context, code, expectedNonce str
 		name = claims.PreferredUsername
 	}
 	return &identityadapter.Profile{
-		Subject: claims.Sub,
-		Email:   claims.Email,
-		Name:    name,
-		Phone:   claims.PhoneNumber,
-		Groups:  claims.Groups,
-		Raw:     raw,
+		Subject:       claims.Sub,
+		EmailVerified: claims.EmailVerified,
+		Email:         claims.Email,
+		Name:          name,
+		Phone:         claims.PhoneNumber,
+		Groups:        claims.Groups,
+		Raw:           raw,
 	}, nil
 }
 

@@ -135,7 +135,7 @@ async function run(): Promise<void> {
       if (new Set(tools.map((tool) => tool.name)).size !== tools.length) {
         throw new LocalError('local.duplicate_tool');
       }
-      const context = new DesktopContext({ allowHttpStorage: () => channel?.allowHttpStorage ?? false, privateRoot: config.privateRoot, skillsRoot: join(canonicalState, 'skills'), brokerPort: Number(new URL(brokerURL).port) });
+      const context = new DesktopContext({ downloadSkill: (run, id, max, signal) => channel!.skillPackage(run.task, id, max, signal), allowHttpStorage: () => channel?.allowHttpStorage ?? false, privateRoot: config.privateRoot, skillsRoot: join(canonicalState, 'skills'), brokerPort: Number(new URL(brokerURL).port) });
       const dsh: DesktopEngine = new DesktopEngine({ packageRoot, cacheRoot: join(canonicalState, 'engine'), brokerURL });
       const engine = new LocalEngineRouter(dsh, new CodexDesktopEngine({ packageRoot, cacheRoot: join(canonicalState, 'codex'), brokerURL }));
       supervisor = new LocalSupervisor({ identity, ledger, engine, validateLease: (task) => channel!.validateLease(task), confirmAccepted: (task) => channel!.confirmAccepted(task),

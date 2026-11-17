@@ -1,0 +1,68 @@
+{
+  "api-proof": [
+    {
+      "method": "GET",
+      "path": "/org/departments",
+      "status": 200,
+      "items": 2
+    },
+    {
+      "method": "GET",
+      "path": "/org/members",
+      "status": 200,
+      "items": 3
+    },
+    {
+      "method": "GET",
+      "path": "/org/positions",
+      "status": 200,
+      "items": 11
+    },
+    {
+      "method": "POST",
+      "path": "/org/departments",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "path": "/knowledge-bases",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "path": "/org/departments",
+      "status": 401
+    }
+  ],
+  "api-revoked-proof": {
+    "revoked_status": 401
+  },
+  "oauth-proof": {
+    "token_http": 200,
+    "tls_verified": true,
+    "id_token_signature_verified": true,
+    "issuer": "https://127.0.0.1:18443",
+    "scope": "",
+    "ungranted_org_status": 403
+  },
+  "oauth-revoked-proof": {
+    "deleted_app_client_authentication": 401
+  },
+  "sdk-proof": {
+    "token_exchange": 200,
+    "scope": "kb.read",
+    "expires_in": 119,
+    "kb_read": 200,
+    "kb_write_denied": 403,
+    "org_read_denied": 403,
+    "ungranted_token_scope_denied": 403
+  },
+  "sdk-revoked-proof": {
+    "revoked_credential_exchange": 401,
+    "revoked_session_request": 401,
+    "database_credential_status": "revoked",
+    "database_session_status": "revoked",
+    "database_revoked_before_expiry": true,
+    "note": "HTTP verification ran after token TTL; database separately confirms revocation before expiry."
+  }
+}

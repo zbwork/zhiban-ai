@@ -4,7 +4,9 @@ import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom'
 import { A2AApprovalsAdmin, Alerts, Auth, clearInflightGet, parseAccessToken, type Menu, type AccountSummary, type ScopeOption, auth } from '../lib/api'
 import { iconFor } from '../lib/icons'
 import { PAGE_MENUS } from '../lib/pageMenus'
+import { FormField, Select, EmptyState } from './ui'
 import clsx from 'clsx'
+import { canViewAdminRoute, isUnrestrictedScope } from '../lib/adminPermissions'
 import {
   LogOut, ChevronDown, User as UserIcon, Key as KeyIcon, MessageSquare,
   Home, Building2, Briefcase, Cpu, Settings2, ShieldCheck, UsersRound,
@@ -23,11 +25,11 @@ type ManagementView = 'platform' | 'tenant'
 // 不允许出现 "能力装配 / 知办AI SkillHub / Composer / Runtime 接入 / KB Provider" 这类技术词。
 const GROUP_ORDER_BY_VIEW: Record<ManagementView, string[]> = {
   platform: [
-    '概览', '租户管理', '企业管理', '计费中心', 'Agent 平台', '技能中心', '应用管理',
+    '概览', '租户管理', '企业管理', 'Agent 平台', '技能中心', '应用管理',
     '知识库', '云盘', '群组与协同', '任务与自动化', '系统管理', '监控与告警', '审计与合规', '平台管理',
   ],
   tenant: [
-    '概览', '计费中心', '数字员工', '技能中心', '应用管理', '知识库',
+    '概览', '数字员工', '技能中心', '应用管理', '知识库',
     '云盘', '任务', '组织与人员', '群聊与协同', '凭证与接入', '系统管理', '监控与告警', '审计与合规',
   ],
 }
@@ -42,7 +44,6 @@ const GROUP_ICONS = {
   '概览': Home,
   '租户管理': Building2,
   '企业管理': Briefcase,
-  '计费中心': Layers,
   'Agent 平台': Cpu,
   '技能中心': Wand2,
   '应用管理': Settings2,
@@ -69,16 +70,7 @@ const MENU_NAME_OVERRIDES: Record<string, string> = {
   '/client-analytics': '客户端分析',
   // platform
   '/tenants': '租户管理',
-  '/plans': '套餐管理',
-  '/billing/plans': '套餐管理',
-  '/billing/features': '权益项',
-  '/billing/credits': '积分包配置',
-  '/billing/orders': '订单管理',
-  '/billing/config': '计费配置',
-  '/billing/subscription': '订阅与配额',
-  '/billing/usage': '用量统计',
   '/alerts': '告警中心',
-  '/billing/overrides': '权益覆写',
   '/runtimes': '运行环境',
   '/platform-types': 'Agent 平台类型',
   '/runtime-hosting': '平台托管配置',
@@ -221,7 +213,9 @@ export function Layout({ showAllPages = false }: { showAllPages?: boolean }) {
   // 同一路由若有多个 scope 版本，保留当前视图对应的菜单项。
   const menuSections = useMemo(() => {
     type Item = Menu & { group: string }
+    const unrestricted = isUnrestrictedScope(scopes, actScope)
     const rawItems: Item[] = menus
+      .filter((m) => unrestricted || canViewAdminRoute(m.route))
       .filter((m) => menuBelongsToView(m, currentView))
       .map((m) => ({ ...m, group: menuGroup(m, currentView) }))
     const byRoute = new Map<string, Item>()
@@ -248,7 +242,14 @@ export function Layout({ showAllPages = false }: { showAllPages?: boolean }) {
       if (ib === -1) return -1
       return ia - ib
     })
-  }, [currentView, menus])
+  }, [currentView, menus, scopes, actScope])
+
+  useEffect(() => {
+    if (!loading && (loc.pathname === '/' || loc.pathname === '/dashboard') && !isUnrestrictedScope(scopes, actScope) && !canViewAdminRoute('/dashboard')) {
+      const first = menuSections.flatMap(([, items]) => items)[0]
+      if (first) nav(first.route, { replace: true })
+    }
+  }, [loading, loc.pathname, scopes, actScope, menuSections, nav])
 
   const activeMenuRoute = useMemo(() => {
     let best = ''
@@ -536,6 +537,28 @@ export function Layout({ showAllPages = false }: { showAllPages?: boolean }) {
                   onChange={(nextView) => void switchManagementView(nextView)}
                 />
               )}
+              {scopes.some((scope) => scope.kind === 'tenant') && (
+                <div className="px-2.5 py-2">
+                  <FormField label="当前租户">
+                    <Select
+                      aria-label="当前租户"
+                      value={actScope?.kind === 'tenant' ? scopeKey(actScope) : ''}
+                      disabled={switching}
+                      onChange={(event) => {
+                        const next = scopes.find((scope) => scope.kind === 'tenant' && scopeKey(scope) === event.target.value)
+                        if (next) void switchScope(next)
+                      }}
+                    >
+                      <option value="" disabled>选择已授权租户</option>
+                      {scopes.filter((scope) => scope.kind === 'tenant').map((scope) => (
+                        <option key={scopeKey(scope)} value={scopeKey(scope)}>
+                          {scope.tenantName || scope.tenantSlug || `租户 #${scope.tenantId}`}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                </div>
+              )}
               <DropLink to="/me/profile" icon={UserIcon} onClick={() => setMenuOpen(false)}>个人资料</DropLink>
               <DropLink to="/me/sessions" icon={MessageSquare} onClick={() => setMenuOpen(false)}>我的会话</DropLink>
               {/* API Key 是租户级权限，不是个人级；走 sidebar 凭证与接入组的 /api-keys，避免头像下拉误导。 */}
@@ -593,7 +616,10 @@ export function Layout({ showAllPages = false }: { showAllPages?: boolean }) {
           }
         }} />
         <div className="w-full px-[clamp(16px,2vw,36px)] py-[clamp(20px,2.4vw,36px)]">
-          <Outlet context={{ actScope, switchingScope: switching }} />
+          {isUnrestrictedScope(scopes, actScope) || canViewAdminRoute(loc.pathname) ?
+            <Outlet context={{ actScope, switchingScope: switching }} /> :
+            <EmptyState title="没有访问权限" description="当前角色没有此功能的访问权限，请联系管理员。" />
+          }
         </div>
       </main>
     </div>
@@ -813,16 +839,6 @@ function menuGroup(menu: Menu, view: ManagementView) {
         menu.route === '/web-leads' ||
         menu.route === '/web-funnel' ||
         menu.route === '/web-feedback') return '企业管理'
-    if (menu.route === '/plans' ||
-        menu.route === '/billing/plans' ||
-        menu.route === '/billing/features' ||
-        menu.route === '/billing/credits' ||
-        menu.route === '/billing/orders' ||
-        menu.route === '/billing/config' ||
-        menu.route === '/billing/usage' ||
-        menu.route === '/billing/overrides') {
-      return '计费中心'
-    }
     if (menu.route === '/runtimes' || menu.route === '/runtime-environments' ||
         menu.route === '/runtime-hosting' ||
         menu.route === '/platform-types' || menu.route === '/preset-agents' ||
@@ -866,7 +882,6 @@ function menuGroup(menu: Menu, view: ManagementView) {
       menu.route === '/client-analytics'
     ) return '平台管理'
   } else {
-    if (menu.route === '/billing/subscription' || menu.route === '/billing/usage') return '计费中心'
     // tenant 视角：能力配置走 /agents/:uuid 详情的 "能力与应用" Tab，不挂一级菜单。
     // /runtime-environments 是租户视角"运行环境启用"页面（管理本租户可用的运行环境），归数字员工组。
     if (menu.route === '/agents' || menu.route === '/runtime-environments') return '数字员工'
@@ -910,17 +925,6 @@ function menuItemOrder(menu: Menu, group: string) {
   const byGroup: Record<string, Record<string, number>> = {
     '概览': { '/dashboard': 10 },
     '租户管理': { '/tenants': 10 },
-    '计费中心': {
-      '/plans': 5,
-      '/billing/plans': 10,
-      '/billing/features': 20,
-      '/billing/credits': 30,
-      '/billing/orders': 40,
-      '/billing/config': 50,
-      '/billing/subscription': 55,
-      '/billing/usage': 60,
-      '/billing/overrides': 90,
-    },
     // 技能中心: platform 菜单 sort_order 与 SQL 000100 seed 一致;
     // tenant 菜单按 SQL 000106 (拆分后) sort_order 排: platform=10, own=20。
     '技能中心': {

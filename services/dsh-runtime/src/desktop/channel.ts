@@ -364,6 +364,30 @@ export class DesktopChannel {
 
   get allowHttpStorage(): boolean { return this.base.protocol === 'http:' && this.base.hostname === '127.0.0.1'; }
 
+  /** Fixed same-Bus resource, scoped to this accepted task; never accepts a URL or object key. */
+  async skillPackage(task: LocalTask, skillID: string, maxBytes: number, signal: AbortSignal): Promise<Buffer> {
+    const capability = this.capabilities.get(task.run);
+    if (!this.connected || !capability || !sameIdentity(task, this.opts.identity) || !id.safeParse(task.run).success || !z.string().uuid().safeParse(skillID).success || !Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > 20 * 1024 * 1024) throw new LocalError('local.lease_invalid');
+    const combined = AbortSignal.any([signal, AbortSignal.timeout(60_000)]);
+    const response = await fetch(new URL(`local-runtime/runs/${task.run}/skills/${skillID}/package`, this.base), {
+      redirect: 'error', headers: { authorization: `Bearer ${capability}`, 'X-Local-Fence': String(task.fence), 'accept-encoding': 'identity' }, signal: combined,
+    });
+    if (!response.ok || !response.body || Number(response.headers.get('content-length') ?? 0) > maxBytes) {
+      await response.body?.cancel(); throw new LocalError('local.resource_download_failed');
+    }
+    const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
+    try {
+      for (;;) {
+        const part = await reader.read(); if (part.done) break;
+        size += part.value.length; if (size > maxBytes) throw new LocalError('local.resource_download_failed');
+        chunks.push(part.value);
+      }
+    } finally { await reader.cancel(); }
+    combined.throwIfAborted();
+    if (!this.connected || this.capabilities.get(task.run) !== capability || !sameIdentity(task, this.opts.identity)) throw new LocalError('local.lease_invalid');
+    return Buffer.concat(chunks, size);
+  }
+
   async output(task: LocalTask, operation: 'sign' | 'confirm', body: unknown, signal: AbortSignal): Promise<unknown> {
     const capability = this.capabilities.get(task.run);
     if (!this.connected || !capability || !sameIdentity(task, this.opts.identity)) throw new LocalError('local.lease_invalid');

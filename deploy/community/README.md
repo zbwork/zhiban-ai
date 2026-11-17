@@ -1,6 +1,6 @@
 # 社区本地部署（实施中）
 
-当前提供 PostgreSQL、Redis、MinIO、迁移、Bus/Admin API、审计和文件维护 worker。管理台及服务端复用内网原有版本；2026-11-12 已撤销本轮新增 SQL、后台页面和配套扩展。历史联调不代表当前源码完整支持这些能力，限制见[复用核对](../../docs/architecture/community-schema-reuse.md)。
+当前提供 PostgreSQL、Redis、MinIO、迁移、Bus/Admin API、管理台、审计和文件维护 worker。管理台及服务端复用原有版本。2026-11-16～17 已验证租户/组织、管理员创建普通成员并首次设置密码、DSH/Codex 组织员工、头像、组织技能与知识文档等核心闭环；完整后台尚有未验收项，见[里程碑二验收](../../docs/verification/community-admin-milestone2-2026-11-17.md)和[数据库复用核对](../../docs/architecture/community-schema-reuse.md)。本段替代 11 月 12 日撤销期间的历史状态说明。
 
 需要 Docker Compose v2、OpenSSL 和可下载公开镜像的网络。服务镜像从本仓库源码构建，不读取私有配置仓库。
 
@@ -10,7 +10,7 @@
 4. Bus 地址 `http://127.0.0.1:18080`，Admin API 地址 `http://127.0.0.1:18081`。两者使用各自 API 前缀。
 5. `./community-down.sh` 停止服务并保留数据。不要使用 `down -v`，除非明确要删除数据。
 
-对象存储内部写地址使用 host.docker.internal:19000（容器 extra_hosts 注入 host-gateway），签名下载地址为 127.0.0.1:19000。已验证本机代理上传和签名下载字节一致；跨机器访问需要部署者配置可达的读写地址。社区管理台地址为 http://127.0.0.1:18082；WuKong 客户端 WS 为 ws://127.0.0.1:18083；REST 仅容器内可达。完整管理前端已复用内网原入口；现有服务端菜单数据和统计/角色等接口仍有缺漏，不能视为完整后台可用。真实模型仍待验收。worker 必须运行，否则最终 IM 回复停留在 outbox。
+对象存储内部写地址使用 host.docker.internal:19000（容器 extra_hosts 注入 host-gateway），签名下载地址为 127.0.0.1:19000。已验证本机代理上传和签名下载字节一致；跨机器访问需要部署者配置可达的读写地址。社区管理台地址为 http://127.0.0.1:18082；WuKong 客户端 WS 为 ws://127.0.0.1:18083；REST 仅容器内可达。后台员工头像和技能图标保留稳定对象引用，Bus 动态解析；本机执行下载私服技能包经当前 Bus 的 run-scoped 接口，不要求桌面直接访问内网对象存储。已完成服务器模型及独立成员 DSH/Codex 的真实调用，旧偶发失败不能视为全部消除。worker 必须运行，否则最终 IM 回复停留在 outbox。
 
 升级前备份 PostgreSQL、对象卷及 JWT 文件；迁移有校验和保护。不要把社区迁移应用到已有商业数据库。回退需要配套数据库备份，不能只切换镜像。
 
@@ -19,3 +19,5 @@
 知识库原件清理：worker 每分钟轮询已删除文档/知识库，每轮最多 45 秒；对象删除失败保留持久化键并自动重试。部署时需要同时升级 Bus 和 worker。该任务只清理租户知识库对象，不处理平台或其他路径。
 
 应用 H5/OAuth 装配：通过 COMMUNITY_APP_ISSUER 配置自己的 HTTPS issuer，并向 Bus 注入 AGBUS_SECRETBOX_KEY（32 随机字节的 Base64，持久保存且不能随重启变更）；也可在 service.yaml 设置 appissuer。未配置 issuer 时不注册应用启动及换码路由。签名密钥加密保存在 PostgreSQL，Discovery/JWKS 使用该 issuer。应用接口沿用内网原有版本；本轮未重新执行部署验收。
+
+管理台 Nginx 接受最大 64 MiB 请求，避免其默认 1 MiB 在业务处理前拦截头像/技能包。头像业务仍限制 5 MiB，其他文件继续按各自上传接口限制；不是无限上传。

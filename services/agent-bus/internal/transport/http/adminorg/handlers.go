@@ -10,7 +10,10 @@ import (
 	svcdept "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/department"
 	svcmem "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/membership"
 	"net/http"
+	"net/mail"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 type MembershipService interface {
@@ -20,9 +23,14 @@ type MembershipService interface {
 	Remove(context.Context, int64, int64, int64) error
 	UpdateContactFields(context.Context, int64, int64, svcmem.ContactFieldsInput) error
 }
+type MemberCreator interface {
+	Invite(context.Context, int64, int64, svcmem.InviteInput) (*svcmem.InviteResult, error)
+}
+
 type Handlers struct {
-	Department svcdept.Service
-	Membership MembershipService
+	MemberCreator MemberCreator
+	Department    svcdept.Service
+	Membership    MembershipService
 }
 
 func (h *Handlers) GetDepartment(w http.ResponseWriter, r *http.Request) {
@@ -169,4 +177,53 @@ func (h *Handlers) ListMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	encode.JSON(w, map[string]any{"items": items, "total": total, "limit": limit, "offset": offset})
+}
+
+// CreateMember provisions a normal member; role elevation remains a separate RBAC operation.
+func (h *Handlers) CreateMember(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email        string `json:"email"`
+		Phone        string `json:"phone"`
+		DisplayName  string `json:"display_name"`
+		EmployeeID   string `json:"employee_id"`
+		Title        string `json:"title"`
+		DepartmentID *int64 `json:"department_id"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16*1024))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		encode.JSONError(w, apperr.ErrInvalidParams)
+		return
+	}
+	if strings.TrimSpace(body.DisplayName) == "" || body.DepartmentID == nil || *body.DepartmentID <= 0 {
+		encode.JSONError(w, apperr.ErrInvalidParams.Withf("请填写姓名并选择部门"))
+		return
+	}
+	email, phone := strings.TrimSpace(body.Email), strings.TrimSpace(body.Phone)
+	if (email == "") == (phone == "") {
+		encode.JSONError(w, apperr.ErrInvalidParams.Withf("请填写邮箱或手机号中的一项"))
+		return
+	}
+	if email != "" {
+		address, err := mail.ParseAddress(email)
+		if err != nil || address.Address != email {
+			encode.JSONError(w, apperr.ErrInvalidParams.Withf("邮箱格式不正确"))
+			return
+		}
+	}
+	if phone != "" && !regexp.MustCompile(`^1[3-9][0-9]{9}$`).MatchString(phone) {
+		encode.JSONError(w, apperr.ErrInvalidParams.Withf("手机号格式不正确"))
+		return
+	}
+	if h.MemberCreator == nil {
+		encode.JSONError(w, apperr.ErrInternal)
+		return
+	}
+	result, err := h.MemberCreator.Invite(r.Context(), middleware.MustTenantID(r.Context()), middleware.MustAccountID(r.Context()), svcmem.InviteInput{Email: email, Phone: phone, DisplayName: strings.TrimSpace(body.DisplayName), EmployeeID: body.EmployeeID, Title: body.Title, DepartmentID: body.DepartmentID, RoleCode: "tenant.member"})
+	if err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	encode.JSON(w, result)
 }

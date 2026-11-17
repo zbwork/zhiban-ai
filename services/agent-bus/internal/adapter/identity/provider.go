@@ -34,12 +34,13 @@ const (
 //   - Groups      可选, 用于 group 同步 / role 自动绑定
 //   - Raw         保留原始 claims 供 admin 调试
 type Profile struct {
-	Subject string         `json:"subject"`
-	Email   string         `json:"email,omitempty"`
-	Name    string         `json:"name,omitempty"`
-	Phone   string         `json:"phone,omitempty"`
-	Groups  []string       `json:"groups,omitempty"`
-	Raw     map[string]any `json:"raw,omitempty"`
+	EmailVerified bool           `json:"email_verified"`
+	Subject       string         `json:"subject"`
+	Email         string         `json:"email,omitempty"`
+	Name          string         `json:"name,omitempty"`
+	Phone         string         `json:"phone,omitempty"`
+	Groups        []string       `json:"groups,omitempty"`
+	Raw           map[string]any `json:"raw,omitempty"`
 }
 
 // Config 是租户配 IdP 时录入的字段; provider-agnostic 形式。

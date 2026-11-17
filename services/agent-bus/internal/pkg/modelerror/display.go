@@ -24,6 +24,7 @@ var messages = map[string]string{
 	"model.rate_limited":              "模型平台请求过于频繁，请稍后重试",
 	"model.timeout":                   "模型平台响应超时，请稍后重试",
 	"model.connection_failed":         "模型平台连接失败，请稍后重试",
+	"model.redirect_not_allowed":      "模型平台返回了重定向，请检查模型服务地址",
 	"model.upstream_failure":          "模型平台处理请求失败，请稍后重试",
 	"billing.model_access_recovering": "积分已到账，正在恢复模型使用权限，请稍后重试",
 	"billing.insufficient_credits":    "积分不足，请先购买积分包或升级套餐后再试",
