@@ -70,10 +70,13 @@ type Deps struct {
 	StreamHub              A2AStreamHub   // 可选; nil = 进程内 stream hub
 	StreamStore            A2AStreamStore // 可选; nil = 仅进程内 stream, 无重启/跨节点续接
 	Approvals              domapproval.Repository
-	ChatTimeline           ChatTimelinePublisher // 可选; 将 A2A invoke 投影到当前聊天执行过程
-	RunHooks               RunStepNotifier       // 可选; F24 运行轨迹: 边终态时收敛调用方 run 的 a2a_invoke step
-	Logger                 a2aLogger             // 可选; 只记录低敏链路诊断字段, 不记录 token/endpoint/raw payload
-	Now                    func() time.Time
+	LocalApprovalQueue     interface {
+		ApproveLocal(context.Context, int64, string, int64) error
+	}
+	ChatTimeline ChatTimelinePublisher // 可选; 将 A2A invoke 投影到当前聊天执行过程
+	RunHooks     RunStepNotifier       // 可选; F24 运行轨迹: 边终态时收敛调用方 run 的 a2a_invoke step
+	Logger       a2aLogger             // 可选; 只记录低敏链路诊断字段, 不记录 token/endpoint/raw payload
+	Now          func() time.Time
 	// Governance Phase5 长链路预算治理参数 (cmd 从 config.A2A.Governance 映射; 零值在 New() 补默认)。
 	Governance GovernanceConfig
 }
@@ -943,6 +946,26 @@ func (s *Service) cancelRuntimeBestEffort(ctx context.Context, edge *doma2a.Edge
 	return res
 }
 
+func (s *Service) ApprovalResumeAvailable() bool {
+	return s.deps.LocalApprovalQueue != nil || s.externalResumeAvailable()
+}
+
+func (s *Service) CanResumeApproval(parentToken int64) bool {
+	if parentToken == 0 {
+		return s.deps.LocalApprovalQueue != nil
+	}
+	return s.externalResumeAvailable()
+}
+
+func (s *Service) externalResumeAvailable() bool {
+	switch s.deps.AgentInvoker.(type) {
+	case nil, NoopAgentInvoker, *NoopAgentInvoker:
+		return false
+	default:
+		return true
+	}
+}
+
 func (s *Service) DecideApproval(ctx context.Context, in ApprovalDecisionInput) (*ApprovalDecisionResult, error) {
 	if s.deps.Approvals == nil {
 		return nil, apperr.ErrInternal.Withf("a2a approvals not wired")
@@ -952,6 +975,23 @@ func (s *Service) DecideApproval(ctx context.Context, in ApprovalDecisionInput) 
 	}
 	if in.Decision != domapproval.StatusApproved && in.Decision != domapproval.StatusRejected {
 		return nil, apperr.ErrInvalidParams.Withf("decision must be approved|rejected")
+	}
+	if in.Decision == domapproval.StatusApproved {
+		if s.deps.LocalApprovalQueue != nil && in.AdminOverride {
+			proposed, err := s.deps.Approvals.GetByUUID(ctx, in.TenantID, in.ApprovalUUID)
+			if err != nil {
+				return nil, err
+			}
+			if proposed.ParentSessionTokenID == 0 {
+				if err := s.deps.LocalApprovalQueue.ApproveLocal(ctx, in.TenantID, in.ApprovalUUID, in.ActorAccountID); err != nil {
+					return nil, err
+				}
+				return &ApprovalDecisionResult{ApprovalUUID: proposed.UUID, EdgeUUID: proposed.EdgeUUID, EdgeCreatedAt: proposed.EdgeCreatedAt, ApprovalStatus: domapproval.StatusApproved, EdgeStatus: doma2a.StatusAwaitingApproval}, nil
+			}
+		}
+		if !s.externalResumeAvailable() {
+			return nil, apperr.New(apperr.PreconditionFailed, "当前服务未接入协同执行器，无法同意并继续执行此请求")
+		}
 	}
 	now := s.deps.Now()
 	parentAccountID := in.ActorAccountID
@@ -1004,15 +1044,6 @@ func (s *Service) DecideApproval(ctx context.Context, in ApprovalDecisionInput) 
 		return nil, fmt.Errorf("a2a.approval: to agent: %w", err)
 	}
 	if in.Decision == domapproval.StatusRejected {
-		rejected, uerr := s.deps.Edges.UpdateStatus(ctx, in.TenantID, approval.EdgeUUID, approval.EdgeCreatedAt, doma2a.UpdateStatusInput{
-			Status:         statusPtr(doma2a.StatusRejected),
-			ErrorMessage:   strPtr("a2a.approval_rejected"),
-			CompletedAt:    timePtr(now),
-			ExpectStatuses: []doma2a.Status{doma2a.StatusAwaitingApproval},
-		})
-		if uerr == nil {
-			edge = rejected
-		}
 		s.fireAudit(ctx, fromAgent, toAgent, "a2a.approval_rejected", edge, map[string]any{
 			"approval_request_id": approval.UUID,
 		})

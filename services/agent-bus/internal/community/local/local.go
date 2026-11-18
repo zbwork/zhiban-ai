@@ -121,6 +121,26 @@ func (m *Models) PrepareLocalModel(ctx context.Context, scope dom.Scope, employe
 	return m.resolve(ctx, scope, employeeID, bound)
 }
 
+// DefaultLocalModel selects a compatible model only from the authenticated member's catalog.
+func (m *Models) DefaultLocalModel(ctx context.Context, scope dom.Scope, employeeID int64) (string, error) {
+	employee, err := m.agents.GetByID(ctx, employeeID)
+	if err != nil || !m.authorizeEmployee(ctx, employee, scope) || m.sources == nil {
+		return "", dom.ErrDenied
+	}
+	sourceScope := domsource.Scope{TenantID: scope.TenantID, AccountID: scope.AccountID}
+	options, _, err := m.sources.List(ctx, sourceScope)
+	if err != nil {
+		return "", err
+	}
+	for _, option := range options {
+		route, err := m.sources.Resolve(ctx, sourceScope, option.ID)
+		if err == nil && (employee.LocalEngine != dom.EngineCodex || route.Protocol == "openai-compatible") {
+			return option.ID, nil
+		}
+	}
+	return "", dom.ErrModelUnavailable
+}
+
 func (m *Models) SelectLocalModel(ctx context.Context, scope dom.Scope, employeeID int64, hint string) (svc.ModelSelection, error) {
 	return m.resolve(ctx, scope, employeeID, hint)
 }

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { fingerprint, LocalError } from './ledger.js';
 
 export type PermissionMode = 'ask' | 'assist' | 'full';
-export type Operation = 'read' | 'write' | 'overwrite' | 'delete' | 'shell' | 'network' | 'browser' | 'desktop' | 'upload';
+export type Operation = 'read' | 'write' | 'overwrite' | 'delete' | 'shell' | 'network' | 'browser' | 'desktop' | 'upload' | 'collaboration';
 export interface ToolIntent { tool: string; operation: Operation; args: Record<string, unknown> }
 export interface ApprovalRequest { id: string; run: string; revision: number; intent: ToolIntent; expiresAt: number }
 interface Pending { request: ApprovalRequest; digest: string; resolve: (approved: boolean) => void; timer: NodeJS.Timeout }
@@ -72,7 +72,7 @@ export class LocalPolicy {
     combined.throwIfAborted();
     // Full never implies file upload consent. Each upload intent includes immutable artifact IDs + hashes.
     const workspaceRead = intent.operation === 'read' && !(['search_files', 'view_local_image'].includes(intent.tool) && intent.args['scope'] === 'home');
-    const automatic = intent.operation !== 'upload' && (this.taskGrants.has(fingerprint(intent)) || this.currentMode === 'full' || workspaceRead || (this.currentMode === 'assist' && intent.operation === 'write'));
+    const automatic = intent.operation !== 'upload' && (this.taskGrants.has(fingerprint(intent)) || this.currentMode === 'full' || workspaceRead || (this.currentMode === 'assist' && ['write', 'collaboration'].includes(intent.operation)));
     if (!automatic) {
       const frozen = structuredClone(intent);
       const digest = fingerprint(frozen);

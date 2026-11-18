@@ -20,10 +20,12 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +43,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/jwt"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/smscode"
 	identitysvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/identity"
+	"golang.org/x/oauth2"
 )
 
 // ===== DTO =====
@@ -109,9 +112,10 @@ type SmsLoginReq struct {
 
 // OIDCCallbackReq /auth/login/oidc/callback。M4 真接入: state 必填用于反查 IdP + 校 nonce。
 type OIDCCallbackReq struct {
-	Code   string     `json:"code"`
-	State  string     `json:"state"`
-	Device DeviceInfo `json:"device,omitempty"`
+	Code         string     `json:"code"`
+	State        string     `json:"state"`
+	Device       DeviceInfo `json:"device,omitempty"`
+	DesktopProof string     `json:"-"`
 }
 
 // SmsRegisterReq /auth/register/sms 客户端自助注册 (zhiban-app cutover).
@@ -143,14 +147,16 @@ type SelfRegisterer interface {
 
 // StartOIDCReq /auth/login/oidc/start。
 type StartOIDCReq struct {
-	ProviderUUID  string `json:"providerUuid"`
-	AfterRedirect string `json:"afterRedirect,omitempty"`
+	ProviderUUID    string `json:"providerUuid"`
+	AfterRedirect   string `json:"afterRedirect,omitempty"`
+	DesktopRedirect string `json:"desktopRedirect,omitempty"`
 }
 
 // StartOIDCResp 返回 AuthCodeURL 给前端 window.location.href 跳转。
 type StartOIDCResp struct {
-	AuthURL string `json:"authUrl"`
-	State   string `json:"state"`
+	AuthURL      string `json:"authUrl"`
+	State        string `json:"state"`
+	DesktopProof string `json:"-"`
 }
 
 // MySessionSummary /me/sessions 行 (多设备管理) — 不暴露 refresh_token_hash 等机密字段。
@@ -608,6 +614,9 @@ func (s *impl) LoginOIDC(ctx context.Context, ac AuthContext, req OIDCCallbackRe
 	if err != nil {
 		return nil, err
 	}
+	if subtle.ConstantTimeCompare([]byte(req.DesktopProof), []byte(payload.DesktopProof)) != 1 {
+		return nil, apperr.ErrUnauthorized.Withf("企业登录验证已失效")
+	}
 	lp, err := s.d.IdentityRegistry.ResolveByUUID(ctx, payload.ProviderUUID)
 	if err != nil {
 		return nil, err
@@ -620,7 +629,18 @@ func (s *impl) LoginOIDC(ctx context.Context, ac AuthContext, req OIDCCallbackRe
 	if !ok {
 		return nil, apperr.ErrInternal.Withf("provider does not support nonce verification (only OIDC supported in M4)")
 	}
-	profile, err := nc.ExchangeCodeWithNonce(ctx, req.Code, req.State, payload.Nonce)
+	var profile *identityadapter.Profile
+	if payload.DesktopRedirect != "" {
+		desktop, ok := lp.Provider.(interface {
+			ExchangeDesktopCode(context.Context, string, string, string, string) (*identityadapter.Profile, error)
+		})
+		if !ok {
+			return nil, apperr.ErrForbidden
+		}
+		profile, err = desktop.ExchangeDesktopCode(ctx, req.Code, payload.Nonce, payload.DesktopRedirect, payload.PKCEVerifier)
+	} else {
+		profile, err = nc.ExchangeCodeWithNonce(ctx, req.Code, req.State, payload.Nonce)
+	}
 	if err != nil {
 		return nil, apperr.ErrUnauthorized.Wrap(err)
 	}
@@ -723,28 +743,53 @@ func (s *impl) StartOIDC(ctx context.Context, req StartOIDCReq) (*StartOIDCResp,
 	if req.ProviderUUID == "" {
 		return nil, apperr.ErrInvalidParams.Withf("providerUuid required")
 	}
+	if req.DesktopRedirect != "" && !validDesktopRedirect(req.DesktopRedirect) {
+		return nil, apperr.ErrInvalidParams.Withf("桌面回调地址无效")
+	}
 	lp, err := s.d.IdentityRegistry.ResolveByUUID(ctx, req.ProviderUUID)
 	if err != nil {
 		return nil, err
 	}
 	state := newRandomToken()
-	nonce := newRandomToken()
-	if err := s.d.OIDCStateStore.Save(ctx, state, identitysvc.StatePayload{
-		ProviderUUID:  req.ProviderUUID,
-		Nonce:         nonce,
-		AfterRedirect: req.AfterRedirect,
-	}); err != nil {
+	payload := identitysvc.StatePayload{
+		ProviderUUID:    req.ProviderUUID,
+		Nonce:           newRandomToken(),
+		AfterRedirect:   req.AfterRedirect,
+		DesktopRedirect: req.DesktopRedirect,
+	}
+	authURLer, ok := lp.Provider.(interface{ AuthCodeURL(string, string) string })
+	if !ok {
+		return nil, apperr.ErrForbidden
+	}
+	out := &StartOIDCResp{State: state}
+	if req.DesktopRedirect != "" {
+		desktop, ok := lp.Provider.(interface {
+			DesktopAuthCodeURL(string, string, string, string) string
+		})
+		if !ok {
+			return nil, apperr.ErrForbidden
+		}
+		payload.PKCEVerifier = oauth2.GenerateVerifier()
+		payload.DesktopProof = newRandomToken()
+		out.DesktopProof = payload.DesktopProof
+		out.AuthURL = desktop.DesktopAuthCodeURL(state, payload.Nonce, req.DesktopRedirect, payload.PKCEVerifier)
+	} else {
+		out.AuthURL = authURLer.AuthCodeURL(state, payload.Nonce)
+	}
+	if err := s.d.OIDCStateStore.Save(ctx, state, payload); err != nil {
 		return nil, apperr.ErrInternal.Wrap(err)
 	}
-	// 仅 OIDC provider 有 AuthCodeURL 方法
-	type authURLer interface {
-		AuthCodeURL(state, nonce string) string
+	return out, nil
+}
+
+func validDesktopRedirect(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.User != nil || u.Scheme != "http" || u.Hostname() != "127.0.0.1" ||
+		u.Path != "/oauth/callback" || u.RawPath != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+		return false
 	}
-	au, ok := lp.Provider.(authURLer)
-	if !ok {
-		return nil, apperr.ErrInternal.Withf("provider does not expose AuthCodeURL")
-	}
-	return &StartOIDCResp{AuthURL: au.AuthCodeURL(state, nonce), State: state}, nil
+	port, err := strconv.Atoi(u.Port())
+	return err == nil && port >= 1024 && port <= 65535 && raw == "http://127.0.0.1:"+strconv.Itoa(port)+"/oauth/callback"
 }
 
 // ListMySessions /me/sessions: 列当前账号 active session, 用于多设备管理。

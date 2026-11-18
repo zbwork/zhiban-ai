@@ -157,11 +157,20 @@ Future<void> main() async {
       await tap(find.text('连接服务器'));
       await type(input('https://ai.example.com'), admin['busUrl'] as String);
       await tap(find.text('检测并连接'));
-      await type(input('邮箱 / 手机号 / 用户名'),
-          (member?['Email'] ?? admin['email']) as String);
-      await type(
-          input('请输入密码'), (member?['Password'] ?? admin['password']) as String);
-      await tap(find.text('登录'));
+      const enterpriseName =
+          String.fromEnvironment('COMMUNITY_UI_ENTERPRISE_LOGIN');
+      if (enterpriseName.isNotEmpty) {
+        final signIn = find.text('企业登录 · $enterpriseName');
+        await waitFor(signIn);
+        await shot('desktop-enterprise-login');
+        await tap(signIn);
+      } else {
+        await type(input('邮箱 / 手机号 / 用户名'),
+            (member?['Email'] ?? admin['email']) as String);
+        await type(input('请输入密码'),
+            (member?['Password'] ?? admin['password']) as String);
+        await tap(find.text('登录'));
+      }
       const tenantName = String.fromEnvironment('COMMUNITY_UI_TENANT_NAME');
       if (tenantName.isNotEmpty) {
         final deadline = DateTime.now().add(const Duration(seconds: 40));

@@ -149,10 +149,11 @@ func (s *ChatUploadSvc) Presign(ctx context.Context, accountID, tenantID int64, 
 	// 派生 keys; chat 附件归 caller 的 personal space (内部归属, 客户端不感知)
 	fileUUID := uuid.NewString()
 	ext := extFromName(cleanName)
-	stagingKey := buildStagingKey(tenantID, fileUUID, ext)
-	finalKey := buildFinalKey(tenantID, accountID, fileUUID, ext)
-
 	store, err := s.storage.Resolve(ctx, tenantID)
+	if err != nil {
+		return nil, apperr.ErrInternal.Withf("drive.storage_config_missing").Wrap(err)
+	}
+	stagingKey, finalKey, err := uploadKeys(ctx, store, tenantID, accountID, fileUUID, ext)
 	if err != nil {
 		return nil, apperr.ErrInternal.Withf("drive.storage_config_missing").Wrap(err)
 	}

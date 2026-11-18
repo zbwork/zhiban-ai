@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/middleware"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/encode"
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
+	reporoom "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/room"
 )
 
 // AdminRoomsHandler · F09-A6-05.
@@ -44,6 +46,7 @@ type roomSummary struct {
 	RoomKind          string `json:"room_kind"`
 	Status            string `json:"status"`
 	SpeakerPolicy     string `json:"speaker_policy"`
+	SpeakerPolicyUUID string `json:"speaker_policy_uuid,omitempty"`
 	ManagerAgentUUID  string `json:"manager_agent_uuid,omitempty"`
 	HumanCount        int    `json:"human_count"`
 	AgentCount        int    `json:"agent_count"`
@@ -153,12 +156,12 @@ func (h *AdminRoomsHandler) Get(w http.ResponseWriter, r *http.Request) {
        COALESCE((r.metadata->>'frozen')::boolean, false),
        COALESCE((SELECT count(*) FROM agent_trigger_log atl WHERE atl.room_id=r.id AND atl.received_at > now() - interval '24 hours'), 0),
        COALESCE(r.wukong_channel_id, ''), COALESCE(r.wukong_channel_type, 0),
-       to_char(r.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+       to_char(r.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), COALESCE(r.speaker_policy_config->>'template_uuid','')
   FROM rooms r WHERE r.uuid=$1 AND r.tenant_id=$2 AND r.deleted_at IS NULL`
 	err := h.Pool.QueryRow(r.Context(), q, roomUUID, tenantID).Scan(
 		&rs.UUID, &rs.Title, &rs.RoomKind, &rs.Status, &rs.SpeakerPolicy,
 		&rs.ManagerAgentUUID, &rs.HumanCount, &rs.AgentCount, &rs.Frozen,
-		&rs.Triggers24h, &rs.WuKongChannelID, &rs.WuKongChannelType, &rs.CreatedAt,
+		&rs.Triggers24h, &rs.WuKongChannelID, &rs.WuKongChannelType, &rs.CreatedAt, &rs.SpeakerPolicyUUID,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -169,6 +172,34 @@ func (h *AdminRoomsHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	encode.JSON(w, rs)
+}
+
+func (h *AdminRoomsHandler) ApplySpeaker(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		PolicyUUID string `json:"speaker_policy_uuid"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 2048)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		encode.JSONError(w, apperr.ErrInvalidParams)
+		return
+	}
+	roomID, roomErr := uuid.Parse(r.PathValue("uuid"))
+	policyID, policyErr := uuid.Parse(in.PolicyUUID)
+	if roomErr != nil || policyErr != nil {
+		encode.JSONError(w, apperr.ErrInvalidParams)
+		return
+	}
+	ctx := r.Context()
+	tenantID := middleware.MustTenantID(ctx)
+	if err := reporoom.New(h.Pool).ApplyLocalSpeaker(ctx, tenantID, roomID.String(), policyID.String()); err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	if h.Audit != nil {
+		payload, _ := json.Marshal(map[string]string{"speaker_policy_uuid": policyID.String()})
+		_ = h.Audit.Insert(ctx, domaudit.Event{OccurredAt: time.Now(), TenantID: tenantID, AccountID: middleware.MustAccountID(ctx), ActorKind: domaudit.ActorAdmin, Domain: "room", EventKind: "tenant.room.speaker_policy.update", ResourceKind: "room", ResourceUUID: roomID.String(), Payload: payload})
+	}
+	h.Get(w, r)
 }
 
 type triggerRow struct {
@@ -234,6 +265,70 @@ func (h *AdminRoomsHandler) Triggers(w http.ResponseWriter, r *http.Request) {
 		items = append(items, t)
 	}
 	encode.JSON(w, triggerListResp{Items: items, Total: total, Page: page, PageSize: pageSize})
+}
+
+// SpeakerDecisions lists the decisions persisted when a local group message is dispatched.
+func (h *AdminRoomsHandler) SpeakerDecisions(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.MustTenantID(r.Context())
+	roomUUID := r.PathValue("uuid")
+	roomID, err := h.resolveRoomID(r, tenantID, roomUUID)
+	if err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	from, to, err := parseTimeWindow(r.URL.Query(), 7*24*time.Hour)
+	if err != nil {
+		encode.JSONError(w, err)
+		return
+	}
+	page, pageSize := parsePagination(r.URL.Query())
+	const decisions = `
+	   FROM agent_trigger_log l
+	   JOIN messages m ON m.tenant_id=l.tenant_id AND m.room_id=l.room_id AND m.role='user'
+	     AND m.metadata->>'source'='local_group' AND m.metadata->>'wukong_message_id'=l.openim_client_msg_id
+	   LEFT JOIN digital_employees e ON e.id=l.agent_id
+	  WHERE l.tenant_id=$1 AND l.room_id=$2 AND l.received_at >= $3 AND l.received_at < $4 AND l.decision='triggered'`
+	var total int
+	if err := h.Pool.QueryRow(r.Context(), `SELECT count(*)`+decisions, tenantID, roomID, from, to).Scan(&total); err != nil {
+		encode.JSONError(w, apperr.ErrInternal.Wrap(err))
+		return
+	}
+	rows, err := h.Pool.Query(r.Context(), `SELECT l.uuid, l.received_at, m.metadata->>'speaker_policy',
+	    l.agent_id, e.name, m.metadata->>'speaker_selected_reason',
+	    (m.metadata->>'speaker_candidate_count')::int, (m.metadata->>'speaker_latency_ms')::int`+
+		decisions+` ORDER BY l.received_at DESC, l.id DESC LIMIT $5 OFFSET $6`, tenantID, roomID, from, to, pageSize, (page-1)*pageSize)
+	if err != nil {
+		encode.JSONError(w, apperr.ErrInternal.Wrap(err))
+		return
+	}
+	defer rows.Close()
+	type decision struct {
+		UUID           string    `json:"uuid"`
+		CreatedAt      time.Time `json:"created_at"`
+		BasePolicy     string    `json:"base_policy"`
+		AgentID        int64     `json:"selected_agent_id"`
+		AgentName      *string   `json:"selected_agent_name,omitempty"`
+		Reason         *string   `json:"selected_reason,omitempty"`
+		CandidateCount *int      `json:"candidate_count,omitempty"`
+		LatencyMs      *int      `json:"latency_ms,omitempty"`
+		Kind           string    `json:"selection_kind"`
+	}
+	items := make([]decision, 0)
+	for rows.Next() {
+		item := decision{Kind: "single"}
+		if err := rows.Scan(&item.UUID, &item.CreatedAt, &item.BasePolicy, &item.AgentID, &item.AgentName,
+			&item.Reason, &item.CandidateCount, &item.LatencyMs); err != nil {
+			encode.JSONError(w, apperr.ErrInternal.Wrap(err))
+			return
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		encode.JSONError(w, apperr.ErrInternal.Wrap(err))
+		return
+	}
+	encode.JSON(w, map[string]any{"items": items, "total": total, "page": page, "page_size": pageSize,
+		"room_uuid": roomUUID, "from": from, "to": to})
 }
 
 // Freeze POST /api/admin/v1/tenant/rooms/{uuid}/freeze.

@@ -63,6 +63,8 @@ type SelectInput struct {
 
 	// Candidates (调用方已过滤 active agent participants)
 	Candidates []SpeakerCandidate
+	// RoundRobinUnavailable skips ineligible candidates for this sender without changing the room order.
+	RoundRobinUnavailable map[int64]bool
 
 	// 触发上下文
 	UserMsgText  string
@@ -218,8 +220,18 @@ func (s *Selector) selectRoundRobin(in SelectInput) (*SelectResult, error) {
 	if idx < 0 {
 		idx = 0
 	}
-	selected := filtered[idx]
-	res.Selected = []int64{selected}
+	for skipped := 0; skipped < len(filtered); skipped++ {
+		if !in.RoundRobinUnavailable[filtered[idx]] {
+			break
+		}
+		idx = (idx + 1) % len(filtered)
+	}
+	if in.RoundRobinUnavailable[filtered[idx]] {
+		res.Kind = domsd.SelectionNone
+		res.SelectedReason = "no_eligible_candidate"
+		return res, nil
+	}
+	res.Selected = []int64{filtered[idx]}
 	res.Kind = domsd.SelectionSingle
 	res.SelectedReason = "round_robin"
 	// 回写状态 (caller 持久化 rooms.speaker_policy_config)

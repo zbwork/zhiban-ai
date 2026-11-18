@@ -84,7 +84,7 @@ func (p *Provider) Kind() identityadapter.ProviderKind { return identityadapter.
 //
 // **不**校验 email_verified, 由 callback handler 决定 (有些 IdP 不发这个 claim)。
 func (p *Provider) ExchangeCode(ctx context.Context, code, _state string) (*identityadapter.Profile, error) {
-	return p.exchangeCodeImpl(ctx, code, "")
+	return p.exchangeCodeImpl(ctx, p.oauth, code, "")
 }
 
 // ExchangeCodeWithNonce 同 ExchangeCode, 但额外强制校验 ID Token nonce claim
@@ -94,14 +94,14 @@ func (p *Provider) ExchangeCodeWithNonce(ctx context.Context, code, _state, expe
 	if expectedNonce == "" {
 		return nil, fmt.Errorf("oidc: expectedNonce required (use ExchangeCode if you really don't want nonce verification)")
 	}
-	return p.exchangeCodeImpl(ctx, code, expectedNonce)
+	return p.exchangeCodeImpl(ctx, p.oauth, code, expectedNonce)
 }
 
-func (p *Provider) exchangeCodeImpl(ctx context.Context, code, expectedNonce string) (*identityadapter.Profile, error) {
+func (p *Provider) exchangeCodeImpl(ctx context.Context, oauth oauth2.Config, code, expectedNonce string, options ...oauth2.AuthCodeOption) (*identityadapter.Profile, error) {
 	if code == "" {
 		return nil, fmt.Errorf("oidc: code required")
 	}
-	tok, err := p.oauth.Exchange(ctx, code)
+	tok, err := oauth.Exchange(ctx, code, options...)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: exchange code: %w", err)
 	}
@@ -156,4 +156,20 @@ func (p *Provider) exchangeCodeImpl(ctx context.Context, code, expectedNonce str
 // callback 入口先校 state, 再调 ExchangeCodeWithNonce(code, state, nonce)。
 func (p *Provider) AuthCodeURL(state, nonce string) string {
 	return p.oauth.AuthCodeURL(state, gooidc.Nonce(nonce))
+}
+
+// DesktopAuthCodeURL uses the loopback URI and PKCE for this request only.
+func (p *Provider) DesktopAuthCodeURL(state, nonce, redirect, verifier string) string {
+	oauth := p.oauth
+	oauth.RedirectURL = redirect
+	return oauth.AuthCodeURL(state, gooidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier))
+}
+
+func (p *Provider) ExchangeDesktopCode(ctx context.Context, code, nonce, redirect, verifier string) (*identityadapter.Profile, error) {
+	if nonce == "" || redirect == "" || verifier == "" {
+		return nil, fmt.Errorf("oidc: desktop flow incomplete")
+	}
+	oauth := p.oauth
+	oauth.RedirectURL = redirect
+	return p.exchangeCodeImpl(ctx, oauth, code, nonce, oauth2.VerifierOption(verifier))
 }

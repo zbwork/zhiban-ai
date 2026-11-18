@@ -195,7 +195,9 @@ func (h *Handlers) registerPages(mux *http.ServeMux, adminAuth func(http.Handler
 	if h.Rooms != nil {
 		mux.Handle("GET /api/admin/v1/tenant/rooms", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Rooms.List)))
 		mux.Handle("GET /api/admin/v1/tenant/rooms/{uuid}", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Rooms.Get)))
+		mux.Handle("GET /api/admin/v1/tenant/rooms/{uuid}/speaker-decisions", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Rooms.SpeakerDecisions)))
 		mux.Handle("GET /api/admin/v1/tenant/rooms/{uuid}/triggers", tenantPerm("tenant.agent.read", http.HandlerFunc(h.Rooms.Triggers)))
+		mux.Handle("PUT /api/admin/v1/tenant/rooms/{uuid}/speaker-policy", tenantPerm("tenant.agent.update", http.HandlerFunc(h.Rooms.ApplySpeaker)))
 		mux.Handle("POST /api/admin/v1/tenant/rooms/{uuid}/freeze", tenantPerm("tenant.agent.update", http.HandlerFunc(h.Rooms.Freeze)))
 		mux.Handle("POST /api/admin/v1/tenant/rooms/{uuid}/unfreeze", tenantPerm("tenant.agent.update", http.HandlerFunc(h.Rooms.Unfreeze)))
 	}
@@ -246,6 +248,9 @@ func (h *Handlers) registerPages(mux *http.ServeMux, adminAuth func(http.Handler
 	}
 	if h.PlatformType != nil {
 		mux.Handle("GET /api/admin/v1/runtime/platform-types", adminAuth(middleware.RequirePasswordValid(http.HandlerFunc(h.listPlatformTypes))))
+	}
+	if h.UserKBInspect != nil {
+		mux.Handle("GET /api/admin/v1/tenant/users/{user_uuid}/knowledge-bases", tenantPerm("tenant.kb.read_user_private", http.HandlerFunc(h.UserKBInspect.List)))
 	}
 	if h.Knowledge != nil {
 		mux.Handle("GET /api/admin/v1/platform/knowledge-bases", platformPerm("platform.kb.read", h.listManagedKnowledgeBases(domkb.ScopePlatform)))
@@ -384,6 +389,7 @@ func (h *Handlers) registerPages(mux *http.ServeMux, adminAuth func(http.Handler
 	if h.AdminA2AApprovals != nil {
 		mux.Handle("GET /api/admin/v1/tenant/a2a/approvals", tenantPerm("tenant.agent.read", http.HandlerFunc(h.AdminA2AApprovals.List)))
 		mux.Handle("GET /api/admin/v1/tenant/a2a/approvals/{approval_request_id}", tenantPerm("tenant.agent.read", http.HandlerFunc(h.AdminA2AApprovals.Get)))
+		mux.Handle("POST /api/admin/v1/tenant/a2a/approvals/{approval_request_id}/decide", tenantPerm("tenant.a2a_approval.decide", http.HandlerFunc(h.AdminA2AApprovals.Decide)))
 	}
 	if h.SupportFeedback != nil {
 		mux.Handle("GET /api/admin/v1/platform/support-feedback",

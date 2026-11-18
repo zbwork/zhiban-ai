@@ -266,6 +266,12 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
       setTab('basic')
       return
     }
+    if (draft.AgentKind === 'orchestrator' && draft.ExecutionLocus === 'local' &&
+        (draft.ChildAgentUuids.length < 2 || draft.ChildAgentUuids.length > 8)) {
+      setErr('请为本机编排选择 2 到 8 位已发布的数字员工')
+      setTab('runtime')
+      return
+    }
     if (publish && !isSupportBuiltin && draft.ExecutionLocus !== 'local' && !draft.RuntimeEnvironmentID) {
       setErr('发布前需要绑定可用运行环境')
       setTab('runtime')
@@ -424,6 +430,7 @@ function AgentDetailEditor({ uuid, templateUuid }: { uuid?: string; templateUuid
           locked={locked}
           runtimeOptions={runtimeOptions}
           context="tenantAgent"
+          localOrchestrationAgent={agent?.UUID ?? ""}
           allowExecutionChoice={isCreate}
         />
       )}

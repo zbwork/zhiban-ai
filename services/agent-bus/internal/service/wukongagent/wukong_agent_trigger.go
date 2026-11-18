@@ -360,6 +360,9 @@ func (t *wukongAgentTrigger) handle(ctx context.Context, ev wukongwh.Event) erro
 		return fmt.Errorf("wukong trigger: agent id=%d miss: %w", selectedAgentID, err)
 	}
 
+	if ag.ExecutionLocus == "local" {
+		return nil // device authorization is attached only by the authenticated local send path
+	}
 	// 7) supports_group_chat 闸口。
 	if !ag.SupportsGroupChat {
 		t.recordReject(ctx, tenantID, room.ID, ev.MessageID, &callerAccountID, &selectedAgentID, "agent_not_published_for_group")

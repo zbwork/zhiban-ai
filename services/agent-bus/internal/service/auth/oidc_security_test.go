@@ -34,14 +34,17 @@ func (f *oidcRegistryFixture) ExchangeCodeWithNonce(_ context.Context, _, _, non
 	return &f.profile, nil
 }
 
-type oidcStateFixture struct{ missing bool }
+type oidcStateFixture struct {
+	missing      bool
+	desktopProof string
+}
 
 func (f oidcStateFixture) Save(context.Context, string, identitysvc.StatePayload) error { return nil }
 func (f oidcStateFixture) Pop(context.Context, string) (*identitysvc.StatePayload, error) {
 	if f.missing {
 		return nil, apperr.ErrUnauthorized
 	}
-	return &identitysvc.StatePayload{ProviderUUID: "idp", Nonce: "expected"}, nil
+	return &identitysvc.StatePayload{ProviderUUID: "idp", Nonce: "expected", DesktopProof: f.desktopProof}, nil
 }
 
 type oidcAccountFixture struct {
@@ -109,5 +112,33 @@ func TestOIDCSessionCannotSwitchToPlatformOrOtherTenant(t *testing.T) {
 		if !errors.As(err, &actual) || actual.Code != apperr.Forbidden {
 			t.Fatalf("%+v: got %v", req, err)
 		}
+	}
+}
+
+func TestDesktopOIDCRedirectIsFixedToLoopbackCallback(t *testing.T) {
+	if !validDesktopRedirect("http://127.0.0.1:43877/oauth/callback") {
+		t.Fatal("valid desktop callback refused")
+	}
+	for _, redirect := range []string{
+		"https://example.test:43877/oauth/callback",
+		"http://127.0.0.1.example.test:43877/oauth/callback",
+		"http://127.0.0.1:43877/another/path",
+		"http://127.0.0.1:43877/oauth/callback?state=x",
+		"http://name@127.0.0.1:43877/oauth/callback",
+	} {
+		if validDesktopRedirect(redirect) {
+			t.Fatalf("accepted invalid desktop callback %q", redirect)
+		}
+	}
+}
+
+func TestDesktopOIDCCallbackNeedsPrivateAttemptProof(t *testing.T) {
+	accounts := &oidcAccountFixture{member: true}
+	provider := &oidcRegistryFixture{profile: adapter.Profile{Subject: "subject", Email: "member@example.test", EmailVerified: true}}
+	svc := &impl{d: Deps{Accounts: accounts, IdentityRegistry: provider, OIDCStateStore: oidcStateFixture{desktopProof: "private-attempt-proof"}}}
+	_, err := svc.LoginOIDC(context.Background(), AuthContext{}, OIDCCallbackReq{Code: "code", State: "browser-visible-state"})
+	actual, ok := apperr.AsError(err)
+	if !ok || actual.Code != apperr.Unauthorized || accounts.lookupCalled {
+		t.Fatalf("expected callback to fail before account lookup, got %v", err)
 	}
 }

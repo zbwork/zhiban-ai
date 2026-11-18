@@ -344,9 +344,9 @@ type Service interface {
 	CreateApp(ctx context.Context, tenantID, creatorID int64, in CreateAppInput) (*CreatedAppResult, error)
 	GetApp(ctx context.Context, tenantID int64, uuid string) (*App, *OAuthClient, error)
 	ListApps(ctx context.Context, tenantID int64, filter AppListFilter) ([]App, int64, error)
-	PatchApp(ctx context.Context, tenantID int64, uuid string, fields map[string]any) (*App, error)
-	DeleteApp(ctx context.Context, tenantID int64, uuid string) error
-	RotateSecret(ctx context.Context, tenantID int64, uuid string) (string, error) // 返新明文 secret 一次
+	PatchApp(ctx context.Context, tenantID, actorAccountID int64, uuid string, fields map[string]any) (*App, error)
+	DeleteApp(ctx context.Context, tenantID, actorAccountID int64, uuid string) error
+	RotateSecret(ctx context.Context, tenantID, actorAccountID int64, uuid string) (string, error) // 返新明文 secret 一次
 
 	// admin 通用应用开关 + 业务应用绑定
 	SetUniversal(ctx context.Context, tenantID int64, appUUID string, isUniversal bool, sortOrder int) error

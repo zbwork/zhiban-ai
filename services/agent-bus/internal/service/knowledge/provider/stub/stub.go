@@ -3,18 +3,19 @@
 // 见 docs/tasks/m8-knowledge-bases.md §4.2:
 //   - Ingest: INSERT kb_chunks(content); tsv 由 GENERATED 列自动生成.
 //   - Retrieve: 主路径 ts_rank > threshold ORDER BY score DESC LIMIT top_k;
-//     0 命中则 fallback `content ILIKE '%query%'` 兜底 (固定 score = 1.0/n 区分顺序).
+//     0 命中时补查原文子串和连续汉字片段。
 //
 // 关键约束:
 //   - 调用方必须先用 service 层验过 KB 所属 tenant; 这里 SQL WHERE kb_id=$N 已经收口
 //     在单个 KB 内; tenant 隔离由 service 保证 (provider 不重复校).
-//   - 不引入 pg_trgm / 任何 extension; ILIKE 子串足够 Phase A 验收范围.
+//   - 不引入 pg_trgm 或外部模型。
 package stub
 
 import (
 	"context"
 	"errors"
 	"strings"
+	"unicode"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -134,49 +135,106 @@ func retrieve(ctx context.Context, q any, in provider.RetrieveReq) ([]provider.C
 	if err != nil {
 		return nil, err
 	}
+	out, err := readChunks(rows, in.TopK, "tsvector")
+	if err != nil || len(out) != 0 {
+		return out, err
+	}
+	rows, err = queryRows(ctx, q,
+		`SELECT uuid::text, document_id, chunk_index, content, 0.01::float8
+		   FROM kb_chunks
+		  WHERE kb_id = $2
+		    AND strpos(lower(content), lower($1)) > 0
+		  ORDER BY chunk_index ASC
+		  LIMIT $3`, in.Query, in.KBID, in.TopK)
+	if err != nil {
+		return nil, err
+	}
+	out, err = readChunks(rows, in.TopK, "ilike")
+	if err != nil || len(out) != 0 {
+		return out, err
+	}
+	phrases := hanPhrases(in.Query)
+	if len(phrases) == 0 {
+		return out, nil
+	}
+	rows, err = queryRows(ctx, q,
+		`SELECT chunk.uuid::text, chunk.document_id, chunk.chunk_index, chunk.content, matches.score
+		   FROM kb_chunks AS chunk
+		   CROSS JOIN LATERAL (
+		       SELECT count(*)::float8 / cardinality($1::text[]) AS score
+		         FROM unnest($1::text[]) AS phrase(text)
+		        WHERE strpos(chunk.content, phrase.text) > 0
+		   ) AS matches
+		  WHERE chunk.kb_id = $2 AND matches.score > $3
+		  ORDER BY matches.score DESC, chunk.chunk_index ASC, chunk.id ASC
+		  LIMIT $4`, phrases, in.KBID, in.Threshold, in.TopK)
+	if err != nil {
+		return nil, err
+	}
+	return readChunks(rows, in.TopK, "han_phrase")
+}
+
+func readChunks(rows pgx.Rows, capacity int, source string) ([]provider.Chunk, error) {
 	defer rows.Close()
-	out := make([]provider.Chunk, 0, in.TopK)
+	out := make([]provider.Chunk, 0, capacity)
 	for rows.Next() {
 		var c provider.Chunk
 		if err := rows.Scan(&c.UUID, &c.DocumentID, &c.ChunkIndex, &c.Content, &c.Score); err != nil {
 			return nil, err
 		}
-		c.Source = "tsvector"
+		c.Source = source
 		out = append(out, c)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if len(out) > 0 {
-		return out, nil
-	}
-	// fallback: ILIKE 子串. plainto_tsquery 解析空 / score 全 0 → 兜底.
-	rows2, err := queryRows(ctx, q,
-		`SELECT uuid::text, document_id, chunk_index, content
-		   FROM kb_chunks
-		  WHERE kb_id = $2
-		    AND content ILIKE '%' || $1 || '%'
-		  ORDER BY chunk_index ASC
-		  LIMIT $3`,
-		in.Query, in.KBID, in.TopK)
-	if err != nil {
-		return nil, err
-	}
-	defer rows2.Close()
-	for rows2.Next() {
-		var c provider.Chunk
-		if err := rows2.Scan(&c.UUID, &c.DocumentID, &c.ChunkIndex, &c.Content); err != nil {
-			return nil, err
-		}
-		// fallback 固定低分; 让 caller 能区分主路径与 fallback (审计 / 监控).
-		c.Score = 0.01
-		c.Source = "ilike"
-		out = append(out, c)
-	}
-	if err := rows2.Err(); err != nil {
-		return nil, err
-	}
 	return out, nil
+}
+
+// hanPhrases derives bounded, literal overlap candidates without assigning terms that
+// do not occur in the query. Punctuation and non-Han characters break a phrase.
+func hanPhrases(query string) []string {
+	const width, limit = 4, 24
+	trim := func(s string) string {
+		return strings.TrimFunc(s, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsPunct(r) })
+	}
+	query = trim(query)
+	for _, prefix := range []string{"请问", "请告诉我", "想知道"} {
+		if rest, ok := strings.CutPrefix(query, prefix); ok {
+			query = trim(rest)
+			break
+		}
+	}
+	for _, suffix := range []string{"是什么意思", "是什么", "有哪些", "是多少", "在哪里", "吗"} {
+		if rest, ok := strings.CutSuffix(query, suffix); ok {
+			query = trim(rest)
+			break
+		}
+	}
+	runes := []rune(query)
+	seen := make(map[string]bool, limit)
+	var phrases []string
+	consecutive := 0
+	for i, r := range runes {
+		if !unicode.Is(unicode.Han, r) {
+			consecutive = 0
+			continue
+		}
+		consecutive++
+		if consecutive < width {
+			continue
+		}
+		phrase := string(runes[i-width+1 : i+1])
+		if seen[phrase] {
+			continue
+		}
+		seen[phrase] = true
+		phrases = append(phrases, phrase)
+		if len(phrases) == limit {
+			break
+		}
+	}
+	return phrases
 }
 
 func deleteDocument(ctx context.Context, q any, in provider.DeleteDocumentReq) error {

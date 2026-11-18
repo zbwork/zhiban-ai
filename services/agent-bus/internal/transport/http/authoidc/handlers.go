@@ -64,9 +64,12 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	}
 	encode.JSON(w, map[string]any{"items": items})
 }
+
+const desktopProofCookie = "zhiban_oidc_desktop"
+
 func (h *Handlers) Start(w http.ResponseWriter, r *http.Request) {
 	var in svcauth.StartOIDCReq
-	if err := decode(w, r, &in); err != nil {
+	if err := decode(w, r, &in); err != nil || (h.AdminOnly && in.DesktopRedirect != "") {
 		encode.JSONError(w, apperr.ErrInvalidParams)
 		return
 	}
@@ -77,7 +80,11 @@ func (h *Handlers) Start(w http.ResponseWriter, r *http.Request) {
 		encode.JSONError(w, err)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: h.cookieName, Value: out.State, Path: h.cookiePath, MaxAge: 300, HttpOnly: true, Secure: r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https"), SameSite: http.SameSiteLaxMode})
+	secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	http.SetCookie(w, &http.Cookie{Name: h.cookieName, Value: out.State, Path: h.cookiePath, MaxAge: 300, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
+	if out.DesktopProof != "" {
+		http.SetCookie(w, &http.Cookie{Name: desktopProofCookie, Value: out.DesktopProof, Path: h.cookiePath, MaxAge: 300, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	encode.JSON(w, out)
 }
@@ -93,6 +100,12 @@ func (h *Handlers) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: h.cookieName, Value: "", Path: h.cookiePath, MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	if !h.AdminOnly {
+		if proof, err := r.Cookie(desktopProofCookie); err == nil {
+			in.DesktopProof = proof.Value
+			http.SetCookie(w, &http.Cookie{Name: desktopProofCookie, Path: h.cookiePath, MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+		}
+	}
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()

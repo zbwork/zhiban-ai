@@ -15,9 +15,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/adapter/storage/oss"
 	domdrivev3 "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/drive"
+	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
 )
 
 // ResolverInvalidator 允许调用方 (drive.StorageResolver) 失效缓存.
@@ -28,10 +30,11 @@ type ResolverInvalidator interface {
 
 // Service admin 视角 S3/OSS 配置.
 type Service struct {
-	Repo       domdrivev3.StorageRepo
-	Secret     SecretResolver
-	Resolver   ResolverInvalidator // 可 nil (admin-only 进程)
-	AllowValue bool                // 与 SecretResolver.AllowValue 同步 (dev 时 true)
+	Repo              domdrivev3.StorageRepo
+	Secret            SecretResolver
+	Resolver          ResolverInvalidator // 可 nil (admin-only 进程)
+	AllowValue        bool                // 与 SecretResolver.AllowValue 同步 (dev 时 true)
+	ProbeTenantBucket func(context.Context, *domdrivev3.StorageOverride) (bool, error)
 }
 
 // PresentDefault 用于返给 admin 的视图; 不漏 secret 明文.
@@ -181,6 +184,9 @@ func (s *Service) GetTenantOverride(ctx context.Context, tenantID int64) (*domdr
 
 // UpsertTenantOverride 写租户覆盖.
 func (s *Service) UpsertTenantOverride(ctx context.Context, o *domdrivev3.StorageOverride) error {
+	if o.Status == "" {
+		o.Status = domdrivev3.StorageStatusActive
+	}
 	if o.AccessKeySecretRef != nil && *o.AccessKeySecretRef != "" {
 		if err := ValidateRef(*o.AccessKeySecretRef, s.AllowValue); err != nil {
 			return fmt.Errorf("access_key_secret_ref: %w", err)
@@ -189,6 +195,11 @@ func (s *Service) UpsertTenantOverride(ctx context.Context, o *domdrivev3.Storag
 	if o.SecretKeySecretRef != nil && *o.SecretKeySecretRef != "" {
 		if err := ValidateRef(*o.SecretKeySecretRef, s.AllowValue); err != nil {
 			return fmt.Errorf("secret_key_secret_ref: %w", err)
+		}
+	}
+	if s.ProbeTenantBucket != nil {
+		if _, err := s.ProbeTenantBucket(ctx, o); err != nil {
+			return apperr.New(apperr.PreconditionFailed, "存储桶暂不可访问，请检查桶名和存储权限").Wrap(err)
 		}
 	}
 	if err := s.Repo.UpsertTenantOverride(ctx, o); err != nil {
@@ -219,6 +230,15 @@ func (s *Service) TestConnectionOverride(ctx context.Context, tenantID int64) (s
 	}
 	if ov == nil {
 		return "", errors.New("storage: tenant has no override")
+	}
+	if s.ProbeTenantBucket != nil {
+		matched, err := s.ProbeTenantBucket(ctx, ov)
+		if err != nil {
+			return "", err
+		}
+		if matched {
+			return "ok", nil
+		}
 	}
 	base, err := s.Repo.GetActiveDefault(ctx)
 	if err != nil {
@@ -263,21 +283,15 @@ func (s *Service) testWithConfig(ctx context.Context, endpoint, bucket, region, 
 		AccessKeyID:     ak,
 		SecretAccessKey: sk,
 		ForcePathStyle:  force,
+		HTTPClient:      &http.Client{Timeout: 5 * time.Second},
 	})
 	if err != nil {
 		return "", err
 	}
-	// 试 Stat 一个不存在 key; 期望: nil + ErrNotFound 表示通; 否则报错原因.
-	_, err = store.Stat(ctx, "__zhiban_admin_probe__")
-	if err == nil {
-		return "ok", nil
+	if err := store.HeadBucket(ctx); err != nil {
+		return "", err
 	}
-	// inmem 实现可能返 ErrNotFound; oss 实现可能返 status 404 文本.
-	msg := err.Error()
-	if strings.Contains(msg, "not found") || strings.Contains(msg, "status 404") || strings.Contains(msg, "NoSuchKey") {
-		return "ok", nil
-	}
-	return "", err
+	return "ok", nil
 }
 
 func presentDefault(d *domdrivev3.StorageDefault) PresentDefault {

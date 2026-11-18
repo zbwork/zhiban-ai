@@ -43,7 +43,7 @@ func run(ctx context.Context, path string) error {
 	}
 	defer pool.Close()
 	jobs := repo.NewWorkerJobRepo(pool)
-	worker := svc.NewWorkerSvc(pool, repo.NewTicketRepo(pool), repo.NewRecycleRepo(pool), repo.NewFileRepo(pool), repo.NewFolderRepo(pool), repo.NewFileVersionRepo(pool), repo.NewSpaceRepo(pool), repo.NewQuotaRepo(pool), storage, jobs)
+	worker := svc.NewWorkerSvc(pool, repo.NewTicketRepo(pool), repo.NewRecycleRepo(pool), repo.NewFileRepo(pool), repo.NewFolderRepo(pool), repo.NewFileVersionRepo(pool), repo.NewSpaceRepo(pool), repo.NewQuotaRepo(pool), storage.ForDrive(pool), jobs)
 	logger := logpkg.New("json", "info", "", "")
 	fns := map[string]func(context.Context) (svc.WorkerRunStats, error){"staging_reaper": worker.RunStagingReaperWithStats, "recycle_cleaner": worker.RunRecycleCleanerWithStats, "version_cleaner": worker.RunVersionCleanerWithStats}
 	locks := make(map[string]*sync.Mutex, len(fns))

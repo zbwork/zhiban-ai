@@ -25,6 +25,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	domaudit "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/audit"
 	dombilling "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/billing"
 	domevt "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/event"
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
@@ -736,7 +737,7 @@ func (c *configCache) clear() {
 
 // NewPGAuditPublisher 拿一个 PG pool 包装出 AuditPublisher (与 chat / agent 同款短 tx).
 // cmd/bus / cmd/admin 装配时用; 单测可以传 nil.
-func NewPGAuditPublisher(pool *pgxpool.Pool, pub domevt.Publisher) AuditPublisher {
+func NewPGAuditPublisher(pool *pgxpool.Pool, pub domevt.Publisher) *pgAuditPub {
 	if pool == nil || pub == nil {
 		return nil
 	}
@@ -749,15 +750,21 @@ type pgAuditPub struct {
 }
 
 func (p *pgAuditPub) PublishWithTx(ctx context.Context, topic string, tenantID int64, idempKey string, data map[string]any) error {
-	if p.pool == nil || p.pub == nil {
+	actorKind := domaudit.ActorKind("tenant_admin")
+	if tenantID == 0 {
+		actorKind = domaudit.ActorPlatformAdmin
+	}
+	return p.PublishAsWithTx(ctx, topic, tenantID, 0, actorKind, idempKey, data)
+}
+
+// PublishAsWithTx records the authenticated caller separately from business metadata.
+func (p *pgAuditPub) PublishAsWithTx(ctx context.Context, topic string, tenantID, accountID int64, actorKind domaudit.ActorKind, idempKey string, data map[string]any) error {
+	if p == nil || p.pool == nil || p.pub == nil {
 		return nil
 	}
 	domain, kind := splitDomain(topic)
-	actorKind := "tenant_admin"
-	if tenantID == 0 {
-		actorKind = "platform_admin"
-	}
 	payload := map[string]any{
+		"account_id":    accountID,
 		"actor_kind":    actorKind,
 		"domain":        domain,
 		"event_kind":    kind,

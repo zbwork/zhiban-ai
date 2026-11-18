@@ -23,6 +23,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/chat"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/contacts"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/directroom"
+	svclocal "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/localruntime"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/messagereceipts"
 	roomsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/room"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/wukongagent"
@@ -99,7 +100,7 @@ func decode(w http.ResponseWriter, r *http.Request, out any) error {
 	}
 	return nil
 }
-func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc chat.Service, visibility contacts.Service, auth func(http.Handler) http.Handler, avatarResolvers ...roomsvc.AvatarURLResolver) {
+func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc chat.Service, visibility contacts.Service, auth func(http.Handler) http.Handler, local *svclocal.Service, avatarResolvers ...roomsvc.AvatarURLResolver) {
 	state := &clientchat.StateHandlers{ConvState: convstate.New(pool), ConvAccess: conversation.New(pool)}
 	registerConversationState(mux, state, auth)
 	list := &clientchat.ListHandler{Chat: chatSvc}
@@ -119,7 +120,25 @@ func Register(mux *http.ServeMux, pool *pgxpool.Pool, c config.Config, chatSvc c
 	roomHandlers := &clientrooms.Handlers{Room: roomService, Contacts: visibility, DirectRoom: directroom.New(directroom.Deps{Logger: log.Default(), Rooms: rooms, Accounts: account.New(pool), WuKong: mapper, ConvState: convstate.New(pool)})}
 	roomHandlers.Register(mux, auth)
 	prepare := agentdirect.NewPrepareService(true, agentLookup{agent.New(pool)}, visibility, agentdirect.New(mapper, roomEnsurer{rooms}))
-	trigger := wukongagent.New(pool, chatSvc, visibility, adapter.Client())
+	trigger := wukongagent.New(pool, chatSvc, visibility, adapter.Client()).WithLocalGroupRuntime(local)
+	mux.Handle("POST /api/agent-bus/v1/rooms/{room_uuid}/local-messages", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Text     string             `json:"text"`
+			Device   string             `json:"device_id"`
+			Mentions []wukongwh.Mention `json:"mentions"`
+		}
+		if err := decode(w, r, &in); err != nil {
+			encode.JSONError(w, apperr.ErrInvalidParams)
+			return
+		}
+		handled, err := trigger.SendLocalGroup(r.Context(), middleware.MustTenantID(r.Context()), middleware.MustAccountID(r.Context()), middleware.SessionUUID(r.Context()), in.Device, r.PathValue("room_uuid"), in.Text, in.Mentions)
+		if err != nil {
+			encode.JSONError(w, err)
+			return
+		}
+		encode.JSON(w, map[string]bool{"handled": handled})
+	})))
+
 	syncProxy := wukong.NewMessageSyncProxy(adapter.Client(), lookup)
 	syncProxy.SetMembershipChecker(strictMembership{rooms})
 	receiptLookup := messageReceiptsConvLookup{convs: conversation.New(pool), rooms: rooms, accts: account.New(pool)}

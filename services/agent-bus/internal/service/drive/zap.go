@@ -246,10 +246,11 @@ func (s *ZAPSvc) presignForOwner(ctx context.Context, tenantID, ownerAccountID i
 
 	// 4. 生成 keys + presign
 	ext := extFromName(cleanName)
-	stagingKey := buildStagingKey(tenantID, fileUUID, ext)
-	finalKey := buildFinalKey(tenantID, ownerAccountID, fileUUID, ext)
-
 	store, err := s.storage.Resolve(ctx, tenantID)
+	if err != nil {
+		return nil, apperr.ErrInternal.Withf(ZAPErrStorageMissing).Wrap(err)
+	}
+	stagingKey, finalKey, err := uploadKeys(ctx, store, tenantID, ownerAccountID, fileUUID, ext)
 	if err != nil {
 		return nil, apperr.ErrInternal.Withf(ZAPErrStorageMissing).Wrap(err)
 	}

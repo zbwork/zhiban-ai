@@ -168,13 +168,13 @@ func (s *oauthTokenResponseAppStub) GetApp(context.Context, int64, string) (*dom
 func (s *oauthTokenResponseAppStub) ListApps(context.Context, int64, domapp.AppListFilter) ([]domapp.App, int64, error) {
 	panic("not implemented")
 }
-func (s *oauthTokenResponseAppStub) PatchApp(context.Context, int64, string, map[string]any) (*domapp.App, error) {
+func (s *oauthTokenResponseAppStub) PatchApp(context.Context, int64, int64, string, map[string]any) (*domapp.App, error) {
 	panic("not implemented")
 }
-func (s *oauthTokenResponseAppStub) DeleteApp(context.Context, int64, string) error {
+func (s *oauthTokenResponseAppStub) DeleteApp(context.Context, int64, int64, string) error {
 	panic("not implemented")
 }
-func (s *oauthTokenResponseAppStub) RotateSecret(context.Context, int64, string) (string, error) {
+func (s *oauthTokenResponseAppStub) RotateSecret(context.Context, int64, int64, string) (string, error) {
 	panic("not implemented")
 }
 func (s *oauthTokenResponseAppStub) SetUniversal(context.Context, int64, string, bool, int) error {

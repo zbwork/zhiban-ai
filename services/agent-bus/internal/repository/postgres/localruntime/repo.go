@@ -173,15 +173,44 @@ func (r *Repo) CreateTask(ctx context.Context, task *dom.Task) (*dom.Task, error
 	if !dom.SupportsEngine(dev, task.LocalEngine) {
 		return nil, dom.ErrUpgradeRequired
 	}
+	if task.CollaborationEdgeUUID != "" {
+		var approvalID int64
+		err := tx.QueryRow(ctx, `
+			SELECT j.approval_id FROM local_a2a_jobs j
+			JOIN a2a_approval_requests a ON a.id=j.approval_id
+			JOIN local_runtime_tasks source ON source.uuid=j.source_run_uuid
+			WHERE a.edge_uuid=$1 AND a.tenant_id=$2 AND a.parent_account_id=$3 AND a.to_agent_id=$4
+			  AND a.status='approved' AND a.expires_at>now() AND NOT a.is_deleted
+			  AND j.started_at > clock_timestamp() - make_interval(secs => $7) AND j.finished_at IS NULL
+			  AND source.tenant_id=$2 AND source.account_id=$3 AND source.login_session_uuid=$5 AND source.device_uuid=$6
+			  AND source.status IN ('accepted','completed')
+			FOR UPDATE OF j`, task.CollaborationEdgeUUID, task.Scope.TenantID, task.Scope.AccountID, task.EmployeeID,
+			task.Scope.SessionUUID, task.DeviceUUID, dom.CollaborationObservationTimeout.Seconds()).Scan(&approvalID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, dom.ErrDenied
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
 	var id string
 	err = tx.QueryRow(ctx, `INSERT INTO local_runtime_tasks(uuid,device_uuid,tenant_id,account_id,login_session_uuid,digital_employee_id,conversation_uuid,message_uuid,stream_id,model,payload,token_hash,expires_at,requester_session_uuid,local_engine)
  SELECT $1,$2,$3,$4,$5,e.id,c.uuid,$8,$9,$10,$11,$12,least($13::timestamptz,now()+interval '15 minutes',s.expires_at),NULLIF($14,'')::uuid,e.local_engine
- FROM digital_employees e JOIN conversations c ON c.digital_employee_id=e.id JOIN login_sessions s ON s.uuid=$5
+ FROM digital_employees e JOIN conversations c ON c.uuid=$7 JOIN login_sessions s ON s.uuid=$5
 	 WHERE e.id=$6 AND e.execution_locus='local' AND e.local_engine=$15 AND e.status='published' AND e.deleted_at IS NULL AND NOT e.is_deleted
 	 AND ((e.source='personal' AND e.visibility='private' AND e.tenant_id=$3 AND e.creator_id=$4)
 	   OR (e.source='enterprise' AND e.tenant_id=$3)
 	   OR (e.source='platform' AND e.visibility='platform' AND e.tenant_id IS NULL))
- AND c.uuid=$7 AND c.tenant_id=$3 AND c.account_id=$4 AND c.deleted_at IS NULL
+ AND c.tenant_id=$3 AND c.deleted_at IS NULL AND (
+   (c.digital_employee_id=e.id AND c.account_id=$4) OR EXISTS (
+     SELECT 1 FROM rooms room
+     JOIN room_participants human ON human.room_id=room.id AND human.account_id=$4 AND human.kind='human' AND human.left_at IS NULL
+     JOIN room_participants employee ON employee.room_id=room.id AND employee.agent_id=e.id AND employee.kind='agent' AND employee.left_at IS NULL
+     JOIN messages m ON m.uuid=$8 AND m.conversation_id=c.id AND m.tenant_id=$3 AND m.sender_agent_id=e.id
+     WHERE room.id=c.room_id AND room.tenant_id=$3 AND room.room_kind='group' AND room.status='active'
+       AND e.supports_group_chat
+   )
+ )
  AND ($14='' OR EXISTS(SELECT 1 FROM login_sessions u WHERE u.uuid=NULLIF($14,'')::uuid AND u.account_id=$4 AND u.act_tenant_id=$3 AND u.revoked_at IS NULL AND u.expires_at>now()))
  ON CONFLICT(message_uuid) DO NOTHING RETURNING uuid`, task.UUID, task.DeviceUUID, task.Scope.TenantID, task.Scope.AccountID, task.Scope.SessionUUID, task.EmployeeID, task.ConversationUUID, task.MessageUUID, task.StreamID, task.Model, task.Payload, task.TokenHash, task.ExpiresAt, task.RequesterSessionUUID, task.LocalEngine).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {

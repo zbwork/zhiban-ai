@@ -7,7 +7,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:bot_toast/bot_toast.dart';
+import 'desktop_enterprise_login.dart';
 import 'widgets/login_topbar_background.dart';
+import 'package:zhiban_client/services/app_notification_service.dart';
 import 'package:nexwork/config/login_layout_config.dart';
 import 'package:zhiban_client/pages/login/login_tenant_scope_flow.dart';
 import 'package:zhiban_client/pages/login/models/login_account_state.dart';
@@ -36,9 +38,87 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _showDesktopCaptcha = false;
+  Future<List<DesktopIdentityProvider>>? _enterpriseProviders;
+  DesktopEnterpriseLogin? _enterpriseAttempt;
+
+  @override
+  void initState() {
+    super.initState();
+    if (AppConfig.communityEdition && AppConfig.serverApiUrl != null) {
+      _enterpriseProviders = DesktopIdentityProvider.list();
+    }
+  }
+
+  Future<void> _loginEnterprise(DesktopIdentityProvider provider) async {
+    if (_enterpriseAttempt != null) return;
+    final attempt = DesktopEnterpriseLogin();
+    setState(() => _enterpriseAttempt = attempt);
+    try {
+      final result = await attempt.run(provider);
+      if (!mounted || result == null || _enterpriseAttempt != attempt) return;
+      await AppNotificationService.bringToFront();
+      if (!mounted) return;
+      if (result.account['mustChangePassword'] == true) {
+        context.go(RoutePaths.initialPassword);
+      } else {
+        enterHomeAfterLogin(context);
+      }
+    } catch (error) {
+      if (mounted && _enterpriseAttempt == attempt) {
+        BotToast.showText(
+            text: error is DesktopEnterpriseLoginError
+                ? error.message
+                : '企业登录失败，请检查服务器连接后重试');
+      }
+    } finally {
+      if (mounted && _enterpriseAttempt == attempt) {
+        setState(() => _enterpriseAttempt = null);
+      }
+    }
+  }
+
+  Widget _buildEnterpriseLogin(LoginAccountState state) {
+    return FutureBuilder<List<DesktopIdentityProvider>>(
+      future: _enterpriseProviders,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return TextButton(
+            onPressed: () => setState(() {
+              _enterpriseProviders = DesktopIdentityProvider.list();
+            }),
+            child: const Text('重试加载企业登录'),
+          );
+        }
+        final providers = snapshot.data ?? const [];
+        if (providers.isEmpty) return const SizedBox.shrink();
+        if (_enterpriseAttempt != null) {
+          return TextButton(
+            onPressed: () {
+              _enterpriseAttempt?.cancel();
+              setState(() => _enterpriseAttempt = null);
+            },
+            child: const Text('等待浏览器完成企业登录 · 取消'),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 12),
+            for (final provider in providers)
+              OutlinedButton(
+                onPressed:
+                    state.isLoggingIn ? null : () => _loginEnterprise(provider),
+                child: Text('企业登录 · ${provider.name}'),
+              ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   void dispose() {
+    _enterpriseAttempt?.cancel();
     _mobileController.dispose();
     _captchaController.dispose();
     _smsCodeController.dispose();
@@ -163,7 +243,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Widget _buildPasswordTab(LoginAccountState state) {
-    final loading = state.isLoggingIn;
+    final loading = state.isLoggingIn || _enterpriseAttempt != null;
     return AutofillGroup(
         child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -477,9 +557,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               children: [
                                 const _LoginBrandHeader(),
                                 const SizedBox(height: 22),
-                                if (communityPasswordLoginOnly)
-                                  _buildPasswordTab(state)
-                                else
+                                if (communityPasswordLoginOnly) ...[
+                                  _buildPasswordTab(state),
+                                  if (_enterpriseProviders != null)
+                                    _buildEnterpriseLogin(state),
+                                ] else
                                   _LoginTabs(
                                     accountTabBuilder: (context) => Consumer(
                                       builder: (context, ref, _) =>

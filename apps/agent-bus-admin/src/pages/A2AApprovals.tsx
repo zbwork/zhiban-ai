@@ -38,6 +38,7 @@ const statusOptions: Array<{ value: '' | A2AApprovalStatus; label: string }> = [
   { value: 'cancelled', label: '已取消' },
 ]
 const A2A_APPROVALS_CHANGED_EVENT = 'a2a-approvals:changed'
+const RESUME_UNAVAILABLE = '本部署无法继续执行这条协作请求，仍可查看或拒绝。'
 
 const statusMeta: Record<A2AApprovalStatus, { label: string; className: string }> = {
   pending: {
@@ -65,6 +66,7 @@ const statusMeta: Record<A2AApprovalStatus, { label: string; className: string }
 export function A2AApprovalsPage() {
   const [items, setItems] = useState<A2AApprovalItem[]>([])
   const [total, setTotal] = useState(0)
+  const [resumeAvailable, setResumeAvailable] = useState<boolean | null>(null)
   const [status, setStatus] = useState<'' | A2AApprovalStatus>('pending')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -92,6 +94,7 @@ export function A2AApprovalsPage() {
       const resp = await A2AApprovalsAdmin.list({ status, limit: pageSize, offset })
       setItems(resp.items || [])
       setTotal(resp.total || 0)
+      setResumeAvailable(resp.resume_available === true)
       setSelectedIds(new Set())
     } catch (e) {
       setError((e as Error).message)
@@ -113,7 +116,7 @@ export function A2AApprovalsPage() {
   }
 
   const openBatchDecision = (kind: 'approved' | 'rejected') => {
-    if (selectedPendingItems.length === 0) return
+    if (selectedPendingItems.length === 0 || (kind === 'approved' && selectedPendingItems.some((item) => item.resume_available !== true))) return
     setRejectReason('')
     setDialog({ kind, mode: 'batch', items: selectedPendingItems })
   }
@@ -193,6 +196,7 @@ export function A2AApprovalsPage() {
         title="协作审批"
         subtitle="处理数字员工之间需要人工确认的协作请求。"
       />
+      {resumeAvailable === false && <InlineAlert tone="info">{RESUME_UNAVAILABLE}</InlineAlert>}
 
       <Toolbar
         filters={(
@@ -220,7 +224,7 @@ export function A2AApprovalsPage() {
                   <X size={14} />
                   批量拒绝
                 </Button>
-                <Button size="sm" onClick={() => openBatchDecision('approved')}>
+                <Button size="sm" onClick={() => openBatchDecision('approved')} disabled={!resumeAvailable || selectedPendingItems.some((item) => item.resume_available !== true)}>
                   <Check size={14} />
                   批量同意
                 </Button>
@@ -291,7 +295,7 @@ export function A2AApprovalsPage() {
                     <X size={14} />
                     拒绝
                   </Button>
-                  <Button size="sm" onClick={() => openDecision('approved', item)}>
+                  <Button size="sm" onClick={() => openDecision('approved', item)} disabled={!resumeAvailable || item.resume_available !== true}>
                     <Check size={14} />
                     同意
                   </Button>
@@ -314,6 +318,17 @@ export function A2AApprovalsPage() {
         }}
       />
 
+      {detailItem && (
+        <ApprovalDetailDrawer
+          item={detailItem}
+          loading={detailLoading}
+          error={detailError}
+          resumeAvailable={resumeAvailable === true && detailItem.resume_available === true}
+          onClose={closeDetail}
+          onApprove={() => openDecision('approved', detailItem)}
+          onReject={() => openDecision('rejected', detailItem)}
+        />
+      )}
       {dialog && (
         <ConfirmDialog
           title={dialog.kind === 'approved' ? '同意协作请求' : '拒绝协作请求'}
@@ -332,17 +347,6 @@ export function A2AApprovalsPage() {
             />
           )}
         </ConfirmDialog>
-      )}
-
-      {detailItem && (
-        <ApprovalDetailDrawer
-          item={detailItem}
-          loading={detailLoading}
-          error={detailError}
-          onClose={closeDetail}
-          onApprove={() => openDecision('approved', detailItem)}
-          onReject={() => openDecision('rejected', detailItem)}
-        />
       )}
     </div>
   )
@@ -390,6 +394,7 @@ function ApprovalDetailDrawer({
   item,
   loading,
   error,
+  resumeAvailable,
   onClose,
   onApprove,
   onReject,
@@ -397,6 +402,7 @@ function ApprovalDetailDrawer({
   item: A2AApprovalItem
   loading: boolean
   error: string
+  resumeAvailable: boolean
   onClose: () => void
   onApprove: () => void
   onReject: () => void
@@ -404,7 +410,7 @@ function ApprovalDetailDrawer({
   return (
     <DrawerShell
       title="审批详情"
-      subtitle="查看协作请求上下文，确认后可同意或拒绝。"
+      subtitle="查看协作请求详情和审批记录。"
       onClose={onClose}
       width="md"
       footer={(
@@ -416,7 +422,7 @@ function ApprovalDetailDrawer({
                 <X size={14} />
                 拒绝
               </Button>
-              <Button onClick={onApprove}>
+              <Button onClick={onApprove} disabled={!resumeAvailable}>
                 <Check size={14} />
                 同意
               </Button>
@@ -426,6 +432,7 @@ function ApprovalDetailDrawer({
       )}
     >
       <div className="space-y-4">
+        {!resumeAvailable && item.status === 'pending' && <InlineAlert tone="info">{RESUME_UNAVAILABLE}</InlineAlert>}
         {loading && <InlineAlert tone="info">正在加载审批详情...</InlineAlert>}
         {error && <InlineAlert>{error}</InlineAlert>}
 

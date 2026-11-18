@@ -4,6 +4,8 @@ import 'package:zhiban_ui/widgets/ui_ai_generated_label.dart';
 import 'chat_ai_generated.dart';
 
 import 'package:bot_toast/bot_toast.dart';
+import 'package:zhiban_client/config/app_config.dart';
+import 'package:zhiban_client/services/local_agent_service.dart';
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/cupertino.dart';
@@ -1505,8 +1507,20 @@ class _GroupChatPaneState extends ConsumerState<GroupChatPane> {
       final blocks = _input.toMixedBlocks();
       if (blocks.isEmpty) return;
       if (blocks.length == 1 && blocks.single.isText) {
-        await controller.sendText(blocks.single.text,
-            mentions: mentions.isEmpty ? null : mentions, replyRef: replyJson);
+        final localDevice = LocalAgentService.instance.deviceId;
+        final handled = AppConfig.communityEdition &&
+            PlatformUtils.isDesktop &&
+            localDevice.isNotEmpty &&
+            widget.roomUuid.isNotEmpty &&
+            replyJson == null &&
+            await ref.read(chatServiceProvider).sendLocalGroupText(
+                widget.roomUuid, localDevice, blocks.single.text,
+                mentions: mentions);
+        if (!handled) {
+          await controller.sendText(blocks.single.text,
+              mentions: mentions.isEmpty ? null : mentions,
+              replyRef: replyJson);
+        }
       } else {
         await controller.sendMixedMessage(
           blocks,

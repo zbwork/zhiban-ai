@@ -87,7 +87,7 @@ export function TenantDriveStorageOverridePage() {
     setBusy(true)
     try {
       const r = await DriveStorage.testOverride()
-      if (r.status === 'ok') notifyOk('连接通过 · 可用')
+      if (r.status === 'ok') notifyOk('存储桶可访问')
       else notifyError(`连接异常 (${r.status})${r.message ? ': ' + r.message : ''}`)
     } catch (e) { notifyError((e as Error).message) }
     finally { setBusy(false) }
@@ -95,23 +95,15 @@ export function TenantDriveStorageOverridePage() {
 
   const revert = async () => {
     const ok = await confirm.confirm({
-      title: '恢复为平台默认存储',
-      description: (
-        <>
-          本租户云盘将切回平台默认 OSS/S3 桶。
-          <br />
-          <span className="text-[12px] text-[var(--color-text-sub)]">
-            已签发的下载 URL 仍可用; 新签发的 URL 会指向平台默认桶。
-          </span>
-        </>
-      ),
-      confirmLabel: '恢复默认',
+      title: '清除租户存储配置',
+      description: '清除后，新文件将写入部署默认桶，已上传文件仍从原桶读取。',
+      confirmLabel: '清除配置',
     })
     if (!ok) return
     setBusy(true)
     try {
       await DriveStorage.deleteOverride()
-      notifyOk('已恢复为平台默认存储')
+      notifyOk('已清除租户存储配置')
       refresh()
     } catch (e) { notifyError((e as Error).message) }
     finally { setBusy(false) }
@@ -125,8 +117,13 @@ export function TenantDriveStorageOverridePage() {
       {confirm.dialog}
       <PageHeader
         title="专属云盘存储"
-        subtitle="本租户使用独立的 OSS/S3 桶。未配置时继承平台默认; 填写下方字段即可切到本租户专属存储。"
+        subtitle="只填写部署已允许的桶名，保存后用于新文件。其他连接配置可保存后单独测试。"
       />
+      {override?.effective_bucket && (
+        <p className="mb-4 text-sm text-[var(--color-text-sub)]">
+          新文件写入 <strong>{override.effective_bucket}</strong>
+        </p>
+      )}
 
       {loadErr && (
         <div className="mb-3">
@@ -134,7 +131,9 @@ export function TenantDriveStorageOverridePage() {
         </div>
       )}
 
-      <StorageConfigForm mode="tenant-override" value={form} onChange={setForm} />
+      <fieldset className="m-0 min-w-0 border-0 p-0" disabled={disabled}>
+        <StorageConfigForm mode="tenant-override" value={form} onChange={setForm} />
+      </fieldset>
 
       {/* Sticky 底部操作栏: main 是 scrollable, sticky 吃满 main 视野底。
           负 margin 抵消 Layout main 的 horizontal padding, 让 bar 顶到左右边缘。 */}
@@ -142,7 +141,7 @@ export function TenantDriveStorageOverridePage() {
         <div className="flex items-center justify-end gap-2 px-[clamp(16px,2vw,36px)] py-3">
           {hasOverride && (
             <Button variant="ghost" onClick={revert} disabled={disabled}>
-              <RotateCcw size={13} /> 恢复默认
+              <RotateCcw size={13} /> 清除配置
             </Button>
           )}
           <Button variant="secondary" onClick={test} disabled={disabled}>测试连接</Button>

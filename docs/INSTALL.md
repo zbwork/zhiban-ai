@@ -30,6 +30,8 @@
 
 依次准备当前源码服务镜像、管理台、持久化空库与存储，执行迁移，再从 stdin 初始化管理员；用 Admin API 创建自己的租户后，桌面连接 Bus 地址并使用同一账号登录。重启使用本部署 compose 文件的 up -d；停止使用 stop 或 down（不加 -v）。默认 Mock 先验证收发，真实模型凭据由用户自行配置。
 
+如需租户专属云盘桶，在同一对象存储服务先建桶并授权部署凭据访问，再配置 `COMMUNITY_DRIVE_BUCKET_ALLOWLIST=租户数字ID=桶名`。多个批准项用逗号分隔。在管理台「云盘 → 专属云盘存储」仅填写桶名并保存即可启用。历史文件仍需要原桶及对应访问权限。
+
 ## 本地服务候选部署
 
 可选服务端候选版本 v0.1.0-rc.1 尚未正式发布。以下服务流程在 macOS Docker 环境验证；公开源码树的后端、管理台构建已通过。macOS桌面社区版1.0.0的签名、公证和安装包状态见[发布记录](releases/community-macos-1.0.0.md)；按机器CPU选择arm64（M系列）或x64（Intel），最低macOS 13.5。Windows仍未验收。
@@ -78,3 +80,7 @@
 数字员工也可免登录执行本地工作：创建或编辑时选择 DeepSeek Harness / Codex App Server；对话中选择已配置模型和工作目录。没有选择目录时使用文档目录下员工独立文件夹。读文件和新增文件按原 assist 策略执行，覆盖/删除/命令执行需批准；停止按钮撤销当轮执行。模型 Key 从「模型服务」读取，外部开发工具也只能从「模型服务」选择配置。Codex 要求服务商支持 Responses，Harness 支持 OpenAI compatible / Anthropic Messages；Google 原生协议保留文本分析。
 
 运行数据、工具时间线和生成文件快照保存在应用支持目录 community-runtime 与 SQLite 中；输出也留在所选工作目录，不上传云盘。备份完整历史时同时保存 community_attachments、community_avatars、community-runtime 和 SQLite；Key 位于独立 community-credentials 目录，不在聊天数据库中。
+
+### 桌面企业登录
+
+配置企业 OIDC 后，桌面连接该服务器时可在登录页选择相应企业。身份提供方须允许同一客户端使用部署的管理台回调和桌面回环回调 `http://127.0.0.1:{临时端口}/oauth/callback`，按提供方的原生应用规则登记回环地址。客户端使用系统浏览器，Bus 保留令牌交换和租户成员核对。

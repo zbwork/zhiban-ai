@@ -20,7 +20,10 @@ type StatePayload struct {
 	ProviderUUID string `json:"provider_uuid"`
 	Nonce        string `json:"nonce"`
 	// AfterRedirect 用户原本想去的页面 (登陆成功跳回去)。默认 "/dashboard"。
-	AfterRedirect string `json:"after_redirect,omitempty"`
+	AfterRedirect   string `json:"after_redirect,omitempty"`
+	DesktopRedirect string `json:"desktop_redirect,omitempty"`
+	DesktopProof    string `json:"desktop_proof,omitempty"`
+	PKCEVerifier    string `json:"pkce_verifier,omitempty"`
 }
 
 // StateStore Redis 实现。

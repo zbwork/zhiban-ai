@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	dom "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/app"
+	domaudit "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/audit"
 	domconv "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/conversation"
 	domroom "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/room"
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
@@ -264,7 +265,7 @@ func (s *Service) Launch(ctx context.Context, in dom.LaunchInput) (*dom.LaunchRe
 	if err := s.deps.OAuthCodes.Insert(ctx, codeRow); err != nil {
 		return nil, fmt.Errorf("insert code: %w", err)
 	}
-	s.audit(ctx, "audit.app.launch", in.TenantID, "app.launch:"+codeRow.CodeHash, map[string]any{
+	s.auditAs(ctx, "audit.app.launch", in.TenantID, in.AccountID, domaudit.ActorUser, "app.launch:"+codeRow.CodeHash, map[string]any{
 		"resource_kind":      "app",
 		"resource_uuid":      a.UUID,
 		"app_uuid":           a.UUID,
