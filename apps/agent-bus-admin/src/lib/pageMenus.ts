@@ -47,11 +47,9 @@ const pages: Record<'platform' | 'tenant', Record<string, [string, string][]>> =
   },
   tenant: {
     '概览': [['/dashboard', '概览']],
-    '数字员工': [['/agents', '数字员工列表'], ['/runtime-environments', '智能体托管环境']],
+    '数字员工': [['/agents', '数字员工列表']],
     '技能中心': [['/tenant-skills/platform', '平台技能'], ['/tenant-skills/own', '企业技能']],
-    '应用管理': [
-      ['/apps', '应用栏配置'], ['/workspace-apps', '工作台应用'],
-    ],
+    '应用管理': [['/apps', '应用栏配置']],
     '知识库': [
       ['/kb', '知识库管理'], ['/kb-documents', '文档管理'], ['/user-kb-inspect', '用户知识库审计'],
     ],
@@ -62,7 +60,7 @@ const pages: Record<'platform' | 'tenant', Record<string, [string, string][]>> =
     '任务': [['/cron', '定时任务'], ['/cron-prompt-templates', '定时任务模板']],
     '组织与人员': [
       ['/members', '成员'], ['/departments', '部门'], ['/positions', '职位'],
-      ['/org-sync', '组织同步'], ['/contacts', '通讯录配置'],
+      ['/contacts', '通讯录配置'],
     ],
     '群聊与协同': [
       ['/approvals', '审批'], ['/rooms', '群聊'], ['/rooms/a2a', 'A2A 调用治理'],

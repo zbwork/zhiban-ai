@@ -13,7 +13,7 @@ import (
 
 // LocalOutputs archives files produced by local digital employees into the drive,
 // using the same signed-upload and confirm path as commercial Bus.
-func LocalOutputs(pool *pgxpool.Pool, storage *Storage, resolver local.OutputAgentResolver) *svc.ZAPSvc {
+func LocalOutputs(pool *pgxpool.Pool, storage *DriveStorage, resolver local.OutputAgentResolver) *svc.ZAPSvc {
 	if storage == nil {
 		return nil
 	}

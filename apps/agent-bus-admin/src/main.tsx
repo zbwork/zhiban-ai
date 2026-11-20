@@ -102,7 +102,7 @@ createRoot(document.getElementById('root')!).render(
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<ScopedDashboard />} />
           <Route path="client-analytics" element={<TenantHiddenRoute><ClientAnalyticsDashboardPage /></TenantHiddenRoute>} />
-          <Route path="tenants" element={<TenantList />} />
+          <Route path="tenants" element={<TenantHiddenRoute><TenantList /></TenantHiddenRoute>} />
           {/* 产品化「运行环境」页面，统一消费 /platform/runtime-environments + /platform/runtimes。 */}
           <Route path="runtimes" element={<RuntimesPage />} />
           {/* 4 层 Agent 平台模型 L1: 只读类型枚举。 */}

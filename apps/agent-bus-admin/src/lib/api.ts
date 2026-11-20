@@ -1786,6 +1786,7 @@ export const AgentsAdmin = {
 export type A2AApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled'
 
 export interface A2AApprovalItem {
+  resume_available?: boolean
   id: string
   edge_id: string
   edge_created_at: string
@@ -1879,7 +1880,7 @@ export const A2AApprovalsAdmin = {
     if (params.limit != null) qs.set('limit', String(params.limit))
     if (params.offset != null) qs.set('offset', String(params.offset))
     const suffix = qs.toString() ? `?${qs.toString()}` : ''
-    return api<{ items: A2AApprovalItem[]; total: number; limit: number; offset: number }>(
+    return api<{ items: A2AApprovalItem[]; total: number; limit: number; offset: number; resume_available: boolean }>(
       `/api/admin/v1/tenant/a2a/approvals${suffix}`,
     )
   },
@@ -3161,6 +3162,7 @@ export type DriveStorageDefaultCreateInput = {
 
 export type DriveStorageOverride = {
   exists: boolean
+  effective_bucket?: string
   tenant_id?: number
   default_id?: number | null
   region?: string
@@ -5084,6 +5086,7 @@ export type AdminRoomSummary = {
   room_kind: string
   status: string
   speaker_policy: string
+  speaker_policy_uuid?: string
   manager_agent_uuid?: string
   human_count: number
   agent_count: number
@@ -5111,6 +5114,11 @@ export const AdminRooms = {
     ),
   get: (uuid: string) =>
     api<AdminRoomSummary>(`/api/admin/v1/tenant/rooms/${encodeURIComponent(uuid)}`),
+  applySpeaker: (uuid: string, policyUUID: string) =>
+    api<AdminRoomSummary>(`/api/admin/v1/tenant/rooms/${encodeURIComponent(uuid)}/speaker-policy`, {
+      method: 'PUT',
+      body: JSON.stringify({ speaker_policy_uuid: policyUUID }),
+    }),
   triggers: (uuid: string, params?: { page?: number; page_size?: number }) =>
     api<{ items: AdminTriggerRow[]; total: number; page: number; page_size: number }>(
       `/api/admin/v1/tenant/rooms/${encodeURIComponent(uuid)}/triggers${queryString(params || {})}`,
@@ -5458,7 +5466,8 @@ export type AdminSpeakerDecision = {
   uuid: string
   created_at: string
   base_policy: string
-  candidates: unknown // 候选 Agent JSON 数组 (selector 写入时格式)
+  candidates?: unknown // 候选 Agent JSON 数组 (selector 写入时格式)
+  candidate_count?: number
   selected_agent_id?: number
   selected_agent_name?: string
   selected_reason?: string

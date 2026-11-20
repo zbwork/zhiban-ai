@@ -124,6 +124,15 @@ async function run(): Promise<void> {
       const mediaRenderer = process.platform === 'darwin' && existsSync(join(packageRoot, 'assets/bridge/local-media')) ? join(packageRoot, 'assets/bridge/local-media') : undefined;
       if (mediaRenderer) tools.push(mediaTool({ executable: mediaRenderer, privateRoot: config.privateRoot, brokerPort: Number(new URL(brokerURL).port) }));
       tools.push(...localTools({ privateRoot: config.privateRoot, artifacts, brokerPort: Number(new URL(brokerURL).port), runtimeReadRoots: [join(packageRoot, 'node_modules')], moduleRoot: join(packageRoot, 'node_modules') }));
+      const collaborationSchema = z.object({ employee: z.string().min(1).max(128), text: z.string().min(1).max(4000) }).strict();
+      tools.push({
+        name: 'request_employee_collaboration',
+        description: '用户明确要求转交工作时，用目标本机数字员工的准确姓名提交一条文字协作请求。返回待审批，须等待租户管理员处理。请向用户说明状态，勿声称目标已执行。',
+        operation: 'collaboration',
+        schema: collaborationSchema,
+        inputSchema: z.toJSONSchema(collaborationSchema),
+        call: (run, args, signal) => channel!.collaborate(run.task, String(args['employee']), String(args['text']), signal),
+      });
       tools.push(historyTool(), ...officeTools({ packageRoot, privateRoot: config.privateRoot, artifacts, brokerPort: Number(new URL(brokerURL).port) }));
       tools.push(...imageTools({
         privateRoot: config.privateRoot,

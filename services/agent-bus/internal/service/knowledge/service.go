@@ -151,6 +151,8 @@ type Service interface {
 
 	// Admin API ----
 	ListTenantKB(ctx context.Context, tenantID int64) ([]KBDTO, error)
+	// ListTenantMemberPersonalKB requires permission and caller-specific audit at the API boundary.
+	ListTenantMemberPersonalKB(ctx context.Context, tenantID, targetAccountID int64) ([]KBDTO, error)
 	// AssertKBAttachable Codex review #2: admin attach KB capability 闸口.
 	//
 	// Phase A 仅允许装 tenant+tenant KB; personal/private KB 不允许 admin attach (留 owner 流程).

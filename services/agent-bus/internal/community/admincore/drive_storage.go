@@ -107,11 +107,14 @@ func (h *Handlers) getTenantStorageOverride(w http.ResponseWriter, r *http.Reque
 		encode.JSONError(w, apperr.ErrInternal.Wrap(err))
 		return
 	}
-	if ov == nil {
-		encode.JSON(w, map[string]any{"exists": false})
-		return
+	dto := map[string]any{"exists": false}
+	if ov != nil {
+		dto = presentOverride(ov)
 	}
-	encode.JSON(w, presentOverride(ov))
+	if h.DriveEffectiveBucket != nil {
+		dto["effective_bucket"] = h.DriveEffectiveBucket(ov)
+	}
+	encode.JSON(w, dto)
 }
 
 func (h *Handlers) putTenantStorageOverride(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +146,10 @@ func (h *Handlers) putTenantStorageOverride(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := h.DriveStorage.UpsertTenantOverride(r.Context(), o); err != nil {
-		encode.JSONError(w, apperr.ErrInvalidParams.Wrap(err))
+		if _, ok := apperr.AsError(err); !ok {
+			err = apperr.ErrInvalidParams.Wrap(err)
+		}
+		encode.JSONError(w, err)
 		return
 	}
 	encode.JSON(w, map[string]any{"ok": true})

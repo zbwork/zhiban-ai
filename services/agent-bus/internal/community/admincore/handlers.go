@@ -4,6 +4,7 @@ package admincore
 import (
 	"context"
 	domapp "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/app"
+	domdrive "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/drive"
 	domkb "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/knowledge"
 	svcclientanalytics "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/clientanalytics"
 	svcclientbuild "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/clientbuild"
@@ -69,6 +70,7 @@ type Handlers struct {
 	OrgWebhook             domorgwebhook.Service
 	SysUser                sysusersvc.Service
 	Knowledge              kbsvc.Service
+	UserKBInspect          *UserKBInspectHandler
 	PlatformType           typesvc.Service
 	Observability          *ObservabilityCallLogsHandler
 	ObservabilityAgentRuns *ObservabilityAgentRunsHandler
@@ -81,6 +83,7 @@ type Handlers struct {
 	Skill                  *skillsvc.Service
 	Media                  *mediasvc.Service
 	DriveStorage           StorageAdminService
+	DriveEffectiveBucket   func(*domdrive.StorageOverride) string
 	DriveBrowse            DriveBrowseService
 	DriveQuotaAdmin        DriveQuotaAdminService
 	DriveRecycleAdmin      DriveRecycleAdminService

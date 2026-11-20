@@ -17,6 +17,8 @@
 - [社区版复用与缺陷修复范围](requirements/community-capability-parity.md)
 - [社区数据库复用核对](architecture/community-schema-reuse.md)
 - [ADR：可选服务器工作区](adr/0003-optional-server-workspace.md)
+- [ADR：社区云盘租户存储桶](adr/0005-community-drive-bucket-routing.md)
+- [ADR：社区版在原桌面设备执行群聊与协作](adr/0006-community-local-collaboration.md)
 - [服务器工作区踩坑](pitfalls/server-workspace.md)
 - [服务器工作区验证](verification/server-workspace-2026-11-10.md)
 - [服务器工作区真实部署联调](verification/server-workspace-2026-11-11.md)

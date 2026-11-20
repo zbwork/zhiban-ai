@@ -136,6 +136,18 @@ func (s *FileSvc) MoveCrossSpace(ctx context.Context, accountID int64, src *dom.
 		ownerForKey = *src.CreatedBy
 	}
 	newStorageKey := buildFinalKey(dstSpace.TenantID, ownerForKey, newFileUUID, ext)
+	store, err := s.storage.Resolve(ctx, dstSpace.TenantID)
+	if err != nil {
+		return nil, apperr.ErrInternal.Withf("drive.copy_failed").Wrap(err)
+	}
+	if routed, ok := store.(interface {
+		CopyKey(string, string) (string, error)
+	}); ok {
+		newStorageKey, err = routed.CopyKey(src.StorageKey, newStorageKey)
+		if err != nil {
+			return nil, apperr.ErrInternal.Withf("drive.copy_failed").Wrap(err)
+		}
+	}
 
 	// TX1: dup-name + reserve quota + INSERT copying + bump space.used_bytes
 	tx1, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
@@ -214,12 +226,6 @@ func (s *FileSvc) MoveCrossSpace(ctx context.Context, accountID int64, src *dom.
 	committed = true
 
 	// Phase B: store.Copy (NO TX)
-	store, err := s.storage.Resolve(ctx, dstSpace.TenantID)
-	if err != nil {
-		// 标 copy_failed 让 caller retry; 不 release quota (cancel 时才 release)
-		_ = s.markCopyFailed(ctx, newRow.ID, "storage_resolve_failed")
-		return nil, apperr.ErrInternal.Withf("drive.copy_failed").Wrap(err)
-	}
 	if err := store.Copy(ctx, src.StorageKey, newStorageKey); err != nil {
 		_ = s.markCopyFailed(ctx, newRow.ID, "copy_error: "+err.Error())
 		return nil, apperr.ErrInternal.Withf("drive.copy_failed").Wrap(err)

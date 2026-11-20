@@ -11,12 +11,22 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/conversation"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/room"
 	outboxrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/wukongoutbox"
+	svcchat "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/chat"
 	outboxsvc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/wukongoutbox"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/transport/http/wukongwh"
 )
 
 // Trigger shares the existing transactional shadow/run gate with webhook and attach.
-type Trigger struct{ inner *wukongAgentTrigger }
+type Trigger struct {
+	inner *wukongAgentTrigger
+	local localGroupRuntime
+}
+
+func (t *Trigger) WithLocalGroupRuntime(local localGroupRuntime) *Trigger {
+	t.local = local
+	return t
+}
+
 type AttachResult struct {
 	StreamID         string `json:"stream_id"`
 	AgentMessageUUID string `json:"agent_message_uuid"`
@@ -27,6 +37,7 @@ type AttachResult struct {
 
 func New(pool *pgxpool.Pool, chat wkChatRunner, contacts wkContacts, sender *wukong.Client) *Trigger {
 	deps := wukongAgentTriggerDeps{logger: log.Default(), rooms: room.New(pool), accounts: account.New(pool), agents: agent.New(pool), convs: conversation.New(pool), triggers: agenttrigger.New(pool), contacts: contacts, chat: chat, sender: sender, readReceipt: sender, agentDirectEnabled: true, agentDirectLookup: agentDirectRoomLookupAdapter{rooms: room.New(pool)}}
+	deps.speaker = svcchat.NewSelector(svcchat.SelectorDeps{})
 	deps.outbox = outboxsvc.NewService(outboxrepo.New(pool))
 	return &Trigger{inner: &wukongAgentTrigger{d: deps}}
 }

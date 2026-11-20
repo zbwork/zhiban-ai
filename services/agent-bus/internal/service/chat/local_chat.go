@@ -44,7 +44,7 @@ func (s *impl) runLocalChat(ctx context.Context, in ZapDispatchInput, d *zapDisp
 		s.finalize(ctx, in.StreamID, in.AccountID, in.TenantID, in.Conversation.UUID, in.RoomUUID, in.AgentMessageUUID, blocks, status, code, message, usage)
 	}
 	scope := domlocal.Scope{TenantID: in.TenantID, AccountID: in.AccountID, SessionUUID: get("local_login_session_id")}
-	if s.localRuntime == nil || scope.SessionUUID == "" || in.RoomUUID != "" || !canRunOnCallersComputer(in.Agent, in.AccountID) {
+	if s.localRuntime == nil || scope.SessionUUID == "" || (in.RoomUUID != "" && in.UserMetadata["local_group_authorized"] != true) || !canRunOnCallersComputer(in.Agent, in.AccountID) {
 		finish(nil, "failed", "local_runtime.unavailable", "本机执行上下文不可用，请确认桌面已登录在线；定时任务持续失败时请联系管理员检查调度服务版本", nil)
 		return
 	}
@@ -89,12 +89,12 @@ func (s *impl) runLocalChat(ctx context.Context, in ZapDispatchInput, d *zapDisp
 	if contextID == "" {
 		contextID = in.Conversation.UUID
 	}
-	payload, err := json.Marshal(map[string]any{"local_context_id": contextID, "task_source": localTaskSource(get("local_task_source")), "employee_name": in.Agent.Name, "text": prompt, "persona": persona, "history": past, "blocks": blocks, "skills": d.buildZapSessionSkills(ctx, in), "knowledge_context": zapKnowledgeContextMetadata(kc), "metadata": mergeZapForwardedUserMetadata(nil, in.UserMetadata)})
+	payload, err := json.Marshal(map[string]any{"local_context_id": contextID, "local_collaboration_child": in.UserMetadata["local_collaboration_child"] == true, "task_source": localTaskSource(get("local_task_source")), "employee_name": in.Agent.Name, "text": prompt, "persona": persona, "history": past, "blocks": blocks, "skills": d.buildZapSessionSkills(ctx, in), "knowledge_context": zapKnowledgeContextMetadata(kc), "metadata": mergeZapForwardedUserMetadata(nil, in.UserMetadata)})
 	if err != nil {
 		finish(nil, "failed", "local_runtime.config_unavailable", "本机任务配置无效", nil)
 		return
 	}
-	task, err := s.localRuntime.Create(ctx, domlocal.Task{LocalEngine: engine, Scope: scope, RequesterSessionUUID: get("local_requester_session_id"), DeviceUUID: get("local_device_id"), EmployeeID: in.Agent.ID, ConversationUUID: in.Conversation.UUID, MessageUUID: in.AgentMessageUUID, StreamID: in.StreamID, Model: get("local_model_hint"), Payload: payload})
+	task, err := s.localRuntime.Create(ctx, domlocal.Task{LocalEngine: engine, Scope: scope, RequesterSessionUUID: get("local_requester_session_id"), DeviceUUID: get("local_device_id"), EmployeeID: in.Agent.ID, ConversationUUID: in.Conversation.UUID, MessageUUID: in.AgentMessageUUID, StreamID: in.StreamID, Model: get("local_model_hint"), Payload: payload, CollaborationEdgeUUID: get("local_collaboration_edge_uuid")})
 	if err != nil {
 		if errors.Is(err, domlocal.ErrUpgradeRequired) {
 			finish(nil, "failed", "local_runtime.upgrade_required", "当前电脑未提供所选引擎，请更新电脑客户端并检查本地引擎状态", nil)

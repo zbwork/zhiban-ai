@@ -43,7 +43,7 @@ func TestPageModulesRegisterTogetherAndRequireAuthorization(t *testing.T) {
 		}{}, ClientAnalyticsErrors: struct {
 			svcclientanalytics.ErrorAdminService
 		}{},
-		Knowledge: struct{ kbsvc.Service }{}, SysUser: struct{ sysusersvc.Service }{}, PlatformType: typesvc.New(), Media: &mediasvc.Service{},
+		Knowledge: struct{ kbsvc.Service }{}, UserKBInspect: &UserKBInspectHandler{}, SysUser: struct{ sysusersvc.Service }{}, PlatformType: typesvc.New(), Media: &mediasvc.Service{},
 		ApiKey: struct{ domapikey.Service }{}, AgentSDK: struct{ domagentsdk.Service }{}, OrgWebhook: struct{ domorgwebhook.Service }{}, Alerts: &AlertsAdminHandler{}, WuKongStatus: &WuKongStatusHandler{},
 		Observability: &ObservabilityCallLogsHandler{}, ObservabilityAgentRuns: &ObservabilityAgentRunsHandler{},
 		AdminA2A: &AdminA2AHandler{}, AdminOrchestrations: &AdminOrchestrationsHandler{}, AdminSpeakerPolicies: &AdminSpeakerPoliciesHandler{}, AdminA2AApprovals: &AdminA2AApprovalHandler{},
@@ -80,7 +80,7 @@ func TestPageModulesRegisterTogetherAndRequireAuthorization(t *testing.T) {
 	h.registerPages(mux, auth, perm("platform"), perm("tenant"))
 	for _, path := range []string{
 		"/platform/kb-providers", "/tenant/agents/example/a2a-card", "/tenant/agents/example/a2a-invoke-capability", "/tenant/agents/example/kb-bindings", "/platform/preset-agents/example/a2a-card", "/platform/preset-agents/example/kb-bindings", "/platform/client-build-jobs", "/platform/local-coding-tool-versions", "/platform/local-coding-tool-auto-sync", "/platform/preset-agents", "/platform/agent-model-options", "/tenant/identity-providers", "/platform/emp-blocks", "/platform/support-feedback", "/platform/marketing-leads", "/platform/client-versions", "/platform/download-channels", "/platform/share-growth", "/platform/client-analytics/overview",
-		"/tenant/knowledge-bases", "/platform/knowledge-bases", "/tenant/org-webhooks", "/tenant/api-keys", "/platform/sys-users",
+		"/tenant/knowledge-bases", "/tenant/users/example/knowledge-bases", "/platform/knowledge-bases", "/tenant/org-webhooks", "/tenant/api-keys", "/platform/sys-users",
 		"/tenant/agent-sdk-credentials", "/platform/agent-sdk-credentials", "/platform/wukong/overview", "/platform/wukong/connections",
 		"/tenant/alerts", "/platform/alerts", "/tenant/a2a/approvals", "/tenant/a2a", "/tenant/orchestrations", "/tenant/speaker-policies",
 		"/tenant/observability/agent-runs", "/platform/observability/conversations", "/tenant/observability/call-logs",
@@ -115,6 +115,9 @@ func TestPageModulesRegisterTogetherAndRequireAuthorization(t *testing.T) {
 }
 
 type approvalReadStub struct{ AdminA2AApprovalService }
+
+func (approvalReadStub) ApprovalResumeAvailable() bool { return false }
+func (approvalReadStub) CanResumeApproval(int64) bool  { return false }
 
 func (approvalReadStub) ListApprovalViewsForAdmin(context.Context, int64, domapproval.Status, int, int) ([]svca2a.ApprovalView, int, error) {
 	return nil, 0, nil

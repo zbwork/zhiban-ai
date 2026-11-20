@@ -11,21 +11,30 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/adapter/runtime/mock"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/community/config"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/log"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/a2acalledge"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/a2acapability"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agent"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/chattx"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/conversation"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/event"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/message"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/messagestream"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/orchestration"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/runtimeenv"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/a2a"
 	svc "github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/chat"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/deorch"
 )
 
 // Compose wires real persistence, Redis fanout and cancellation. Queue is disabled
 // until a community chat task consumer is explicitly configured.
 func Compose(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client, c config.Config, visibility svc.ContactsVisibility) (svc.Service, error) {
 	logger := log.Default()
-	service := svc.NewWithStopRetry(logger, agent.New(pool), conversation.New(pool), message.New(pool), nil, visibility, nil, nil, svc.NewRedisFanout(rdb, logger), "community-"+uuid.NewString(), svc.StopRetryDeps{StreamStore: messagestream.New(pool), EventPub: event.New(pool), TxBegin: chattx.Beginner(pool)})
+	service := svc.NewWithStopRetry(logger, agent.New(pool), conversation.New(pool), message.New(pool), nil, visibility, nil, nil, svc.NewRedisFanout(rdb, logger), "community-"+uuid.NewString(), svc.StopRetryDeps{StreamStore: messagestream.New(pool), EventPub: event.New(pool), TxBegin: chattx.Beginner(pool),
+		OrchRuns: orchestration.New(pool), OrchEdges: a2acalledge.New(pool),
+		OrchAdmission:               deorch.A2AAdmission{Capabilities: a2acapability.New(pool), Quota: a2a.NewRedisQuotaChecker(rdb, a2a.DefaultQuotaLoader{}, nil)},
+		CommunityLocalOrchestration: true,
+	})
 	svc.SetRuntimeEnvFrameworkLookupOnService(service, frameworkLookup{runtimeenv.New(pool)})
 	switch c.Model.Provider {
 	case "mock":

@@ -169,6 +169,8 @@ func run(ctx context.Context, path string) error {
 		probeTokenIssuer = svcruntime.NewProbeTokenIssuer([]byte(secret), 5*time.Minute)
 	}
 	appService := communityapps.New(pool, cfg.AppIssuer)
+	knowledgeService := kbsvc.New(kbsvc.Deps{Repo: kbrepo.New(pool), Pool: pool, Provider: stub.New(pool), Audit: pub, AgentKBRepo: agentkbrepo.New(pool), ObjectStores: storage, Config: kbsvc.Config{PersistOriginals: true, ExtractDocuments: true}})
+	storageAdmin := &storagesvc.Service{Repo: repodrive.NewStorageRepo(pool), Secret: storagesvc.SecretResolver{AllowValue: true}, AllowValue: true}
 	core := &admincore.Handlers{
 		KBProviderRepo:      kbrepo.New(pool),
 		AdminAgentA2AInvoke: &admincore.AdminAgentA2AInvokeHandler{Pool: pool, Audit: repoaudit.New(pool)},
@@ -192,12 +194,13 @@ func run(ctx context.Context, path string) error {
 		ClientAnalyticsErrors:   svcclientanalytics.NewErrorAdmin(repoclientanalytics.New(pool)),
 		AgentSDK:                sdkService, RuntimeChecker: &agentSDKRuntimeChecker{pool: pool},
 		WuKongStatus:           &admincore.WuKongStatusHandler{Pool: pool, Connections: imrepo.New(pool), Client: imClient, Cfg: admincore.WuKongConfig{Enabled: cfg.WuKong.URL != "", APIAddr: cfg.WuKong.URL, TCPAddr: cfg.WuKong.TCPAddr, WSAddr: cfg.WuKong.WSAddr, WebhookSecretRef: cfg.WuKong.Token}},
-		AdminA2AApprovals:      &admincore.AdminA2AApprovalHandler{Service: a2asvc.New(a2asvc.Deps{Edges: edgerepo.New(pool), CapabilityRepo: caprepo.New(pool), SessionDeriver: sdkService, Approvals: approvalrepo.New(pool), Agents: agentrepo.New(pool)}), Audit: repoaudit.New(pool)},
+		AdminA2AApprovals:      &admincore.AdminA2AApprovalHandler{Service: a2asvc.New(a2asvc.Deps{Edges: edgerepo.New(pool), CapabilityRepo: caprepo.New(pool), SessionDeriver: sdkService, Approvals: approvalrepo.New(pool), LocalApprovalQueue: approvalrepo.New(pool), Agents: agentrepo.New(pool)}), Audit: repoaudit.New(pool)},
 		ApiKey:                 apisvc.New(apisvc.Deps{Repo: apirepo.New(pool)}),
 		Alerts:                 &admincore.AlertsAdminHandler{Store: alertrepo.New(pool, pub), Audit: repoaudit.New(pool)},
 		OrgWebhook:             orgsvc.New(orgsvc.Deps{Repo: orgrepo.New(pool)}),
 		SysUser:                sysusersvc.New(pool),
-		Knowledge:              kbsvc.New(kbsvc.Deps{Repo: kbrepo.New(pool), Pool: pool, Provider: stub.New(pool), Audit: pub, AgentKBRepo: agentkbrepo.New(pool), ObjectStores: storage, Config: kbsvc.Config{PersistOriginals: true, ExtractDocuments: true}}),
+		Knowledge:              knowledgeService,
+		UserKBInspect:          &admincore.UserKBInspectHandler{Accounts: account.New(pool), Knowledge: knowledgeService, Audit: repoaudit.New(pool)},
 		PlatformType:           typesvc.New(),
 		Observability:          &admincore.ObservabilityCallLogsHandler{Pool: pool},
 		ObservabilityAgentRuns: &admincore.ObservabilityAgentRunsHandler{Pool: pool, EventPub: pub, Redactor: redact.New()},
@@ -208,7 +211,7 @@ func run(ctx context.Context, path string) error {
 		Cron:  cronsvc.New(cronsvc.Deps{Repo: repocron.NewCommunity(pool), PromptTemplates: repocron.NewCommunity(pool), Agents: agentrepo.New(pool), Audit: pub, Config: cronsvc.Config{DisableRuntimeProjection: true}}),
 		Skill: skillService, Media: mediaService,
 		Membership: membersvc.New(pool, pub), Platform: platformsvc.NewCommunity(pool), Position: positionsvc.New(pool), RBAC: rbacsvc.New(rbacRepo), RuntimeEnv: runtimeenvsvc.New(envrepo.New(pool), probeTokenIssuer), Agent: agentsvc.New(agentrepo.New(pool), nil, nil, pool, pub),
-		DriveStorage:       &storagesvc.Service{Repo: repodrive.NewStorageRepo(pool), Secret: storagesvc.SecretResolver{AllowValue: true}, AllowValue: true},
+		DriveStorage:       storageAdmin,
 		DriveBrowse:        drivesvc.NewAdminBrowseSvc(pool),
 		DriveQuotaAdmin:    drivesvc.NewAdminQuotaSvc(pool, repodrive.NewQuotaRepo(pool)),
 		DriveUsageAdmin:    drivesvc.NewAdminUsageSvc(repodrive.NewSpaceRepo(pool)),
@@ -229,7 +232,10 @@ func run(ctx context.Context, path string) error {
 		core.RuntimeProbe = svcruntime.NewProbeService(nil, probeTokenIssuer)
 	}
 	if storage != nil {
-		worker := drivesvc.NewWorkerSvc(pool, repodrive.NewTicketRepo(pool), repodrive.NewRecycleRepo(pool), repodrive.NewFileRepo(pool), repodrive.NewFolderRepo(pool), repodrive.NewFileVersionRepo(pool), repodrive.NewSpaceRepo(pool), repodrive.NewQuotaRepo(pool), storage, repodrive.NewWorkerJobRepo(pool))
+		driveStorage := storage.ForDrive(pool)
+		storageAdmin.ProbeTenantBucket = driveStorage.ProbeOverride
+		core.DriveEffectiveBucket = driveStorage.EffectiveBucket
+		worker := drivesvc.NewWorkerSvc(pool, repodrive.NewTicketRepo(pool), repodrive.NewRecycleRepo(pool), repodrive.NewFileRepo(pool), repodrive.NewFolderRepo(pool), repodrive.NewFileVersionRepo(pool), repodrive.NewSpaceRepo(pool), repodrive.NewQuotaRepo(pool), driveStorage, repodrive.NewWorkerJobRepo(pool))
 		core.DriveRecycleAdmin = drivesvc.NewAdminRecycleSvc(pool, repodrive.NewRecycleRepo(pool), repodrive.NewFileRepo(pool), repodrive.NewFolderRepo(pool), repodrive.NewSpaceRepo(pool), worker)
 	}
 	handlers := adminrouter.Handlers{

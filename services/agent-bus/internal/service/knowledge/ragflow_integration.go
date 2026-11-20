@@ -341,6 +341,21 @@ func (s *impl) publishAudit(ctx context.Context, kind string, tenantID int64, pa
 //  2. SELECT FROM knowledge_bases WHERE owner_account_id=$1 AND space_kind='personal'
 //  3. 写审计事件 'tenant.admin.user_kb_inspect'
 func (s *impl) ListUserPrivateKB(ctx context.Context, tenantID, targetAccountID int64, apiKeyPrefix string, scopesUsed []string) ([]KBDTO, error) {
+	out, err := s.ListTenantMemberPersonalKB(ctx, tenantID, targetAccountID)
+	if err != nil {
+		return nil, err
+	}
+	s.publishAudit(ctx, "tenant.admin.user_kb_inspect", tenantID, map[string]any{
+		"target_account_id": targetAccountID,
+		"api_key_prefix":    apiKeyPrefix,
+		"scopes_used":       scopesUsed,
+		"result_count":      len(out),
+	})
+	return out, nil
+}
+
+// ListTenantMemberPersonalKB is shared by the two authorized callers. Each caller records its own audit actor.
+func (s *impl) ListTenantMemberPersonalKB(ctx context.Context, tenantID, targetAccountID int64) ([]KBDTO, error) {
 	if tenantID <= 0 || targetAccountID <= 0 {
 		return nil, apperr.ErrInvalidParams.Withf("tenant/target account required")
 	}
@@ -348,7 +363,7 @@ func (s *impl) ListUserPrivateKB(ctx context.Context, tenantID, targetAccountID 
 	var targetTenantID int64
 	err := s.pool.QueryRow(ctx, `
 SELECT tenant_id FROM tenant_memberships
-WHERE account_id=$1 AND tenant_id=$2 AND status='active'`, targetAccountID, tenantID).Scan(&targetTenantID)
+WHERE account_id=$1 AND tenant_id=$2 AND status='active' AND deleted_at IS NULL`, targetAccountID, tenantID).Scan(&targetTenantID)
 	if err != nil || targetTenantID != tenantID {
 		return nil, apperr.New(apperr.NotFound, "tenant.user.not_found").
 			Withf("target account %d not in tenant %d", targetAccountID, tenantID)
@@ -363,6 +378,8 @@ SELECT id, uuid::text, tenant_id, creator_id, owner_account_id, space_kind, name
        retrieval_config, metadata, created_at, updated_at
 FROM knowledge_bases k
 WHERE tenant_id=$1 AND space_kind='personal' AND owner_account_id=$2 AND deleted_at IS NULL
+  AND EXISTS (SELECT 1 FROM tenant_memberships tm
+              WHERE tm.tenant_id=$1 AND tm.account_id=$2 AND tm.status='active' AND tm.deleted_at IS NULL)
 ORDER BY updated_at DESC LIMIT 200`, tenantID, targetAccountID)
 	if err != nil {
 		return nil, apperr.ErrInternal.Wrap(err)
@@ -380,13 +397,6 @@ ORDER BY updated_at DESC LIMIT 200`, tenantID, targetAccountID)
 		return nil, apperr.ErrInternal.Wrap(err)
 	}
 
-	// D13 审计 (必写, 即便 caller 是空 admin 角色)
-	s.publishAudit(ctx, "tenant.admin.user_kb_inspect", tenantID, map[string]any{
-		"target_account_id": targetAccountID,
-		"api_key_prefix":    apiKeyPrefix,
-		"scopes_used":       scopesUsed,
-		"result_count":      len(out),
-	})
 	return out, nil
 }
 

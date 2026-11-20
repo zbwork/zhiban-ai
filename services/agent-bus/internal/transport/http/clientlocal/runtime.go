@@ -25,6 +25,9 @@ import (
 // Handlers serves the community Local Agent control plane, member model platforms,
 // image generation, web search and file archiving into the drive.
 type Handlers struct {
+	Collaboration interface {
+		Request(context.Context, *dom.Task, string, string) (string, error)
+	}
 	Local   *svclocal.Service
 	Models  LocalModelProxy
 	Sources *svcsource.Service

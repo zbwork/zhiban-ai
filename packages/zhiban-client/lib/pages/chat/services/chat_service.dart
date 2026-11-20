@@ -201,10 +201,7 @@ class OpenClawChatService {
           'description': internalDescription.trim(),
         if (welcomeMsg != null && welcomeMsg.trim().isNotEmpty)
           'welcome_msg': welcomeMsg.trim(),
-        if (cleanTags.isNotEmpty) ...{
-          'tags': cleanTags,
-          'badges': cleanTags
-        },
+        if (cleanTags.isNotEmpty) ...{'tags': cleanTags, 'badges': cleanTags},
         if (isByok) ...{
           'model_source': 'byok',
           'model_service_config': {
@@ -304,10 +301,7 @@ class OpenClawChatService {
         if (internalDescription != null)
           'description': internalDescription.trim(),
         if (welcomeMsg != null) 'welcome_msg': welcomeMsg.trim(),
-        if (tags != null) ...{
-          'tags': cleanTags,
-          'badges': cleanTags
-        },
+        if (tags != null) ...{'tags': cleanTags, 'badges': cleanTags},
         if (modelSource != null) 'model_source': modelSource.trim(),
         if (isByok) ...{
           'model_service_config': {
@@ -361,9 +355,7 @@ class OpenClawChatService {
   }) async {
     await request.put(
       '$_agents/${Uri.encodeComponent(agentId)}/skill-bindings',
-      data: {
-        'skill_slugs': _cleanStringList(skillSlugs)
-      },
+      data: {'skill_slugs': _cleanStringList(skillSlugs)},
     );
   }
 
@@ -375,9 +367,7 @@ class OpenClawChatService {
   }) async {
     await request.put(
       '$_agents/${Uri.encodeComponent(agentId)}/app-bindings',
-      data: {
-        'app_uuids': _cleanStringList(appUuids)
-      },
+      data: {'app_uuids': _cleanStringList(appUuids)},
     );
   }
 
@@ -388,9 +378,7 @@ class OpenClawChatService {
   }) async {
     await request.put(
       '$_agents/${Uri.encodeComponent(agentId)}/kb-bindings',
-      data: {
-        'kb_uuids': _cleanStringList(knowledgeBaseUuids)
-      },
+      data: {'kb_uuids': _cleanStringList(knowledgeBaseUuids)},
     );
   }
 
@@ -797,6 +785,19 @@ class OpenClawChatService {
       out.add({'type': 'plain', 'text': prompt.trim()});
     }
     return out;
+  }
+
+  /// Sends a plain group message with the current, authenticated desktop device.
+  /// A group without a local-only employee roster stays on the existing IM path.
+  Future<bool> sendLocalGroupText(String roomUuid, String deviceId, String text,
+      {List<Map<String, dynamic>> mentions = const []}) async {
+    final result = await request.post(
+      '/rooms/${Uri.encodeComponent(roomUuid)}/local-messages',
+      options: Options(extra: const {'silent': true}),
+      data: {'device_id': deviceId, 'text': text, 'mentions': mentions},
+    );
+    if (result.statusCode == 404) return false;
+    return responseAsMap(result)['handled'] == true;
   }
 
   /// 发送 room-backed agent-direct 附件消息 → `POST /rooms/{room_uuid}/messages`。

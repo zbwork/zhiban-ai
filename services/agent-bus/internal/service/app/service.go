@@ -23,6 +23,7 @@ import (
 	domaccount "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/account"
 	domagent "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/agent"
 	dom "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/app"
+	domaudit "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/audit"
 	domconv "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/conversation"
 	domtenant "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/tenant"
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
@@ -65,6 +66,7 @@ type Service struct {
 
 type AuditPublisher interface {
 	PublishWithTx(ctx context.Context, topic string, tenantID int64, idempKey string, payload map[string]any) error
+	PublishAsWithTx(ctx context.Context, topic string, tenantID, accountID int64, actorKind domaudit.ActorKind, idempKey string, payload map[string]any) error
 }
 
 // ensure Service satisfies dom.Service at compile time
@@ -175,7 +177,7 @@ func (s *Service) CreateApp(ctx context.Context, tenantID, creatorID int64, in d
 		return nil, fmt.Errorf("set oauth_client_id: %w", err)
 	}
 	a.OAuthClientID = &oc.ID
-	s.audit(ctx, "audit.app.create", tenantID, "app.create:"+a.UUID, map[string]any{
+	s.auditAdmin(ctx, "audit.app.create", tenantID, creatorID, "app.create:"+a.UUID, map[string]any{
 		"resource_kind": "app",
 		"resource_uuid": a.UUID,
 		"app_uuid":      a.UUID,
@@ -221,7 +223,7 @@ func (s *Service) ListApps(ctx context.Context, tenantID int64, filter dom.AppLi
 	return apps, total, nil
 }
 
-func (s *Service) PatchApp(ctx context.Context, tenantID int64, uuid string, fields map[string]any) (*dom.App, error) {
+func (s *Service) PatchApp(ctx context.Context, tenantID, actorAccountID int64, uuid string, fields map[string]any) (*dom.App, error) {
 	if raw, ok := fields["oauth_scopes"]; ok {
 		scopes, ok := raw.([]string)
 		if !ok {
@@ -292,7 +294,7 @@ func (s *Service) PatchApp(ctx context.Context, tenantID int64, uuid string, fie
 		}
 	}
 	s.applyTenantSettings(ctx, tenantID, a)
-	s.audit(ctx, "audit.app.updated", tenantID, "app.updated:"+uuid+":"+fmt.Sprint(s.now().UnixNano()), map[string]any{
+	s.auditAdmin(ctx, "audit.app.updated", tenantID, actorAccountID, "app.updated:"+uuid+":"+fmt.Sprint(s.now().UnixNano()), map[string]any{
 		"resource_kind": "app",
 		"resource_uuid": uuid,
 		"app_uuid":      uuid,
@@ -300,7 +302,7 @@ func (s *Service) PatchApp(ctx context.Context, tenantID int64, uuid string, fie
 	return a, nil
 }
 
-func (s *Service) DeleteApp(ctx context.Context, tenantID int64, uuid string) error {
+func (s *Service) DeleteApp(ctx context.Context, tenantID, actorAccountID int64, uuid string) error {
 	// 软删 app + 撤 OAuth client (级联)
 	a, err := s.deps.Apps.GetByUUID(ctx, tenantID, uuid)
 	if err != nil {
@@ -317,7 +319,7 @@ func (s *Service) DeleteApp(ctx context.Context, tenantID int64, uuid string) er
 			return err
 		}
 	}
-	s.audit(ctx, "audit.app.deleted", tenantID, "app.deleted:"+uuid, map[string]any{
+	s.auditAdmin(ctx, "audit.app.deleted", tenantID, actorAccountID, "app.deleted:"+uuid, map[string]any{
 		"resource_kind": "app",
 		"resource_uuid": uuid,
 		"app_uuid":      uuid,
@@ -326,7 +328,7 @@ func (s *Service) DeleteApp(ctx context.Context, tenantID int64, uuid string) er
 }
 
 // RotateSecret 重置 client_secret; 返新明文一次。
-func (s *Service) RotateSecret(ctx context.Context, tenantID int64, uuid string) (string, error) {
+func (s *Service) RotateSecret(ctx context.Context, tenantID, actorAccountID int64, uuid string) (string, error) {
 	a, err := s.deps.Apps.GetByUUID(ctx, tenantID, uuid)
 	if err != nil {
 		return "", err
@@ -344,7 +346,7 @@ func (s *Service) RotateSecret(ctx context.Context, tenantID int64, uuid string)
 	if err := s.deps.OAuthClients.RotateSecret(ctx, *a.OAuthClientID, pkgoauth2.HashSecret(plaintext)); err != nil {
 		return "", err
 	}
-	s.audit(ctx, "audit.app.secret_rotated", tenantID, "app.secret_rotated:"+uuid+":"+fmt.Sprint(s.now().UnixNano()), map[string]any{
+	s.auditAdmin(ctx, "audit.app.secret_rotated", tenantID, actorAccountID, "app.secret_rotated:"+uuid+":"+fmt.Sprint(s.now().UnixNano()), map[string]any{
 		"resource_kind": "app",
 		"resource_uuid": uuid,
 		"app_uuid":      uuid,
@@ -570,6 +572,20 @@ func (s *Service) AuditBorrowedCapability(ctx context.Context, tenantID int64, c
 		"method":        method,
 		"path":          path,
 	})
+}
+
+func (s *Service) auditAdmin(ctx context.Context, topic string, tenantID, accountID int64, idempKey string, payload map[string]any) {
+	actorKind := domaudit.ActorAdmin
+	if tenantID == 0 {
+		actorKind = domaudit.ActorPlatformAdmin
+	}
+	s.auditAs(ctx, topic, tenantID, accountID, actorKind, idempKey, payload)
+}
+
+func (s *Service) auditAs(ctx context.Context, topic string, tenantID, accountID int64, actorKind domaudit.ActorKind, idempKey string, payload map[string]any) {
+	if s.deps.Audit != nil {
+		_ = s.deps.Audit.PublishAsWithTx(ctx, topic, tenantID, accountID, actorKind, idempKey, payload)
+	}
 }
 
 func (s *Service) audit(ctx context.Context, topic string, tenantID int64, idempKey string, payload map[string]any) {

@@ -23,6 +23,9 @@ func (h *Handlers) Register(mux *http.ServeMux, authT func(http.Handler) http.Ha
 	mux.HandleFunc("GET "+base+"/runs/{run}/approvals/{id}", h.localRunApproval)
 	mux.HandleFunc("DELETE "+base+"/runs/{run}/approvals/{id}", h.localRunApproval)
 	mux.HandleFunc("POST "+base+"/runs/{run}/authorize", h.localAuthorize)
+	if h.Collaboration != nil {
+		mux.HandleFunc("POST "+base+"/runs/{run}/collaborations", h.localCollaborate)
+	}
 	mux.HandleFunc("POST "+base+"/runs/{run}/model/{protocol...}", h.localModel)
 	mux.HandleFunc("POST "+base+"/runs/{run}/files/{operation}", h.localOutput)
 	mux.HandleFunc("GET "+base+"/runs/{run}/skills/{skill}/package", h.localSkillPackage)

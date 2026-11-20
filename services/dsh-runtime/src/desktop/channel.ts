@@ -305,6 +305,18 @@ export class DesktopChannel {
     });
   }
 
+  async collaborate(task: LocalTask, employee: string, text: string, signal: AbortSignal): Promise<unknown> {
+    const capability = this.capabilities.get(task.run);
+    if (!this.connected || !capability || !sameIdentity(task, this.opts.identity)) throw new LocalError('local.lease_invalid');
+    const response = await fetch(new URL(`local-runtime/runs/${task.run}/collaborations`, this.base), {
+      method: 'POST', redirect: 'error',
+      headers: { authorization: `Bearer ${capability}`, 'X-Local-Fence': String(task.fence), 'content-type': 'application/json' },
+      body: JSON.stringify({ employee, text }), signal: AbortSignal.any([signal, AbortSignal.timeout(12_000)]),
+    });
+    if (!response.ok) { await response.body?.cancel(); throw new LocalError('local.collaboration_rejected'); }
+    return z.object({ success: z.literal(true), data: z.unknown() }).parse(await response.json()).data;
+  }
+
   async image(task: LocalTask, body: Record<string, unknown>, signal: AbortSignal): Promise<Buffer> {
     const capability = this.capabilities.get(task.run);
     if (!this.connected || !capability || !sameIdentity(task, this.opts.identity)) throw new LocalError('local.lease_invalid');

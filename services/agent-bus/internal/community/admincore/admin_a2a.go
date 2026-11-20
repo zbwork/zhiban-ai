@@ -187,7 +187,7 @@ func (h *AdminA2AHandler) List(w http.ResponseWriter, r *http.Request) {
 			encode.JSONError(w, apperr.ErrInternal.Wrap(err))
 			return
 		}
-		e.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		e.CreatedAt = createdAt.UTC().Format(time.RFC3339Nano)
 		e.OrchestrationID = orchID
 		e.RoomID = roomID
 		e.LatencyMs = latencyMs
@@ -273,7 +273,7 @@ func (h *AdminA2AHandler) Get(w http.ResponseWriter, r *http.Request) {
 		encode.JSONError(w, apperr.ErrInternal.Wrap(err))
 		return
 	}
-	d.CreatedAt = createdAtRet.UTC().Format(time.RFC3339)
+	d.CreatedAt = createdAtRet.UTC().Format(time.RFC3339Nano)
 	d.OrchestrationID = orchID
 	d.RoomID = roomID
 	d.LatencyMs = latencyMs

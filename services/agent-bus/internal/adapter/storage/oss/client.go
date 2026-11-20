@@ -110,6 +110,13 @@ func New(cfg Config) (*Store, error) {
 // Kind 返回 message_files.storage_kind / drive_files.storage_kind 写入的值.
 func (s *Store) Kind() string { return s.cfg.Kind }
 
+// WithBucket reuses the configured endpoint, credentials and transport for another bucket.
+func (s *Store) WithBucket(bucket string) *Store {
+	copy := *s
+	copy.cfg.Bucket = bucket
+	return &copy
+}
+
 // PresignPut presign 一次 PUT URL.
 func (s *Store) PresignPut(_ context.Context, in object.PresignPutInput) (*object.PresignPutOutput, error) {
 	if in.Key == "" {
@@ -250,6 +257,32 @@ func (s *Store) PutObject(ctx context.Context, key string, body io.Reader, conte
 		return nil
 	}
 	return fmt.Errorf("oss.PutObject: status %d for key %q", resp.StatusCode, key)
+}
+
+// HeadBucket checks whether the configured bucket is accessible without writing data.
+func (s *Store) HeadBucket(ctx context.Context) error {
+	baseURL, _, bucketPath, err := buildHost(s.cfg.Endpoint, s.cfg.Bucket, s.cfg.ForcePathStyle)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, baseURL+bucketPath, nil)
+	if err != nil {
+		return err
+	}
+	signHeaderAuthRequest(req, s.cfg.SecretAccessKey, s.cfg.AccessKeyID, s.cfg.Region, emptyHashHex, time.Now())
+	client := *s.cfg.HTTPClient
+	client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("oss.HeadBucket: status %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // Stat HEAD object; 取 Content-Length / Content-Type / ETag (M7 Phase A 返修第二轮).

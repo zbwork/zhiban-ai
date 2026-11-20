@@ -278,6 +278,10 @@ Future<void> sendSmsCodeApi({
   );
 }
 
+Future<void> persistEnterpriseLogin(AuthLoginResult result,
+        {required int expectedEpoch}) =>
+    _persistLoginResult(result, expectedEpoch: expectedEpoch);
+
 /// 已有账号密码登录，复用统一会话持久化，不自动注册。
 Future<AuthLoginResult> loginWithPasswordApi({
   required String identifier,

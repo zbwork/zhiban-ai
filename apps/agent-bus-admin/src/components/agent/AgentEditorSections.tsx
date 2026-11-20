@@ -234,6 +234,7 @@ export function AgentRuntimeSection({
   emptyAction,
   allowTemplateCloudToLocal = false,
   allowExecutionChoice = false,
+  localOrchestrationAgent,
 }: {
   draft: AgentDraft
   patch: (p: Partial<AgentDraft>) => void
@@ -247,6 +248,7 @@ export function AgentRuntimeSection({
   emptyAction?: { label: string; onClick: () => void }
   allowTemplateCloudToLocal?: boolean
   allowExecutionChoice?: boolean
+  localOrchestrationAgent?: string
 }) {
   const currentRuntime = runtimeOptions.all.find((r) => r.ID === draft.RuntimeEnvironmentID) || null
   const visibleRuntimeOptions = {
@@ -269,6 +271,10 @@ export function AgentRuntimeSection({
           template={context === 'platformPreset'} runtimes={runtimeOptions.all}
           required={required} allowCreateRuntime={allowCreateRuntime}
           allowTemplateCloudToLocal={allowTemplateCloudToLocal} allowExecutionChoice={allowExecutionChoice} />
+        {localOrchestrationAgent !== undefined && draft.ExecutionLocus === 'local' && (
+          <LocalOrchestrationFields agentUuid={localOrchestrationAgent} draft={draft} patch={patch} locked={locked} />
+        )}
+
 
         {/* Agent Key 系统托管：不在 UI 填写，由后端据运行环境自动生成 / 补默认。 */}
         {selected && currentRuntimeIsSelectable && (
@@ -858,6 +864,65 @@ export const AgentCollaborationSection = forwardRef<AgentCollaborationSectionHan
     </div>
   )
 })
+
+function LocalOrchestrationFields({ agentUuid, draft, patch, locked }: {
+  agentUuid: string
+  draft: AgentDraft
+  patch: (p: Partial<AgentDraft>) => void
+  locked: boolean
+}) {
+  const enabled = draft.AgentKind === 'orchestrator'
+  const [employees, setEmployees] = useState<AgentFull[]>([])
+  const [error, setError] = useState('')
+  useEffect(() => {
+    if (!enabled) return
+    let active = true
+    loadWhitelistAgents(agentUuid)
+      .then((items) => {
+        if (active) setEmployees(items.filter((a) =>
+          a.execution_locus === 'local' && a.Status === 'published' && a.Metadata?.agent_kind !== 'orchestrator',
+        ))
+      })
+      .catch(() => { if (active) setError('无法加载本机员工列表') })
+    return () => { active = false }
+  }, [agentUuid, enabled])
+
+  return (
+    <div className="space-y-3">
+      <FormField label="执行方式">
+        <Select
+          value={enabled ? 'orchestrator' : 'single'}
+          disabled={locked}
+          onChange={(event) => patch({
+            AgentKind: event.target.value === 'orchestrator' ? 'orchestrator' : 'single',
+            OrchestrationStrategy: 'sequential',
+          })}
+        >
+          <option value="single">单个数字员工</option>
+          <option value="orchestrator">本机顺序编排</option>
+        </Select>
+      </FormField>
+      {enabled && (
+        <FormField as="div" label="编排步骤" hint="按选择顺序执行。选 2 到 8 位本机员工，后一步接收前一步的文字结果。">
+          {error && <InlineAlert tone="danger">{error}</InlineAlert>}
+          <SearchableMultiSelect
+            options={employees.map((a) => ({ value: a.UUID, label: a.Name }))}
+            value={draft.ChildAgentUuids}
+            onChange={(value) => patch({ ChildAgentUuids: value.slice(0, 8) })}
+            disabled={locked}
+            placeholder="选择执行员工"
+            emptyHint="暂无已发布的本机员工"
+          />
+          {draft.ChildAgentUuids.length > 0 && (
+            <ol className="list-decimal space-y-1 pl-5 pt-2 text-sm">
+              {draft.ChildAgentUuids.map((id) => <li key={id}>{employees.find((a) => a.UUID === id)?.Name ?? id}</li>)}
+            </ol>
+          )}
+        </FormField>
+      )}
+    </div>
+  )
+}
 
 async function loadWhitelistAgents(excludeAgentUuid: string) {
   const limit = 100

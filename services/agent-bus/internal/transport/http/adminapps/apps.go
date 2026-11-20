@@ -358,7 +358,7 @@ func (h *Handlers) patchAppInScope(w http.ResponseWriter, r *http.Request, tid i
 	if req.RefreshTokenTTLSeconds != nil {
 		fields["oauth_refresh_token_ttl_seconds"] = *req.RefreshTokenTTLSeconds
 	}
-	a, err := h.App.PatchApp(r.Context(), tid, uuid, fields)
+	a, err := h.App.PatchApp(r.Context(), tid, middleware.MustAccountID(r.Context()), uuid, fields)
 	if err != nil {
 		encode.JSONError(w, err)
 		return
@@ -380,7 +380,7 @@ func (h *Handlers) deleteAppInScope(w http.ResponseWriter, r *http.Request, tid 
 		return
 	}
 	uuid := r.PathValue("uuid")
-	if err := h.App.DeleteApp(r.Context(), tid, uuid); err != nil {
+	if err := h.App.DeleteApp(r.Context(), tid, middleware.MustAccountID(r.Context()), uuid); err != nil {
 		encode.JSONError(w, err)
 		return
 	}
@@ -409,7 +409,7 @@ func (h *Handlers) rotateAppSecretInScope(w http.ResponseWriter, r *http.Request
 		return
 	}
 	uuid := r.PathValue("uuid")
-	plaintext, err := h.App.RotateSecret(r.Context(), tid, uuid)
+	plaintext, err := h.App.RotateSecret(r.Context(), tid, middleware.MustAccountID(r.Context()), uuid)
 	if err != nil {
 		encode.JSONError(w, err)
 		return

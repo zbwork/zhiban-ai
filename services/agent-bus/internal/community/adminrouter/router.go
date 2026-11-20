@@ -47,7 +47,7 @@ func (h Handlers) Register(mux *http.ServeMux, authMw func(http.Handler) http.Ha
 	mux.HandleFunc("GET  /api/admin/v1/auth/captcha", h.Session.Captcha)
 	mux.HandleFunc("POST /api/admin/v1/auth/token/refresh", h.Session.Refresh)
 	mux.Handle("POST /api/admin/v1/auth/logout", adminAuth(http.HandlerFunc(h.Session.Logout)))
-	mux.Handle("POST /api/admin/v1/auth/scope/switch", adminAuth(http.HandlerFunc(h.Session.SwitchScope)))
+	mux.Handle("POST /api/admin/v1/auth/scope/switch", adminAuth(middleware.RequirePasswordValid(http.HandlerFunc(h.Session.SwitchScope))))
 	mux.Handle("POST /api/admin/v1/auth/password/change", adminAuth(http.HandlerFunc(h.Session.ChangePassword)))
 	mux.Handle("GET /api/admin/v1/me", adminAuth(http.HandlerFunc(h.Session.Me)))
 	mux.Handle("GET /api/admin/v1/me/menus", adminAuth(http.HandlerFunc(h.Session.Menus)))

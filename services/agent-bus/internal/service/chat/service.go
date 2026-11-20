@@ -165,7 +165,9 @@ type SendReq struct {
 	LocalDeviceUUID  string           `json:"local_device_id,omitempty"`
 	LocalContextID   string           `json:"local_context_id,omitempty"`
 	// Transport identity, never decoded from a client-controlled body.
-	LocalLoginSessionUUID string `json:"-"`
+	LocalLoginSessionUUID      string `json:"-"`
+	LocalCollaborationChild    bool   `json:"-"`
+	LocalCollaborationEdgeUUID string `json:"-"`
 	// FileUUIDs 已 staged 的附件 UUID; service 内调 attachmentBinder.BindToMessage 绑定。
 	// DTO 字段名为 file_uuids (与 docs/modules/m4 §4.3 / boundaries §6.5 一致); SQL 仍按
 	// message_files.uuid 列做 UPDATE.
@@ -352,10 +354,13 @@ type Service interface {
 // RunAgentInput Batch 2E T2E.4: chat.RunAgentForConversation 入参。
 type RunAgentInput struct {
 	// CronRunUUID is trusted internal provenance, never decoded from an HTTP request.
-	CronRunUUID  string
-	AccountID    int64
-	TenantID     int64
-	Conversation *domconv.Conversation
+	CronRunUUID           string
+	LocalGroupSessionUUID string
+	LocalGroupDeviceUUID  string
+	LocalGroupModelHint   string
+	AccountID             int64
+	TenantID              int64
+	Conversation          *domconv.Conversation
 	// RoomUUID "" 表示 single-chat (兼容 2D 行为, SSE payload 不带 room_uuid);
 	// 非空 = group room conversation, SSE payload 携带 room_uuid 字段供客户端按窗口路由。
 	RoomUUID string
@@ -497,7 +502,8 @@ type impl struct {
 	// 历史隔离路径（有意的迁移观察态，不在普通聊天主链路使用；见 boundaries §Digital Employee）。
 	// 多 Agent 协作改由 Agent runtime 通过 A2A 工具自主 discover/invoke，Bus 不替 Agent 编排或拼接
 	// 业务回复。
-	orchExecutor *deorch.Executor
+	orchExecutor                *deorch.Executor
+	communityLocalOrchestration bool
 
 	// doc-12 §11.8: 上游 "agent no longer exists" 按 agent_register 任务状态分类。nil → 统一 warming。
 	agentRegStatus AgentRegisterStatusLookup
@@ -927,7 +933,8 @@ type StopRetryDeps struct {
 	// OrchAdmission (P1 返修) 编排 master→child 的完整 EasyO 内部 A2A 准入。
 	// 生产必须注入 deorch.A2AAdmission (capability + tenant + 白名单 + quota); nil → deorch
 	// 退化为纯 WhitelistAdmission (仅供单测的白名单子集用例, **不作为真实运行默认**)。
-	OrchAdmission deorch.AdmissionChecker
+	OrchAdmission               deorch.AdmissionChecker
+	CommunityLocalOrchestration bool
 }
 
 // NewWithStopRetry Batch 3B T3.5 生产装配入口: 在 NewWithFanout 基础上注入 stop / retry 依赖.
@@ -946,6 +953,7 @@ func NewWithStopRetry(
 ) Service {
 	base := NewWithFanout(logger, agents, convs, messages, runtimes, visibility, gwClient, ocResolver, fanout, nodeID).(*impl)
 	base.streamStore = deps.StreamStore
+	base.communityLocalOrchestration = deps.CommunityLocalOrchestration
 	base.eventPub = deps.EventPub
 	base.txBegin = deps.TxBegin
 	// doc-12 Task D 队列：ChatTasks 供 worker/群聊强制队列使用；QueueEnabled 只控制普通聊天。
@@ -1003,6 +1011,9 @@ func (s *impl) Send(ctx context.Context, accountID, tenantID int64, req SendReq)
 	}
 	if err := s.visibility.AssertAgentVisible(ctx, accountID, tenantID, req.AgentUUID); err != nil {
 		return nil, err
+	}
+	if s.communityLocalOrchestration && ag.ExecutionLocus == "local" && deorch.IsOrchestrator(ag.Metadata) {
+		return s.sendOrchestrator(ctx, accountID, tenantID, ag, req)
 	}
 	runtimeAccountID, err := runtimeAccountIDForAgent(accountID, ag)
 	if err != nil {
@@ -1106,7 +1117,14 @@ func (s *impl) Send(ctx context.Context, accountID, tenantID int64, req SendReq)
 		if err != nil {
 			return nil, apperr.New(apperr.PreconditionFailed, "chat.local_offline")
 		}
-		model, err := s.localRuntime.Ready(ctx, device.Scope, device.UUID, ag.ID, req.ModelHint)
+		hint := req.ModelHint
+		if inChild := req.LocalCollaborationChild; inChild && hint == "" {
+			hint, err = s.localRuntime.DefaultModel(ctx, device.Scope, ag.ID)
+			if err != nil {
+				return nil, apperr.New(apperr.PreconditionFailed, "请先配置兼容的本机模型")
+			}
+		}
+		model, err := s.localRuntime.Ready(ctx, device.Scope, device.UUID, ag.ID, hint)
 		if err != nil {
 			if errors.Is(err, domsource.ErrConfiguration) {
 				return nil, apperr.New(apperr.PreconditionFailed, "chat.model_configuration_unavailable")
@@ -1135,6 +1153,12 @@ func (s *impl) Send(ctx context.Context, accountID, tenantID int64, req SendReq)
 		composerMeta["local_device_id"] = device.UUID
 		composerMeta["local_login_session_id"] = device.Scope.SessionUUID
 		composerMeta["local_model_hint"] = model
+		if req.LocalCollaborationChild {
+			composerMeta["local_collaboration_child"] = true
+			if req.LocalCollaborationEdgeUUID != "" {
+				composerMeta["local_collaboration_edge_uuid"] = req.LocalCollaborationEdgeUUID
+			}
+		}
 	}
 	// F03 v0.9.1 §4.4: active_skill_* / skill_params 透传到 user message metadata。
 	skillF03Meta, err := s.buildF03SkillMetadata(ctx, req)
@@ -1322,6 +1346,30 @@ func (s *impl) RunAgentForConversation(ctx context.Context, in RunAgentInput) (*
 		InputMessageUUID: firstNonEmpty(in.InputMessageUUID, in.UserMessageUUID),
 		ForceQueue:       in.ForceQueue,
 	}
+	if in.LocalGroupSessionUUID != "" {
+		if s.localRuntime == nil || in.LocalGroupDeviceUUID == "" || in.RoomUUID == "" ||
+			in.Agent.ExecutionLocus != "local" || !canRunOnCallersComputer(in.Agent, in.AccountID) {
+			return nil, apperr.ErrForbidden
+		}
+		scope := domlocal.Scope{AccountID: in.AccountID, TenantID: in.TenantID, SessionUUID: in.LocalGroupSessionUUID}
+		device, err := s.localRuntime.ResolveDesktop(ctx, scope, in.LocalGroupDeviceUUID)
+		if err != nil || device.Scope != scope {
+			return nil, apperr.New(apperr.PreconditionFailed, "群聊需要原发送电脑在线")
+		}
+		model, err := s.localRuntime.Ready(ctx, scope, device.UUID, in.Agent.ID, in.LocalGroupModelHint)
+		if err != nil {
+			return nil, apperr.New(apperr.PreconditionFailed, "该数字员工的本机模型暂不可用")
+		}
+		internalIn.UserMetadata = map[string]any{
+			"local_task_source":          "desktop",
+			"local_group_authorized":     true,
+			"local_login_session_id":     scope.SessionUUID,
+			"local_requester_session_id": scope.SessionUUID,
+			"local_device_id":            device.UUID,
+			"local_context_id":           uuid.NewSHA1(uuid.NameSpaceOID, []byte("local-group:"+in.Conversation.UUID+":"+in.Agent.UUID)).String(),
+			"local_model_hint":           model,
+		}
+	}
 	if in.Agent.ExecutionLocus == "local" && in.CronRunUUID != "" {
 		metadata, err := s.prepareScheduledLocalChat(ctx, in)
 		if err != nil {
@@ -1457,6 +1505,7 @@ type runAgentInternalIn struct {
 	// 单体 agent 路径这两个字段恒为零值 → 行为完全不变。
 	OrchestratorChildren []deorch.ChildAgent
 	OrchestratorStrategy deorch.Strategy
+	OrchestrationDesktop deorch.DesktopTarget
 }
 
 type runStartFailure struct {

@@ -19,7 +19,10 @@ import (
 	"net/url"
 )
 
-type Storage struct{ store object.Store }
+type Storage struct {
+	store  *oss.Store
+	bucket string
+}
 
 func (s *Storage) Resolve(ctx context.Context, tenantID int64) (object.Store, error) {
 	if err := ctx.Err(); err != nil {
@@ -49,9 +52,9 @@ func NewStorage(c config.Config) (*Storage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Storage{store: store}, nil
+	return &Storage{store: store, bucket: o.Bucket}, nil
 }
-func Compose(pool *pgxpool.Pool, storage *Storage) *clientdrive.Handlers {
+func Compose(pool *pgxpool.Pool, storage svc.StorageGetter) *clientdrive.Handlers {
 	if storage == nil {
 		panic("object storage required")
 	}
@@ -75,7 +78,7 @@ func Compose(pool *pgxpool.Pool, storage *Storage) *clientdrive.Handlers {
 type accountLookup struct{ accounts *account.Repo }
 
 // ComposeFiles uses the same chat upload, binding and media authorization as Bus.
-func ComposeFiles(pool *pgxpool.Pool, storage *Storage) *clientfiles.Handlers {
+func ComposeFiles(pool *pgxpool.Pool, storage svc.StorageGetter) *clientfiles.Handlers {
 	spaces, files := repo.NewSpaceRepo(pool), repo.NewFileRepo(pool)
 	acl := svc.NewACLService(pool)
 	return &clientfiles.Handlers{

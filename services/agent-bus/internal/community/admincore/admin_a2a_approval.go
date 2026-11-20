@@ -17,6 +17,8 @@ import (
 )
 
 type AdminA2AApprovalService interface {
+	ApprovalResumeAvailable() bool
+	CanResumeApproval(int64) bool
 	ListApprovalViewsForAdmin(ctx context.Context, tenantID int64, status domapproval.Status, limit, offset int) ([]svca2a.ApprovalView, int, error)
 	GetApprovalViewForAdmin(ctx context.Context, tenantID int64, approvalUUID string) (*svca2a.ApprovalView, error)
 	DecideApproval(ctx context.Context, in svca2a.ApprovalDecisionInput) (*svca2a.ApprovalDecisionResult, error)
@@ -54,9 +56,16 @@ func (h *AdminA2AApprovalHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(items))
 	for _, it := range items {
-		out = append(out, adminA2AApprovalDTO(it))
+		dto := adminA2AApprovalDTO(it)
+		if it.Request != nil {
+			dto["resume_available"] = h.Service.CanResumeApproval(it.Request.ParentSessionTokenID)
+		}
+		out = append(out, dto)
 	}
-	encode.JSON(w, map[string]any{"items": out, "total": total, "limit": normalizedApprovalLimit(limit), "offset": maxInt(offset, 0)})
+	encode.JSON(w, map[string]any{
+		"items": out, "total": total, "limit": normalizedApprovalLimit(limit), "offset": maxInt(offset, 0),
+		"resume_available": h.Service.ApprovalResumeAvailable(),
+	})
 }
 
 func (h *AdminA2AApprovalHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +82,11 @@ func (h *AdminA2AApprovalHandler) Get(w http.ResponseWriter, r *http.Request) {
 		encode.JSONError(w, err)
 		return
 	}
-	encode.JSON(w, adminA2AApprovalDTO(*view))
+	dto := adminA2AApprovalDTO(*view)
+	if view.Request != nil {
+		dto["resume_available"] = h.Service.CanResumeApproval(view.Request.ParentSessionTokenID)
+	}
+	encode.JSON(w, dto)
 }
 
 func (h *AdminA2AApprovalHandler) Decide(w http.ResponseWriter, r *http.Request) {

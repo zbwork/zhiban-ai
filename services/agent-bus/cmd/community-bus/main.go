@@ -25,6 +25,8 @@ import (
 	oauthkeys "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/oauth2/keys"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/pgcli"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/secretbox"
+	approvalrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/a2aapproval"
+	caprepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/a2acapability"
 	account "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/account"
 	agentrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agent"
 	agentkbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/agentkb"
@@ -37,6 +39,8 @@ import (
 	kbrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/knowledge"
 	localmediarepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/localmedia"
 	localruntimerepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/localruntime"
+	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/service/locala2a"
+
 	msgrepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/message"
 	modelsourcerepo "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/modelsource"
 	rbac "github.com/zbwork/zhiban-ai/services/agent-bus/internal/repository/postgres/rbac"
@@ -161,7 +165,11 @@ func run(ctx context.Context, path string) error {
 	chatsvc.SetConversationModelSelector(chatSvc, localModels)
 	localImages := localmediasvc.New(localmediarepo.New(pool), localModels)
 	localSearch := websearchsvc.New(websearchadapter.New(cfg.WebSearch.Endpoint, cfg.WebSearch.APIKey))
-	localOutputs := communitydrive.LocalOutputs(pool, storage, localruntimerepo.New(pool))
+	var driveStorage *communitydrive.DriveStorage
+	if storage != nil {
+		driveStorage = storage.ForDrive(pool)
+	}
+	localOutputs := communitydrive.LocalOutputs(pool, driveStorage, localruntimerepo.New(pool))
 	if localOutputs != nil {
 		// Desktops upload archived files through this Bus origin; object storage stays private.
 		origin := strings.TrimSpace(os.Getenv("AGBUS_EXTERNAL_URL"))
@@ -194,7 +202,12 @@ func run(ctx context.Context, path string) error {
 			}
 		}
 	}()
-	handlers := busrouter.Handlers{Session: &httpsession.Handlers{Auth: auth}, Chat: &clientchat.Handlers{Chat: chatSvc}, Contacts: &clientcontacts.Handlers{Contacts: contactsSvc}, Local: &clientlocal.Handlers{Local: localService, Models: localModels, Sources: modelSources, Images: localImages, Search: localSearch, Outputs: localOutputs}}
+	localCollab := &locala2a.Service{Repo: approvalrepo.New(pool), Agents: agentrepo.New(pool), Capabilities: caprepo.New(pool), Local: localService, Chat: chatSvc, Visibility: contactsSvc}
+	collabCtx, stopCollab := context.WithCancel(ctx)
+	collabDone := make(chan struct{})
+	go func() { defer close(collabDone); localCollab.Run(collabCtx) }()
+	defer func() { stopCollab(); <-collabDone }()
+	handlers := busrouter.Handlers{Session: &httpsession.Handlers{Auth: auth}, Chat: &clientchat.Handlers{Chat: chatSvc}, Contacts: &clientcontacts.Handlers{Contacts: contactsSvc}, Local: &clientlocal.Handlers{Local: localService, Collaboration: localCollab, Models: localModels, Sources: modelSources, Images: localImages, Search: localSearch, Outputs: localOutputs}}
 	if skillPackages != nil {
 		handlers.Local.Skills = communitylocal.SkillPackages{Store: skillPackages}
 	}
@@ -209,18 +222,16 @@ func run(ctx context.Context, path string) error {
 	go func() { defer close(cronDone); cronsvc.NewLoop(cronService, 5*time.Second).Run(cronCtx) }()
 	defer func() { stopCron(); <-cronDone }()
 	var driveLookup svckb.DriveFileLookup
-	if storage != nil {
-		driveLookup = drivesvc.NewKBSnapshotAdapter(drivesvc.NewSnapshotSvc(pool, driverepo.NewSpaceRepo(pool), driverepo.NewFolderRepo(pool), driverepo.NewFileRepo(pool), drivesvc.NewACLService(pool), storage))
+	if driveStorage != nil {
+		driveLookup = drivesvc.NewKBSnapshotAdapter(drivesvc.NewSnapshotSvc(pool, driverepo.NewSpaceRepo(pool), driverepo.NewFolderRepo(pool), driverepo.NewFileRepo(pool), drivesvc.NewACLService(pool), driveStorage))
+		handlers.Drive = communitydrive.Compose(pool, driveStorage)
+		handlers.Files = communitydrive.ComposeFiles(pool, driveStorage)
+		chatsvc.SetAttachmentBinderOnService(chatSvc, handlers.Files.ChatUpload)
 	}
 	handlers.KnowledgeAPI = &clientknowledge.Handlers{Knowledge: svckb.New(svckb.Deps{Repo: kbrepo.New(pool), Pool: pool, Audit: eventrepo.New(pool), Provider: stub.New(pool), Config: svckb.Config{PersistOriginals: true, ExtractDocuments: true}, ObjectStores: storage, DriveFiles: driveLookup, AgentKBRepo: agentkbrepo.New(pool)})}
 	handlers.Agents.Environments = envrepo.New(pool)
 	handlers.Agents.Knowledge = handlers.KnowledgeAPI.Knowledge
 	communitychat.WireKnowledge(chatSvc, pool, handlers.KnowledgeAPI.Knowledge)
-	if storage != nil {
-		handlers.Drive = communitydrive.Compose(pool, storage)
-		handlers.Files = communitydrive.ComposeFiles(pool, storage)
-		chatsvc.SetAttachmentBinderOnService(chatSvc, handlers.Files.ChatUpload)
-	}
 	mux := http.NewServeMux()
 	if identities != nil {
 		(&authoidchttp.Handlers{Auth: auth, Catalog: identities, AdminOnly: false}).Register(mux, "/api/agent-bus/v1/auth")
@@ -288,7 +299,7 @@ func run(ctx context.Context, path string) error {
 
 	communityim.Register(mux, pool, cfg, chatSvc, contactsSvc, func(handler http.Handler) http.Handler {
 		return businessAuth(middleware.RequireTenant(middleware.RequireActiveTenantMembership(account.New(pool))(handler)))
-	}, mediaService.ResolveURLForTenant)
+	}, localService, mediaService.ResolveURLForTenant)
 	observed := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pattern := mux.Handler(r)
 		if pattern == "" {

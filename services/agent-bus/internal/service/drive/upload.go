@@ -52,6 +52,17 @@ type StorageGetter interface {
 	Resolve(ctx context.Context, tenantID int64) (object.Store, error)
 }
 
+func uploadKeys(ctx context.Context, store object.Store, tenantID, accountID int64, fileUUID, ext string) (string, string, error) {
+	staging := buildStagingKey(tenantID, fileUUID, ext)
+	final := buildFinalKey(tenantID, accountID, fileUUID, ext)
+	if routed, ok := store.(interface {
+		UploadKeys(context.Context, string, string) (string, string, error)
+	}); ok {
+		return routed.UploadKeys(ctx, staging, final)
+	}
+	return staging, final, nil
+}
+
 // F06 §3.2 + Phase 2.M multipart 常量. 单测覆盖边界.
 const (
 	// MultipartThresholdBytes >= 此 size 强制走 multipart (F06 line 1241 / Phase 2.M 验收).
@@ -299,12 +310,13 @@ func (s *UploadSvc) PresignPut(ctx context.Context, accountID, tenantID int64, r
 	// 5. 生成 file_uuid + 派生 keys
 	fileUUID := uuid.NewString()
 	ext := extFromName(cleanName)
-	stagingKey := buildStagingKey(tenantID, fileUUID, ext)
-	finalKey := buildFinalKey(tenantID, accountID, fileUUID, ext)
-
 	store, err := s.storage.Resolve(ctx, tenantID)
 	if err != nil {
 		return nil, apperr.ErrInternal.Wrap(fmt.Errorf("storage resolve: %w", err))
+	}
+	stagingKey, finalKey, err := uploadKeys(ctx, store, tenantID, accountID, fileUUID, ext)
+	if err != nil {
+		return nil, apperr.ErrInternal.Wrap(fmt.Errorf("allocate upload location: %w", err))
 	}
 
 	// 6. 分流 single / multipart.

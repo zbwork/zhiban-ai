@@ -20,13 +20,13 @@ type Repo struct{ pool *pgxpool.Pool }
 func New(pool *pgxpool.Pool) *Repo { return &Repo{pool: pool} }
 
 const cols = `id, uuid, tenant_id, edge_id, edge_uuid, edge_created_at,
-	from_agent_id, to_agent_id, parent_session_token_id, COALESCE(parent_account_id,0), caller_capabilities,
+	from_agent_id, to_agent_id, COALESCE(parent_session_token_id,0), COALESCE(parent_account_id,0), caller_capabilities,
 	invoke_kind, request_payload, request_payload_redacted, form_schema, form_result,
 	status, COALESCE(reason,''), expires_at, decided_by_account_id, decided_at, dispatched_at,
 	created_at, updated_at, is_deleted, deleted_at`
 
 const colsA = `a.id, a.uuid, a.tenant_id, a.edge_id, a.edge_uuid, a.edge_created_at,
-	a.from_agent_id, a.to_agent_id, a.parent_session_token_id, COALESCE(a.parent_account_id,0), a.caller_capabilities,
+	a.from_agent_id, a.to_agent_id, COALESCE(a.parent_session_token_id,0), COALESCE(a.parent_account_id,0), a.caller_capabilities,
 	a.invoke_kind, a.request_payload, a.request_payload_redacted, a.form_schema, a.form_result,
 	a.status, COALESCE(a.reason,''), a.expires_at, a.decided_by_account_id, a.decided_at, a.dispatched_at,
 	a.created_at, a.updated_at, a.is_deleted, a.deleted_at`
@@ -124,7 +124,7 @@ func (r *Repo) DecidePending(ctx context.Context, in dom.DecisionInput) (*dom.Re
 		args = append(args, in.ParentAccountID)
 		scopeWhere = fmt.Sprintf(" AND parent_account_id=$%d", len(args))
 	}
-	row := r.pool.QueryRow(ctx, `
+	decisionSQL := `
 		UPDATE a2a_approval_requests
 		   SET status=$3,
 		       form_result=$4::jsonb,
@@ -132,17 +132,40 @@ func (r *Repo) DecidePending(ctx context.Context, in dom.DecisionInput) (*dom.Re
 		       decided_by_account_id=$6,
 		       decided_at=$7,
 		       updated_at=now()
-		       `+clearRaw+`
-		       `+setDispatch+`
-		 WHERE tenant_id=$1 AND uuid=$2 AND status='pending' AND is_deleted=false`+scopeWhere+`
-		 RETURNING `+cols,
-		args...,
-	)
-	req, err := scan(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, apperr.ErrConflict.Withf("a2a approval is not pending")
+		       ` + clearRaw + `
+		       ` + setDispatch + `
+		 WHERE tenant_id=$1 AND uuid=$2 AND status='pending' AND is_deleted=false` + scopeWhere + `
+		 RETURNING ` + cols
+	var request *dom.Request
+	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		decided, err := scan(tx.QueryRow(ctx, decisionSQL, args...))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.ErrConflict.Withf("a2a approval is not pending")
+		}
+		if err != nil {
+			return err
+		}
+		if in.Decision == dom.StatusRejected {
+			tag, err := tx.Exec(ctx, `
+				UPDATE a2a_call_edges
+				SET status='rejected', error_message='a2a.approval_rejected', completed_at=$4, updated_at=now()
+				WHERE tenant_id=$1 AND uuid=$2 AND created_at=$3
+				  AND status='awaiting_approval' AND NOT is_deleted`,
+				in.TenantID, decided.EdgeUUID, decided.EdgeCreatedAt, when)
+			if err != nil {
+				return err
+			}
+			if tag.RowsAffected() != 1 {
+				return apperr.New(apperr.PreconditionFailed, "对应的协作调用已不在待审批状态")
+			}
+		}
+		request = decided
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return req, err
+	return request, nil
 }
 
 func (r *Repo) MarkDispatchedAndClear(ctx context.Context, tenantID int64, approvalUUID string, dispatchedAt time.Time) error {

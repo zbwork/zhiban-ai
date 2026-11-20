@@ -23,6 +23,9 @@ type Scope struct {
 	SessionUUID string
 }
 
+// CollaborationObservationTimeout bounds the initial dispatch and stream observation.
+const CollaborationObservationTimeout = 6 * time.Minute
+
 type Device struct {
 	Engines         map[string]string `json:"engines"`
 	ProtocolVersion int               `json:"protocol_version"`
@@ -37,27 +40,28 @@ type Device struct {
 }
 
 type Task struct {
-	LocalEngine          string          `json:"local_engine"`
-	CurrentEngine        string          `json:"-"` // Repository projection, never supplied by the desktop.
-	RequesterSessionUUID string          `json:"-"`
-	UUID                 string          `json:"run_id"`
-	DeviceUUID           string          `json:"device_id"`
-	Scope                Scope           `json:"-"`
-	TenantUUID           string          `json:"tenant_id"`
-	AccountUUID          string          `json:"account_id"`
-	LoginSessionUUID     string          `json:"login_session_id"`
-	EmployeeID           int64           `json:"-"`
-	EmployeeUUID         string          `json:"agent_id"`
-	ConversationUUID     string          `json:"conversation_id"`
-	MessageUUID          string          `json:"message_id"`
-	StreamID             string          `json:"stream_id"`
-	Fence                int64           `json:"fencing_token"`
-	Model                string          `json:"model"`
-	Status               string          `json:"status"`
-	Payload              json.RawMessage `json:"payload"`
-	TokenHash            string          `json:"-"`
-	ExpiresAt            time.Time       `json:"expires_at"`
-	LastSeq              int64           `json:"last_seq"`
+	LocalEngine           string          `json:"local_engine"`
+	CurrentEngine         string          `json:"-"` // Repository projection, never supplied by the desktop.
+	RequesterSessionUUID  string          `json:"-"`
+	CollaborationEdgeUUID string          `json:"-"` // Bus-issued identity of an approved collaboration.
+	UUID                  string          `json:"run_id"`
+	DeviceUUID            string          `json:"device_id"`
+	Scope                 Scope           `json:"-"`
+	TenantUUID            string          `json:"tenant_id"`
+	AccountUUID           string          `json:"account_id"`
+	LoginSessionUUID      string          `json:"login_session_id"`
+	EmployeeID            int64           `json:"-"`
+	EmployeeUUID          string          `json:"agent_id"`
+	ConversationUUID      string          `json:"conversation_id"`
+	MessageUUID           string          `json:"message_id"`
+	StreamID              string          `json:"stream_id"`
+	Fence                 int64           `json:"fencing_token"`
+	Model                 string          `json:"model"`
+	Status                string          `json:"status"`
+	Payload               json.RawMessage `json:"payload"`
+	TokenHash             string          `json:"-"`
+	ExpiresAt             time.Time       `json:"expires_at"`
+	LastSeq               int64           `json:"last_seq"`
 }
 
 type Event struct {

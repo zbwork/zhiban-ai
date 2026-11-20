@@ -4,15 +4,22 @@
 // 房间元数据 + 触发记录 复用 AdminRooms.get / AdminRooms.triggers 已有 API.
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { notifyOk } from '../lib/toast'
 import { Link, useParams } from 'react-router-dom'
 import {
   AdminRooms,
   AdminSpeakerDecisions,
+  AdminSpeakerPolicies,
+  type AdminSpeakerPolicy,
   type AdminRoomSummary,
   type AdminSpeakerDecision,
 } from '../lib/api'
 import {
+  Button,
   DataTable,
+  FormField,
+  Input,
+  Select,
   EmptyState,
   FormSection,
   InlineAlert,
@@ -101,14 +108,14 @@ export default function RoomDetailPage() {
         ]}
       />
 
-      {tab === 'overview' && <OverviewPane room={room} />}
+      {tab === 'overview' && <OverviewPane room={room} onSaved={setRoom} />}
       {tab === 'responses' && uuid && <ResponsesPane roomUUID={uuid} />}
       {tab === 'diagnostics' && <DiagnosticsPane room={room} />}
     </div>
   )
 }
 
-function OverviewPane({ room }: { room: AdminRoomSummary | null }) {
+function OverviewPane({ room, onSaved }: { room: AdminRoomSummary | null; onSaved: (room: AdminRoomSummary) => void }) {
   if (!room) return <div className="text-sm text-[var(--color-text-sub)]">加载中...</div>
   return (
     <Panel>
@@ -121,7 +128,62 @@ function OverviewPane({ room }: { room: AdminRoomSummary | null }) {
         <KV k="24h @数字员工" v={`${room.triggers_24h} 次`} />
         <KV k="创建时间" v={new Date(room.created_at).toLocaleString('zh-CN', { hour12: false })} />
       </FormSection>
+      {room.room_kind === 'group' && <SpeakerPolicyField key={room.speaker_policy_uuid || room.uuid} room={room} onSaved={onSaved} />}
+
     </Panel>
+  )
+}
+
+function SpeakerPolicyField({ room, onSaved }: { room: AdminRoomSummary; onSaved: (room: AdminRoomSummary) => void }) {
+  const [policies, setPolicies] = useState<AdminSpeakerPolicy[]>([])
+  const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState(room.speaker_policy_uuid || '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let active = true
+    const timer = window.setTimeout(() => {
+      setLoading(true)
+      AdminSpeakerPolicies.list({ q: query.trim() || undefined, page_size: 30 })
+        .then((resp) => {
+          if (!active) return
+          setPolicies(resp.items.filter((p) => ['manual', 'manager', 'round_robin'].includes(p.base_policy)))
+          setError('')
+        })
+        .catch((e: Error) => { if (active) setError(e.message) })
+        .finally(() => { if (active) setLoading(false) })
+    }, 180)
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [query])
+  const save = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      onSaved(await AdminRooms.applySpeaker(room.uuid, selected))
+      notifyOk('已应用响应策略')
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <FormSection title="响应策略">
+      <FormField label="搜索策略">
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="输入策略名称" />
+      </FormField>
+      <FormField label="应用已有策略">
+        <Select value={selected} onChange={(e) => setSelected(e.target.value)} disabled={loading || busy}>
+          <option value="">请选择手动、主持人或轮询策略</option>
+          {policies.map((policy) => <option key={policy.uuid} value={policy.uuid}>{policy.name}</option>)}
+        </Select>
+      </FormField>
+      <Button disabled={loading || busy || !policies.some((policy) => policy.uuid === selected)} onClick={() => void save()}>
+        应用响应策略
+      </Button>
+      {error && <InlineAlert tone="danger">{error}</InlineAlert>}
+    </FormSection>
   )
 }
 
@@ -217,9 +279,10 @@ function ResponsesPane({ roomUUID }: { roomUUID: string }) {
 
 function DecisionRow({ d }: { d: AdminSpeakerDecision }) {
   const candCount = useMemo(() => {
+    if (typeof d.candidate_count === 'number') return d.candidate_count
     if (Array.isArray(d.candidates)) return d.candidates.length
     return null
-  }, [d.candidates])
+  }, [d.candidate_count, d.candidates])
   return (
     <tr className="border-t border-[var(--color-line-soft)]" title={d.policy_name ? `policy: ${d.policy_name} (${d.policy_uuid?.slice(0, 8)})` : ''}>
       <td className="px-3 py-2 text-xs text-[var(--color-text-sub)]">{new Date(d.created_at).toLocaleString('zh-CN', { hour12: false })}</td>

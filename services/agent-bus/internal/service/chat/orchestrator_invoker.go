@@ -16,6 +16,7 @@ import (
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/adapter/runtime/openclaw/gatewayws"
 	zapadapter "github.com/zbwork/zhiban-ai/services/agent-bus/internal/adapter/runtime/zap"
 	domagent "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/agent"
+	domlocal "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/localruntime"
 	dommsg "github.com/zbwork/zhiban-ai/services/agent-bus/internal/domain/message"
 	apperr "github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/errors"
 	"github.com/zbwork/zhiban-ai/services/agent-bus/internal/pkg/id"
@@ -48,6 +49,12 @@ func (s *impl) invokeChildAgent(ctx context.Context, in deorch.InvokeInput) (deo
 	if ag.TenantID != in.TenantID && ag.Source != "platform" {
 		return deorch.InvokeResult{}, fmt.Errorf("deorch invoke: child cross-tenant")
 	}
+	if in.Desktop.Device != "" {
+		if ag.ExecutionLocus != "local" || ag.TenantID != in.TenantID || ag.Status != "published" || deorch.IsOrchestrator(ag.Metadata) {
+			return deorch.InvokeResult{}, fmt.Errorf("local orchestration worker is unavailable")
+		}
+		return s.invokeDesktopWorker(ctx, in)
+	}
 	fw, err := s.frameworkForAgent(ctx, ag, s.runtimeEnvFW)
 	if err != nil {
 		return deorch.InvokeResult{}, fmt.Errorf("deorch invoke: resolve framework: %w", err)
@@ -77,6 +84,52 @@ func (s *impl) invokeChildAgent(ctx context.Context, in deorch.InvokeInput) (deo
 		return deorch.InvokeResult{}, err
 	}
 	return deorch.InvokeResult{Text: text}, nil
+}
+
+func (s *impl) invokeDesktopWorker(ctx context.Context, in deorch.InvokeInput) (deorch.InvokeResult, error) {
+	sent, err := s.Send(ctx, in.AccountID, in.TenantID, SendReq{
+		AgentUUID: in.Agent.UUID, Text: in.Prompt,
+		LocalLoginSessionUUID: in.Desktop.Session, LocalDeviceUUID: in.Desktop.Device,
+		LocalCollaborationChild: true,
+	})
+	if err != nil {
+		return deorch.InvokeResult{}, fmt.Errorf("local orchestration worker could not start")
+	}
+	completed := false
+	defer func() {
+		if !completed {
+			stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+			defer cancel()
+			_, _ = s.Stop(stop, in.AccountID, in.TenantID, StopReq{MessageUUID: sent.AgentMessageUUID, Reason: "local_orchestration_closed"})
+		}
+	}()
+	sub, closeStream, err := s.SubscribeWithOwner(ctx, in.AccountID, in.TenantID, sent.StreamID)
+	if err != nil {
+		return deorch.InvokeResult{}, err
+	}
+	defer closeStream()
+	for {
+		select {
+		case <-ctx.Done():
+			return deorch.InvokeResult{}, ctx.Err()
+		case ev, ok := <-sub:
+			if !ok {
+				return deorch.InvokeResult{}, fmt.Errorf("local orchestration worker stream closed")
+			}
+			if !ev.IsTerminal() {
+				continue
+			}
+			completed = true
+			if ev.Kind != EventMessageCompleted {
+				return deorch.InvokeResult{}, fmt.Errorf("local orchestration worker did not complete")
+			}
+			text := strings.TrimSpace(messageblocks.ReadableText(ev.Blocks))
+			if text == "" {
+				return deorch.InvokeResult{}, fmt.Errorf("local orchestration worker returned no text")
+			}
+			return deorch.InvokeResult{Text: text}, nil
+		}
+	}
 }
 
 // drainZapAgentSync 给编排子调用走 ZAP 数据面同步派发。
@@ -313,9 +366,32 @@ func (s *impl) sendOrchestrator(ctx context.Context, accountID, tenantID int64, 
 		return nil, apperr.ErrInternal.Withf("chat: orchestrator runtime not wired")
 	}
 
+	var desktop deorch.DesktopTarget
+	if s.communityLocalOrchestration {
+		scope := domlocal.Scope{AccountID: accountID, TenantID: tenantID, SessionUUID: req.LocalLoginSessionUUID}
+		if s.localRuntime == nil || req.LocalDeviceUUID == "" || req.LocalCollaborationChild ||
+			ag.TenantID != tenantID || ag.Status != "published" || !canRunOnCallersComputer(ag, accountID) {
+			return nil, apperr.ErrForbidden
+		}
+		device, err := s.localRuntime.ResolveDesktop(ctx, scope, req.LocalDeviceUUID)
+		if err != nil || device.Scope != scope || device.UUID != req.LocalDeviceUUID {
+			return nil, apperr.New(apperr.PreconditionFailed, "编排需要当前桌面在线")
+		}
+		desktop = deorch.DesktopTarget{Device: device.UUID, Session: scope.SessionUUID}
+	}
 	cfg, children, err := s.resolveOrchestratorChildren(ctx, accountID, tenantID, ag)
 	if err != nil {
 		return nil, err
+	}
+
+	if desktop.Device != "" && (cfg.Strategy != deorch.StrategySequential || len(children) < 2 ||
+		len(children) > 8 || len(children) != len(cfg.ChildUUIDs)) {
+		return nil, apperr.New(apperr.PreconditionFailed, "请配置 2 到 8 个当前成员可用的本机员工")
+	}
+	for _, block := range req.Blocks {
+		if desktop.Device != "" && block["type"] != "plain" && block["type"] != "text" && block["type"] != "markdown" {
+			return nil, apperr.New(apperr.InvalidParams, "本机编排仅支持文字")
+		}
 	}
 
 	// 复用单聊的 conversation 选取/创建 (digital_employee_id = 编排主控)。
@@ -353,6 +429,7 @@ func (s *impl) sendOrchestrator(ctx context.Context, accountID, tenantID int64, 
 		BudgetChecked:        true, // 编排不入队, 不做 backlog 预算检查
 		OrchestratorChildren: children,
 		OrchestratorStrategy: cfg.Strategy,
+		OrchestrationDesktop: desktop,
 	})
 	if err != nil {
 		return nil, err
@@ -387,7 +464,7 @@ func (s *impl) resolveOrchestratorChildren(ctx context.Context, accountID, tenan
 			s.logger.Warn(ctx, "orchestrator child not found; dropping", "master", ag.UUID, "child", cu)
 			continue
 		}
-		if child.Status != "published" {
+		if (s.communityLocalOrchestration && (child.TenantID != tenantID || child.ExecutionLocus != "local" || child.ID == ag.ID)) || child.Status != "published" {
 			s.logger.Warn(ctx, "orchestrator child not published; dropping", "master", ag.UUID, "child", cu, "status", child.Status)
 			continue
 		}
@@ -432,6 +509,28 @@ func effectiveAgentTenantID(agent *domagent.DigitalEmployee, callerTenantID int6
 	return agent.TenantID
 }
 
+func (s *impl) refreshDesktopAdmission(ctx context.Context, accountID int64, master deorch.MasterAgent, child deorch.ChildAgent) (deorch.MasterAgent, deorch.ChildAgent, error) {
+	from, err := s.agents.GetByUUID(ctx, master.UUID)
+	if err != nil || from == nil || from.ID != master.ID || from.TenantID != master.TenantID ||
+		from.Status != "published" || from.ExecutionLocus != "local" || !deorch.IsOrchestrator(from.Metadata) {
+		return master, child, apperr.ErrForbidden
+	}
+	to, err := s.agents.GetByUUID(ctx, child.UUID)
+	if err != nil || to == nil || to.ID != child.ID || to.TenantID != master.TenantID ||
+		to.Status != "published" || to.ExecutionLocus != "local" || deorch.IsOrchestrator(to.Metadata) {
+		return master, child, apperr.ErrForbidden
+	}
+	for _, employee := range []*domagent.DigitalEmployee{from, to} {
+		if err := s.visibility.AssertAgentVisible(ctx, accountID, master.TenantID, employee.UUID); err != nil {
+			return master, child, err
+		}
+	}
+	master.WorkspaceID = from.WorkspaceID
+	child.WorkspaceID = to.WorkspaceID
+	child.CallableByAgentsJSON = to.CallableByAgentsJSON
+	return master, child, nil
+}
+
 // runOrchestratorGoroutine detached 跑一次编排 run, 完成后把唯一一条 master agent message finalize。
 // 诚实失败: run failed / 出错 / 无最终文本 → 通用收尾消息 (message.failed), 不下发内部码或 child 细节。
 func (s *impl) runOrchestratorGoroutine(ctx context.Context, streamID string, in runAgentInternalIn, agentMsgUUID string) {
@@ -448,6 +547,10 @@ func (s *impl) runOrchestratorGoroutine(ctx context.Context, streamID string, in
 		Children:  in.OrchestratorChildren,
 		Strategy:  in.OrchestratorStrategy,
 		Prompt:    in.PromptText,
+		Desktop:   in.OrchestrationDesktop,
+		RefreshAdmission: func(ctx context.Context, master deorch.MasterAgent, child deorch.ChildAgent) (deorch.MasterAgent, deorch.ChildAgent, error) {
+			return s.refreshDesktopAdmission(ctx, in.AccountID, master, child)
+		},
 	})
 	if err != nil || string(res.Status) != "done" || strings.TrimSpace(res.FinalText) == "" {
 		s.logger.Warn(ctx, "chat orchestrator run failed",

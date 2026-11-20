@@ -159,6 +159,16 @@ func (s *Service) Disconnect(ctx context.Context, scope dom.Scope, deviceID stri
 }
 func (s *Service) Expire(ctx context.Context) (int64, error) { return s.repo.ExpireTasks(ctx) }
 
+func (s *Service) DefaultModel(ctx context.Context, scope dom.Scope, employeeID int64) (string, error) {
+	chooser, ok := s.models.(interface {
+		DefaultLocalModel(context.Context, dom.Scope, int64) (string, error)
+	})
+	if !ok {
+		return "", dom.ErrModelUnavailable
+	}
+	return chooser.DefaultLocalModel(ctx, scope, employeeID)
+}
+
 func (s *Service) Ready(ctx context.Context, scope dom.Scope, deviceID string, employeeID int64, hint string) (string, error) {
 	device, err := s.repo.GetDevice(ctx, scope, deviceID)
 	if err != nil {
@@ -262,7 +272,14 @@ func (s *Service) Create(ctx context.Context, task dom.Task) (*dom.Task, error) 
 	if err != nil {
 		return nil, err
 	}
-	task.UUID = uuid.NewString()
+	if task.CollaborationEdgeUUID != "" {
+		if _, err := uuid.Parse(task.CollaborationEdgeUUID); err != nil {
+			return nil, dom.ErrDenied
+		}
+		task.UUID = task.CollaborationEdgeUUID
+	} else {
+		task.UUID = uuid.NewString()
+	}
 	task.Model = selected.Model
 	task.ExpiresAt = time.Now().Add(15 * time.Minute)
 	task.TokenHash = digest(s.capability(&task))

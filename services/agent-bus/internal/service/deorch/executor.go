@@ -32,8 +32,15 @@ type ChildAgent struct {
 	CallableByAgentsJSON string // 用于 A2A 准入 (callable_by_agents)
 }
 
+// DesktopTarget pins the run to the initiating member's desktop session.
+type DesktopTarget struct {
+	Session string
+	Device  string
+}
+
 // InvokeInput 单次 child 调用入参。
 type InvokeInput struct {
+	Desktop       DesktopTarget
 	TenantID      int64
 	AccountID     int64
 	FromAgentUUID string
@@ -159,12 +166,15 @@ func NewExecutor(runs RunStore, edges EdgeStore, invoker AgentInvoker, admission
 
 // RunInput 一次编排运行 (= 用户对编排型数字员工发一条消息)。
 type RunInput struct {
-	TenantID  int64
-	AccountID int64
-	Master    MasterAgent
-	Children  []ChildAgent
-	Strategy  Strategy
-	Prompt    string
+	// RefreshAdmission supplies the current participants before each desktop step.
+	RefreshAdmission func(context.Context, MasterAgent, ChildAgent) (MasterAgent, ChildAgent, error)
+	Desktop          DesktopTarget
+	TenantID         int64
+	AccountID        int64
+	Master           MasterAgent
+	Children         []ChildAgent
+	Strategy         Strategy
+	Prompt           string
 }
 
 // RunResult 编排结果。FinalText 是回给用户的最终回复 (用户可见安全, 无内部码);
@@ -232,8 +242,14 @@ func (e *Executor) Run(ctx context.Context, in RunInput) (RunResult, error) {
 	finalText, status := reduce(in.Strategy, outcomes)
 	completed := time.Now()
 	finalStatus := status
-	_, _ = e.runs.UpdateStatus(ctx, in.TenantID, run.UUID, orchdom.UpdateStatusInput{
-		Status: &finalStatus, CompletedAt: &completed, FinalSummary: strPtr(trunc(finalText, 2000)),
+	summary := trunc(finalText, 2000)
+	if in.Desktop.Device != "" {
+		summary = ""
+	}
+	settle, cancelSettle := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancelSettle()
+	_, _ = e.runs.UpdateStatus(settle, in.TenantID, run.UUID, orchdom.UpdateStatusInput{
+		Status: &finalStatus, CompletedAt: &completed, FinalSummary: strPtr(summary),
 		EdgesCount: int32Ptr(int32(len(outcomes))),
 	})
 	return RunResult{OrchestrationUUID: run.UUID, FinalText: finalText, Status: status, Calls: callTraces(outcomes)}, nil
@@ -309,7 +325,19 @@ func admissionDropStatus(reason string) edgedom.Status {
 // failed, **不调用** invoker (否则会出现"真实调用了 child 但 a2a_call_edges/step 没有记录"的审计黑洞)。
 func (e *Executor) invokeChild(ctx context.Context, in RunInput, run *orchdom.Orchestration, idx int16, child ChildAgent, prompt string) childOutcome {
 	// 1) A2A 准入 (validation-only, fail-closed)。
-	allowed, reason := e.admission.Admit(ctx, in.Master, child)
+	master := in.Master
+	allowed, reason := false, "participant_unavailable"
+	admissionReady := in.Desktop.Device == ""
+	if !admissionReady && in.RefreshAdmission != nil {
+		freshMaster, freshChild, err := in.RefreshAdmission(ctx, master, child)
+		if err == nil {
+			master, child = freshMaster, freshChild
+			admissionReady = true
+		}
+	}
+	if admissionReady {
+		allowed, reason = e.admission.Admit(ctx, master, child)
+	}
 
 	// 2) 先落 edge trace。插入失败 → fail-closed: 写一条 failed step (best-effort) 后**不调用** child。
 	edge, edgeErr := e.insertEdge(ctx, in, run, child)
@@ -337,7 +365,7 @@ func (e *Executor) invokeChild(ctx context.Context, in RunInput, run *orchdom.Or
 
 	res, attempts, err := e.invokeWithRetry(ctx, InvokeInput{
 		TenantID: in.TenantID, AccountID: in.AccountID, FromAgentUUID: in.Master.UUID,
-		EdgeUUID: edge.UUID, Agent: child, Prompt: prompt,
+		EdgeUUID: edge.UUID, Agent: child, Prompt: prompt, Desktop: in.Desktop,
 	})
 	if err != nil {
 		emsg := trunc(err.Error(), 512)
@@ -352,11 +380,19 @@ func (e *Executor) invokeChild(ctx context.Context, in RunInput, run *orchdom.Or
 		return childOutcome{child: child, ok: false, status: edgedom.StatusFailed, reason: visibleFailureSummary(attempts), edgeUUID: edge.UUID, attempts: attempts}
 	}
 	e.finishEdge(ctx, in.TenantID, edge, edgedom.StatusDone, "", res.TokensIn, res.TokensOut)
-	e.finishStep(ctx, step, orchdom.StepDone, trunc(res.Text, 2000), "")
+	summary := trunc(res.Text, 2000)
+	if in.Desktop.Device != "" {
+		summary = ""
+	}
+	e.finishStep(ctx, step, orchdom.StepDone, summary, "")
 	return childOutcome{child: child, ok: true, text: res.Text, status: edgedom.StatusDone, edgeUUID: edge.UUID, attempts: attempts}
 }
 
 func (e *Executor) invokeWithRetry(ctx context.Context, in InvokeInput) (InvokeResult, int, error) {
+	if in.Desktop.Device != "" {
+		res, err := e.invoker.Invoke(ctx, in)
+		return res, 1, err
+	}
 	var lastErr error
 	for attempt := 1; attempt <= childInvokeMaxAttempts; attempt++ {
 		res, err := e.invoker.Invoke(ctx, in)
@@ -441,6 +477,9 @@ func (e *Executor) writeStep(ctx context.Context, in RunInput, run *orchdom.Orch
 func (e *Executor) startStep(ctx context.Context, in RunInput, run *orchdom.Orchestration, idx int16, child ChildAgent, edge *edgedom.Edge, prompt string) *orchdom.Step {
 	createdBy := in.AccountID
 	worker := child.ID
+	if in.Desktop.Device != "" {
+		prompt = ""
+	}
 	csi := orchdom.CreateStepInput{
 		OrchestrationID: run.ID,
 		StepIndex:       idx,
