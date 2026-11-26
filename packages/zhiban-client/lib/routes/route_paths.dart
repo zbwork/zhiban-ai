@@ -9,6 +9,7 @@ abstract final class RoutePaths {
   static const String digitalEmployeeSearch = '/digital-employee/search';
   static const String createAgent = '/digital-employee/create';
   static const String inspire = '/inspire';
+  static const String creatorRoundtable = '/creator-roundtable';
   static const String skillDetail = '/inspire/detail';
   static const String task = '/task';
   static const String taskEditor = '/task/editor';

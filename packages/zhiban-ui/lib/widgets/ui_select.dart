@@ -46,6 +46,7 @@ class UiSelect<T> extends StatefulWidget {
     this.height,
     this.groupTabs = const [],
     this.searchPlaceholder = '搜索选项...',
+    this.showSelectedGroup = true,
   });
 
   final List<UiSelectOption<T>> options;
@@ -58,6 +59,7 @@ class UiSelect<T> extends StatefulWidget {
   final double? height;
   final List<String> groupTabs;
   final String searchPlaceholder;
+  final bool showSelectedGroup;
 
   @override
   State<UiSelect<T>> createState() => _UiSelectState<T>();
@@ -124,7 +126,7 @@ class _UiSelectState<T> extends State<UiSelect<T>> {
 
   @override
   void dispose() {
-    _removeOverlay(force: true);
+    _removeOverlay(rebuild: false);
     _searchController.dispose();
     _focusNode.dispose();
     _listScrollController.dispose();
@@ -397,11 +399,13 @@ class _UiSelectState<T> extends State<UiSelect<T>> {
     );
   }
 
-  void _removeOverlay({bool force = false}) {
-    if (_overlayEntry == null) return;
-    _overlayEntry?.remove();
+  void _removeOverlay({bool rebuild = true}) {
+    final entry = _overlayEntry;
+    if (entry == null) return;
     _overlayEntry = null;
-    if (mounted) {
+    entry.remove();
+    entry.dispose();
+    if (rebuild && mounted) {
       setState(() => _expanded = false);
     }
   }
@@ -489,7 +493,9 @@ class _UiSelectState<T> extends State<UiSelect<T>> {
                           ),
                     ),
                   ),
-                  if (_grouped && selectedOption?.group != null)
+                  if (widget.showSelectedGroup &&
+                      _grouped &&
+                      selectedOption?.group != null)
                     ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 120),
                         child: Padding(

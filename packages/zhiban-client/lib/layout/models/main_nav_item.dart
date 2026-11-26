@@ -10,6 +10,7 @@ class MainNavItem {
   final String label;
   final String path;
   final bool opensMorePanel;
+  final bool localOnly;
 
   /// 移动端底部导航栏单独显示的标签，为 null 时回退到 [label]。
   final String? mobileLabel;
@@ -25,6 +26,7 @@ class MainNavItem {
     this.mobileSelectedIconWidth = 25,
     this.mobileSelectedIconHeight = 25,
     this.opensMorePanel = false,
+    this.localOnly = false,
   });
 }
 
@@ -58,6 +60,14 @@ const _taskNavItem = MainNavItem(
   mobileLabel: '任务',
   path: RoutePaths.task,
 );
+const _creatorRoundtableNavItem = MainNavItem(
+  mobileIconAsset: 'assets/images/main_layout/mobile_nav/roundtable.svg',
+  mobileIconAssetSelected:
+      'assets/images/main_layout/mobile_nav/roundtable_selected.svg',
+  label: '博主圆桌',
+  path: RoutePaths.creatorRoundtable,
+  localOnly: true,
+);
 
 /// 桌面端沿用既有侧栏信息架构；不要因移动端入口收敛而改动此列表。
 const mainNavItems = [
@@ -65,6 +75,7 @@ const mainNavItems = [
   _digitalEmployeeNavItem,
   _skillsNavItem,
   _taskNavItem,
+  _creatorRoundtableNavItem,
   // 云盘是文件体系的统一入口。"知识库"是 Space 下与云盘并列的索引视图,
   // 渲染在云盘页内部的侧栏(§2 存储 UI 结构全景),不在主导航单列。
   MainNavItem(

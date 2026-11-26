@@ -9,8 +9,11 @@ import 'package:zhiban_client/layout/session_layout.dart';
 import 'widgets/desktop_sidebar.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
-  const MainLayout(
-      {super.key, required this.child, this.localWorkspace = false});
+  const MainLayout({
+    super.key,
+    required this.child,
+    this.localWorkspace = false,
+  });
   final Widget child;
   final bool localWorkspace;
   @override
@@ -21,31 +24,40 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   @override
   Widget build(BuildContext context) {
     if (widget.localWorkspace) return _shell(0);
-    return SessionLayout(builder: (context, unreadCount) {
-      _syncChatRouteActive(context);
-      return _shell(unreadCount);
-    });
+    return SessionLayout(
+      builder: (context, unreadCount) {
+        _syncChatRouteActive(context);
+        return _shell(unreadCount);
+      },
+    );
   }
 
   Widget _shell(int unreadCount) => Scaffold(
-          body: Row(children: [
+    body: Row(
+      children: [
         DesktopSidebar(
           localWorkspace: widget.localWorkspace,
           navItems: mainNavItems
-              .where((item) =>
-                  item.path != RoutePaths.settings &&
-                  (!widget.localWorkspace ||
-                      [
-                        RoutePaths.chat,
-                        RoutePaths.digitalEmployee,
-                        RoutePaths.task,
-                        RoutePaths.inspire
-                      ].contains(item.path)))
+              .where(
+                (item) =>
+                    item.path != RoutePaths.settings &&
+                    (widget.localWorkspace || !item.localOnly) &&
+                    (!widget.localWorkspace ||
+                        [
+                          RoutePaths.chat,
+                          RoutePaths.digitalEmployee,
+                          RoutePaths.task,
+                          RoutePaths.inspire,
+                          RoutePaths.creatorRoundtable,
+                        ].contains(item.path)),
+              )
               .toList(),
           chatUnreadCount: unreadCount,
         ),
         Expanded(child: widget.child),
-      ]));
+      ],
+    ),
+  );
 
   /// 按当前路由是否落在 /chat 子树上，同步 [isChatRouteActiveProvider]。
   /// 不能直接在 build() 里写 provider（Riverpod 不允许 build 期间改状态），
@@ -68,7 +80,8 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     final location = GoRouterState.of(context).matchedLocation;
     // 桌面 /chat 是常驻的"列表 + 会话详情"分栏面板，进这个路由就等于在看
     // activeConversationId 那个会话。
-    final isChat = location == RoutePaths.chat ||
+    final isChat =
+        location == RoutePaths.chat ||
         location.startsWith('${RoutePaths.chat}/');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;

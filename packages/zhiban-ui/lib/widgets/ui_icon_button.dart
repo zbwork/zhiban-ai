@@ -25,10 +25,10 @@ class UiIconButton extends StatefulWidget {
     this.size = 32,
     this.enabled = true,
     this.hoverColor,
-  })  : iconWidget = icon,
-        icon = null,
-        iconSize = 16,
-        color = null;
+  }) : iconWidget = icon,
+       icon = null,
+       iconSize = 16,
+       color = null;
 
   final IconData? icon;
   final Widget? iconWidget;
@@ -51,11 +51,13 @@ class UiIconButton extends StatefulWidget {
 
 class _UiIconButtonState extends State<UiIconButton> {
   bool _hovered = false;
+  bool _focused = false;
 
   bool get _active => widget.enabled && widget.onTap != null;
 
   @override
   Widget build(BuildContext context) {
+    final highlighted = _active && (_hovered || _focused);
     Widget btn = MouseRegion(
       cursor: _active ? SystemMouseCursors.click : SystemMouseCursors.basic,
       onEnter: (_) {
@@ -69,25 +71,40 @@ class _UiIconButtonState extends State<UiIconButton> {
           width: widget.size,
           height: widget.size,
           decoration: BoxDecoration(
-            color: _hovered
+            color: highlighted
                 ? (widget.hoverColor ?? const Color(0xFFE8ECF2))
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.center,
-          child: widget.iconWidget ??
+          child:
+              widget.iconWidget ??
               Icon(
                 widget.icon,
                 size: widget.iconSize,
                 color: _active
                     ? (widget.color ??
-                        (_hovered
-                            ? const Color(0xFF344054)
-                            : const Color(0xFF98A2B3)))
+                          (highlighted
+                              ? const Color(0xFF344054)
+                              : const Color(0xFF98A2B3)))
                     : const Color(0xFFD0D5DD),
               ),
         ),
       ),
+    );
+
+    btn = FocusableActionDetector(
+      enabled: _active,
+      onShowFocusHighlight: (focused) => setState(() => _focused = focused),
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap?.call();
+            return null;
+          },
+        ),
+      },
+      child: Semantics(button: true, enabled: _active, child: btn),
     );
 
     if (widget.tooltip != null) {

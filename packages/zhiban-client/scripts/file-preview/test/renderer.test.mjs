@@ -6,7 +6,7 @@ import { chromium } from "@playwright/test";
 import JSZip from "jszip";
 import ExcelJS from "exceljs";
 import PptxGenJS from "pptxgenjs";
-import { PDFDocument, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFHexString, PDFName, StandardFonts } from "pdf-lib";
 
 test(
   "bundled viewer renders real files and isolates HTML scripts",
@@ -99,6 +99,17 @@ test(
       assert.deepEqual(await page.evaluate(() => [window.previousVideo.paused, window.previousVideo.getAttribute('src'), window.previousVideo.isConnected]), [true, null, false]);
       assert.equal(await page.evaluate(() => window.previewFile({format:'video', name:'broken.mp4', base64:btoa('not a video')})), 'error');
       assert.match(await page.locator('.status').innerText(), /视频/);
+      await render("audio", await readFile(new URL('./fixtures/preview.m4a', import.meta.url)), 'sample.m4a');
+      assert.equal(await page.locator('video').count(), 0);
+      assert.equal(await page.locator('audio').evaluate(a => a.paused), true);
+      await page.getByRole('button', {name: '播放', exact: true}).click();
+      await page.waitForFunction(() => document.querySelector('audio').currentTime > 0);
+      await page.getByRole('button', {name: '暂停', exact: true}).click();
+      await page.getByRole('slider', {name: '播放进度', exact: true}).fill('0.6');
+      await page.waitForFunction(() => Math.abs(document.querySelector('audio').currentTime - 0.6) < 0.1);
+      await page.evaluate(() => { window.previousAudio = document.querySelector('audio'); });
+      assert.equal(await page.evaluate(() => window.previewFile({format:'markdown', name:'next.md', base64:btoa('# Next')})), 'ready');
+      assert.deepEqual(await page.evaluate(() => [window.previousAudio.paused, window.previousAudio.getAttribute('src'), window.previousAudio.isConnected]), [true, null, false]);
       await render(
         "image",
         Buffer.from(
@@ -267,3 +278,70 @@ test(
     }
   },
 );
+
+
+test("PDF chapter selection follows pagination and zoom", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch({
+    headless: true,
+    channel: process.env.PREVIEW_BROWSER_CHANNEL || undefined,
+  });
+  try {
+    const page = await browser.newPage({ viewport: { width: 960, height: 690 } });
+    const shell = await readFile(new URL("../../../assets/file_preview/viewer.html", import.meta.url), "utf8");
+    await page.setContent(shell);
+    await page.waitForFunction(() => typeof window.previewFile === "function");
+    const raw = process.env.ROUNDTABLE_READER_PDF;
+    let bytes;
+    if (raw) {
+      bytes = await readFile(raw);
+    } else {
+      const pdf = await PDFDocument.create();
+      const { context } = pdf;
+      const cover = pdf.addPage();
+      const chapter = pdf.addPage();
+      const sources = pdf.addPage();
+      const outlines = context.nextRef();
+      const first = context.nextRef();
+      const second = context.nextRef();
+      const third = context.nextRef();
+      context.assign(outlines, context.obj({ Type: "Outlines", First: first, Last: third, Count: 3 }));
+      context.assign(first, context.obj({
+        Title: PDFHexString.fromText("封面"), Parent: outlines, Next: second, Dest: [cover.ref, "Fit"],
+      }));
+      context.assign(second, context.obj({
+        Title: PDFHexString.fromText("章节内容"), Parent: outlines, Prev: first, Next: third, Dest: [chapter.ref, "Fit"],
+      }));
+      context.assign(third, context.obj({
+        Title: PDFHexString.fromText("来源索引"), Parent: outlines, Prev: second, Dest: [sources.ref, "Fit"],
+      }));
+      pdf.catalog.set(PDFName.of("Outlines"), outlines);
+      bytes = await pdf.save();
+    }
+    assert.equal(await page.evaluate((base64) => window.previewFile({
+      base64,
+      format: "pdf",
+      name: "book.pdf",
+    }), Buffer.from(bytes).toString("base64")), "ready");
+    const chapters = page.getByRole("combobox", { name: "章节" });
+    assert.equal(await chapters.inputValue(), "0");
+    assert.ok(await page.getByTitle("上一页").isDisabled());
+
+    const chapterLabels = await chapters.locator("option").allTextContents();
+    assert.equal(chapterLabels[0], "封面");
+    assert.equal(chapterLabels.at(-1), "来源索引");
+    const last = await chapters.locator("option").last().getAttribute("value");
+    await chapters.selectOption(last);
+    await page.waitForFunction((value) => document.querySelector("select[aria-label='章节']").value === value, last);
+    assert.ok(await page.getByTitle("下一页").isDisabled());
+    await page.getByTitle("缩小").click();
+    assert.equal(await chapters.inputValue(), last);
+    await page.getByTitle("上一页").click();
+    assert.notEqual(await chapters.inputValue(), last);
+    assert.ok(await page.getByTitle("下一页").isEnabled());
+    if (process.env.ROUNDTABLE_READER_SCREENSHOT) {
+      await page.screenshot({ path: process.env.ROUNDTABLE_READER_SCREENSHOT });
+    }
+  } finally {
+    await browser.close();
+  }
+});

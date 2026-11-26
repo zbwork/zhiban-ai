@@ -1,6 +1,8 @@
 import Cocoa
 import FlutterMacOS
 import PDFKit
+import Vision
+import ImageIO
 
 class MainFlutterWindow: NSWindow {
   private var documentChannel: FlutterMethodChannel?
@@ -24,6 +26,24 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     documentChannel = FlutterMethodChannel(name: "cn.qkfintech.zhiban/local-documents", binaryMessenger: flutterViewController.engine.binaryMessenger)
     documentChannel?.setMethodCallHandler { call, result in
+      if call.method == "recognizeCreatorImage" {
+        guard let bytes = call.arguments as? FlutterStandardTypedData,
+              bytes.data.count <= 10 * 1024 * 1024 else {
+          result(FlutterError(code: "invalid_image", message: "图片不能超过 10 MiB", details: nil))
+          return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+          do {
+            let text = try Self.recognizeCreatorImage(bytes.data)
+            DispatchQueue.main.async { result(text) }
+          } catch {
+            DispatchQueue.main.async {
+              result(FlutterError(code: "image_ocr_failed", message: "无法识别这张图片的文字", details: nil))
+            }
+          }
+        }
+        return
+      }
       guard call.method == "extractPdf" else { result(FlutterMethodNotImplemented); return }
       guard let args = call.arguments as? [String: Any],
             let typed = args["bytes"] as? FlutterStandardTypedData,
@@ -181,6 +201,25 @@ class MainFlutterWindow: NSWindow {
     self.styleMask.insert(.fullSizeContentView)
 
     super.awakeFromNib()
+  }
+
+  private static func recognizeCreatorImage(_ data: Data) throws -> String {
+    guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+          let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+          let width = properties[kCGImagePropertyPixelWidth as String] as? Int,
+          let height = properties[kCGImagePropertyPixelHeight as String] as? Int,
+          (1...8000).contains(width), (1...8000).contains(height),
+          width * height <= 24_000_000 else {
+      throw CocoaError(.fileReadCorruptFile)
+    }
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .accurate
+    let supported = try request.supportedRecognitionLanguages()
+    let preferred = ["zh-Hans", "zh-Hant", "en-US"].filter(supported.contains)
+    if !preferred.isEmpty { request.recognitionLanguages = preferred }
+    try VNImageRequestHandler(data: data).perform([request])
+    let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+    return String(lines.joined(separator: "\n").prefix(6000))
   }
 
   // 点击红色关闭按钮（或 ⌘W）时不退出程序，仅隐藏窗口；应用继续在 Dock 运行，

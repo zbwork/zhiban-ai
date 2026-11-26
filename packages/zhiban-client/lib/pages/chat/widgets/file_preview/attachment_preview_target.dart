@@ -71,6 +71,7 @@ String attachmentPreviewFormat(String name, String url, [String mime = '']) {
       .contains(ext)) {
     return 'image';
   }
+  if (ext == 'm4a') return 'audio';
   if (['mp4', 'm4v', 'mov', 'webm', 'ogv'].contains(ext)) return 'video';
   if (['md', 'markdown', 'mdx'].contains(ext)) return 'markdown';
   if (['html', 'htm'].contains(ext)) return 'html';
@@ -135,6 +136,7 @@ String attachmentPreviewFormat(String name, String url, [String mime = '']) {
   if (type.contains('spreadsheetml')) return 'xlsx';
   if (type.startsWith('image/')) return 'image';
   if (type.startsWith('video/')) return 'video';
+  if (type == 'audio/mp4' || type == 'audio/x-m4a') return 'audio';
   if (type == 'text/html') return 'html';
   if (type == 'text/markdown') return 'markdown';
   if (type.startsWith('text/') || type == 'application/json') return 'text';

@@ -19,12 +19,18 @@ class AttachmentPreviewPanel extends StatefulWidget {
       required this.target,
       required this.onClose,
       this.onExpand,
+      this.onOpenExternal,
       this.expanded = false,
       this.mobile = false,
       this.frameBuilder});
+
+  /// Captures the actual native renderer in debug integration tests.
+  @visibleForTesting
+  static ValueChanged<InAppWebViewController>? debugOnRendererReady;
+
   final AttachmentPreviewTarget target;
   final VoidCallback onClose;
-  final VoidCallback? onExpand;
+  final VoidCallback? onExpand, onOpenExternal;
   final bool expanded, mobile;
   final Widget Function(Widget body, int? byteLength, bool saving,
       VoidCallback reload, VoidCallback save)? frameBuilder;
@@ -119,8 +125,8 @@ class _AttachmentPreviewPanelState extends State<AttachmentPreviewPanel> {
       final bytes = await loader.read(widget.target, format);
       if (!mounted || generation != _generation) return;
       AttachmentPreviewRefresh.instance.validatedRead(widget.target.url);
-      final shell = await (_shell ??=
-          rootBundle.loadString(ClientAssets.path('assets/file_preview/viewer.html'),
+      final shell = await (_shell ??= rootBundle.loadString(
+        ClientAssets.path('assets/file_preview/viewer.html'),
       ));
       if (!mounted || generation != _generation) return;
       setState(() {
@@ -196,13 +202,14 @@ class _AttachmentPreviewPanelState extends State<AttachmentPreviewPanel> {
           onDownload: _download,
           onClose: widget.onClose,
           onExpand: widget.onExpand,
+          onOpenExternal: widget.onOpenExternal,
           expanded: widget.expanded,
           trailingInset: AppConfig.env == AppEnv.prod ? 0 : 64,
         ),
       Expanded(
           child: _error != null
               ? Center(
-                  child: Padding(
+                  child: SingleChildScrollView(
                       padding: const EdgeInsets.all(24),
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                         Icon(CupertinoIcons.doc_text_search,
@@ -299,6 +306,11 @@ class _AttachmentPreviewPanelState extends State<AttachmentPreviewPanel> {
                           }
                           if (mounted && generation == _generation) {
                             _loadDeadline?.cancel();
+                            assert(() {
+                              AttachmentPreviewPanel.debugOnRendererReady
+                                  ?.call(controller);
+                              return true;
+                            }());
                             debugPrint(
                                 '[FilePreview] rendered format=${attachmentPreviewFormat(widget.target.name, widget.target.url, widget.target.mime)}');
                             setState(() => _rendering = false);

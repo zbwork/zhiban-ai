@@ -19,12 +19,13 @@ class ModelPickerEntry extends PopupMenuEntry<String> {
     required this.modelIcon,
     required this.platform,
     required this.onRefresh,
+    this.switchHint = '切换后从下一条消息生效',
   });
 
   @override
   final double height;
   final List<LlmModelOption> models;
-  final String selected, error;
+  final String selected, error, switchHint;
   final Widget Function(String) modelIcon;
   final Widget? Function(LlmModelOption) platform;
   final Future<ConversationModelState> Function() onRefresh;
@@ -289,7 +290,7 @@ class _ModelPickerEntryState extends State<ModelPickerEntry> {
         Divider(height: 1, color: UiFieldStyle.enabledBorderColor(scheme)),
         Padding(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
-            child: Text('切换后从下一条消息生效',
+            child: Text(widget.switchHint,
                 style: TextStyle(
                     fontSize: 10,
                     color: scheme.onSurfaceVariant.withValues(alpha: .65)))),
@@ -299,7 +300,8 @@ class _ModelPickerEntryState extends State<ModelPickerEntry> {
               TextButton.icon(
                   style: TextButton.styleFrom(
                       foregroundColor: scheme.onSurfaceVariant),
-                  onPressed: _refreshing ? null : () => UserRefresh.run(_refresh),
+                  onPressed:
+                      _refreshing ? null : () => UserRefresh.run(_refresh),
                   icon: _refreshing
                       ? const CupertinoActivityIndicator(radius: 7)
                       : const Icon(CupertinoIcons.arrow_clockwise, size: 16),

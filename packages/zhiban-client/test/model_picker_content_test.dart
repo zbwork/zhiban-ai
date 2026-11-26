@@ -3,10 +3,81 @@ import 'package:flutter/material.dart';
 import 'package:zhiban_client/services/conversation_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zhiban_core/chat/chat_models.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:zhiban_client/pages/local_workspace/local_chat_model_control.dart';
+import 'package:zhiban_client/pages/local_workspace/local_model_picker.dart';
+import 'package:zhiban_client/pages/model_service/models/ai_model_config.dart';
+import 'package:zhiban_client/pages/model_service/models/ai_provider_config.dart';
+import 'package:zhiban_client/pages/model_service/providers/model_service_providers.dart';
+import 'package:zhiban_client/pages/model_service/services/model_catalog_loader.dart';
 import 'package:zhiban_client/pages/chat/widgets/model_picker_content.dart';
 import 'local_agent_design_test.dart' show host;
 
+class _ChatPickerProviders extends ModelProvidersNotifier {
+  @override
+  Future<List<AiProviderConfig>> build() async => const [
+        AiProviderConfig(
+          id: 'bee',
+          name: 'BeeBridge',
+          enabled: true,
+          models: [
+            AiModelConfig(
+                id: 'kimi', modelId: 'kimi-test', displayName: 'Kimi'),
+            AiModelConfig(id: 'gpt', modelId: 'gpt-test', displayName: 'GPT'),
+            AiModelConfig(
+                id: 'speech', modelId: 'whisper-test', displayName: '语音模型'),
+          ],
+        ),
+      ];
+}
+
 void main() {
+  testWidgets('社区对话复用模型选择器并返回服务商及模型标识', (tester) async {
+    (String, String)? selection;
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        modelProvidersProvider.overrideWith(_ChatPickerProviders.new),
+        modelCatalogProvider.overrideWith((ref) async =>
+            const ModelCatalog(providers: [], modelsByProviderId: {})),
+      ],
+      child: MaterialApp(
+        home: Scaffold(
+          body: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              LocalChatModelControl(
+                employee: const {'provider_id': 'bee', 'model_id': 'kimi-test'},
+                busy: false,
+                permissionMode: 'assist',
+                onPermission: (_) async {},
+                onSelect: (provider, model) async =>
+                    selection = (provider, model),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final trigger = find.byKey(const ValueKey('local-chat-model-button'));
+    expect(tester.widget(trigger), isA<LocalModelPicker>());
+    await tester.tap(trigger);
+    await tester.pumpAndSettle();
+    final popup = find.byType(ModelPickerEntry);
+    expect(tester.getBottomLeft(popup).dy,
+        lessThan(tester.getTopLeft(trigger).dy));
+    expect(find.text('语音模型'), findsNothing);
+    await tester.tap(find.text('刷新列表'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 个模型'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'gpt-test');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('GPT'));
+    await tester.pumpAndSettle();
+    expect(selection, ('bee', 'gpt-test'));
+    expect(popup, findsNothing);
+  });
+
   for (final dark in [false, true]) {
     testWidgets(
         'model popup filters platforms and preserves model identity ($dark)',
@@ -62,13 +133,14 @@ void main() {
                             modelIcon: (_) =>
                                 const Icon(Icons.auto_awesome, size: 22),
                             platform: (model) => SizedBox(
-                                width: 105,
-                                child: Text(model.providerName,
-                                    style: const TextStyle(fontSize: 11),),
-                          )
-                        ,
-                      ),
-                    ]);
+                              width: 105,
+                              child: Text(
+                                model.providerName,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                            ),
+                          ),
+                        ]);
                   },
                   child: const Text('打开菜单'))),
           dark: dark));

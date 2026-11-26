@@ -70,7 +70,7 @@ void main() {
     final sidebar = find.byKey(const ValueKey('desktop-sidebar'));
     expect(tester.getSize(sidebar).width, 180);
     expect(find.text('本地用户'), findsOneWidget);
-    for (final label in ['对话', '数字员工', '技能广场', '自动任务']) {
+    for (final label in ['对话', '数字员工', '技能广场', '自动任务', '博主圆桌']) {
       expect(find.text(label), findsOneWidget);
     }
     for (final label in ['云盘', '通讯录']) {
@@ -79,6 +79,9 @@ void main() {
     await tester.tap(find.text('数字员工'));
     await tester.pumpAndSettle();
     expect(find.text('page:/digital-employee'), findsOneWidget);
+    await tester.tap(find.text('博主圆桌'));
+    await tester.pumpAndSettle();
+    expect(find.text('page:/creator-roundtable'), findsOneWidget);
     await tester.tap(find.byType(SidebarToggleButton));
     await tester.pumpAndSettle();
     expect(tester.getSize(sidebar).width, 64);

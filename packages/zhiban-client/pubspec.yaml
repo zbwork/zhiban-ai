@@ -36,6 +36,7 @@ dependencies:
   package_info_plus: "^9.0.1"
   pasteboard: "^0.5.0"
   path_provider: "^2.1.5"
+  pdf: 3.11.3
   pretty_dio_logger: 1.4.0
   pull_to_refresh: "^2.0.0"
   qr_flutter: "^4.1.0"
@@ -64,6 +65,7 @@ flutter:
   assets:
   - assets/
   - assets/file_preview/
+  - assets/tools/
   - assets/images/
   - assets/images/main_layout/
   - assets/images/main_layout/mobile_nav/

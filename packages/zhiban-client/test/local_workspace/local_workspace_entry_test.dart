@@ -370,14 +370,15 @@ void main() {
       router.go('/digital-employee');
       await tester.pumpAndSettle();
       expect(find.byType(AgentCard), findsOneWidget);
+      const cardGap = 8.0;
       for (final width in [900.0, 1200.0]) {
         await tester.binding.setSurfaceSize(Size(width, 820));
         await tester.pumpAndSettle();
         final card = tester.getRect(find.byType(AgentCard));
-        final columns = ((width - 24 + 12) / (292 + 12)).floor();
+        final columns = ((width - 24 + cardGap) / (292 + cardGap)).floor();
         expect(card.left, closeTo(12, 0.1));
         expect(card.width,
-            closeTo((width - 24 - 12 * (columns - 1)) / columns, 0.1));
+            closeTo((width - 24 - cardGap * (columns - 1)) / columns, 0.1));
         expect(tester.takeException(), isNull);
       }
       expect(find.text('添加更多'), findsOneWidget);
@@ -461,7 +462,7 @@ void main() {
       final secondCard = tester.getRect(cards.at(1));
       expect(firstCard.left, closeTo(12, 0.1));
       expect(secondCard.top, closeTo(firstCard.top, 0.1));
-      expect(secondCard.left - firstCard.right, closeTo(12, 0.1));
+      expect(secondCard.left - firstCard.right, closeTo(cardGap, 0.1));
       final createdCard = tester
           .widgetList<AgentCard>(find.byType(AgentCard))
           .firstWhere((card) => card.agent.name == '测试招聘员工');

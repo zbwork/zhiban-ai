@@ -8,6 +8,7 @@ import 'package:zhiban_ui/themes/app_theme.dart';
 import '../../routes/route_paths.dart';
 import '../../window/window_controller.dart';
 import '../model_service/model_service_page.dart';
+import '../creator_roundtable/creator_roundtable_page.dart';
 import 'local_workspace_page.dart';
 
 /// No session validation, analytics or runtime prewarm. The skill marketplace
@@ -46,8 +47,11 @@ class _LocalWorkspaceAppState extends State<LocalWorkspaceApp> {
               child: LocalWorkspacePage(
             section: state.uri.path,
             localTaskBuilder: widget.localTaskBuilder,
-            child: [RoutePaths.modelService, RoutePaths.localCodingTools]
-                    .contains(state.uri.path)
+            child: [
+              RoutePaths.modelService,
+              RoutePaths.localCodingTools,
+              RoutePaths.creatorRoundtable,
+            ].contains(state.uri.path)
                 ? child
                 : null,
           ));
@@ -72,6 +76,10 @@ class _LocalWorkspaceAppState extends State<LocalWorkspaceApp> {
                 path: path,
                 pageBuilder: (context, state) =>
                     const NoTransitionPage(child: SizedBox.shrink())),
+          GoRoute(
+              path: RoutePaths.creatorRoundtable,
+              pageBuilder: (context, state) =>
+                  const NoTransitionPage(child: CreatorRoundtablePage())),
           GoRoute(
               path: RoutePaths.modelService,
               pageBuilder: (context, state) =>

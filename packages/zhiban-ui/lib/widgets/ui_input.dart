@@ -14,6 +14,7 @@ class UiInputField extends StatefulWidget {
     this.hintText,
     this.onChanged,
     this.onSubmitted,
+    this.onTap,
     this.autofocus = false,
     this.keyboardType,
     this.minLines = 1,
@@ -51,6 +52,7 @@ class UiInputField extends StatefulWidget {
   final String? hintText;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onTap;
   final bool autofocus;
   final TextInputType? keyboardType;
   final int minLines;
@@ -307,6 +309,7 @@ class _UiInputFieldState extends State<UiInputField> {
       autofocus: widget.autofocus,
       onChanged: widget.onChanged,
       onSubmitted: widget.onSubmitted,
+      onTap: widget.onTap,
       onTapOutside: (_) => FocusScope.of(context).unfocus(),
       enabled: widget.enabled,
       readOnly: widget.readOnly,
@@ -346,7 +349,9 @@ class _UiInputFieldState extends State<UiInputField> {
             height: widget.height ?? UiFieldStyle.defaultHeight,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: widget.enabled ? _focusNode.requestFocus : null,
+              onTap: widget.enabled
+                  ? widget.onTap ?? _focusNode.requestFocus
+                  : null,
               child: InputDecorator(
                 decoration: decoration,
                 baseStyle: resolvedTextStyle,

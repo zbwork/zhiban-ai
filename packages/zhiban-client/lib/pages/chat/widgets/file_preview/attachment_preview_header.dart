@@ -12,6 +12,7 @@ class AttachmentPreviewHeader extends StatelessWidget {
     required this.onDownload,
     required this.onClose,
     this.onExpand,
+    this.onOpenExternal,
     this.expanded = false,
     this.byteLength,
     this.trailingInset = 0,
@@ -19,7 +20,7 @@ class AttachmentPreviewHeader extends StatelessWidget {
 
   final AttachmentPreviewTarget target;
   final VoidCallback onReload, onDownload, onClose;
-  final VoidCallback? onExpand;
+  final VoidCallback? onExpand, onOpenExternal;
   final bool expanded;
   final int? byteLength;
   final double trailingInset;
@@ -84,18 +85,20 @@ class AttachmentPreviewHeader extends StatelessWidget {
           Expanded(
               child: Row(children: [
             Flexible(
-                child: Tooltip(
-              message: _size.isEmpty ? name : '$name · $_size',
-              child: Text(name,
+              child: Tooltip(
+                message: _size.isEmpty ? name : '$name · $_size',
+                child: Text(
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: colors.onSurface,),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurface,
+                  ),
+                ),
+              ),
             ),
-                      ),
-                    ),
             if (showSize) ...[
               const SizedBox(width: 10),
               Text(_size,
@@ -112,14 +115,27 @@ class AttachmentPreviewHeader extends StatelessWidget {
                   icon: Icon(CupertinoIcons.ellipsis,
                       size: 16, color: colors.onSurfaceVariant),
                   padding: EdgeInsets.zero,
-                  onSelected: (value) =>
-                      value == 'reload' ? onReload() : onDownload(),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'reload', child: Text('重新加载')),
-                    PopupMenuItem(value: 'download', child: Text('下载')),
+                  onSelected: (value) {
+                    if (value == 'reload') {
+                      onReload();
+                    } else if (value == 'external') {
+                      onOpenExternal?.call();
+                    } else {
+                      onDownload();
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'reload', child: Text('重新加载')),
+                    const PopupMenuItem(value: 'download', child: Text('下载')),
+                    if (onOpenExternal != null)
+                      const PopupMenuItem(
+                          value: 'external', child: Text('新窗口打开')),
                   ],
                 ))
           else ...[
+            if (onOpenExternal != null)
+              action(CupertinoIcons.arrow_up_right_square, '新窗口打开',
+                  onOpenExternal),
             action(CupertinoIcons.refresh, '重新加载', onReload),
             action(CupertinoIcons.arrow_down_to_line, '下载', onDownload),
           ],

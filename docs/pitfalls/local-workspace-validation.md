@@ -66,3 +66,7 @@ Bus匿名公开接口是广场唯一来源，不再分发官网或旧manifest快
 ## 先确认实际引擎再排查工具后中断
 
 员工本地执行不等于使用DSH。该次个人任务规划专家元数据为 codex_app_server，模型请求诊断为 responses；失败终态 engine_error 为 other，固定关键词 parse/missing/stream disconnected。不能将它先归因于 DSH 或丢失历史。安全诊断与任务台账可还原工具完成和模型请求顺序，不输出凭据、原始提示词或原始上游错误。
+
+## 下拉菜单打开时离开页面
+
+桌面从博主圆桌切换路由时，打开的 `UiSelect` 菜单会随原控件销毁。Flutter 执行 `State.dispose` 时 `mounted` 仍可能为真，销毁回调不能以此为依据触发 `setState`。在销毁时只移除并释放 `OverlayEntry`，正常交互关闭时才刷新触发控件。验证需在菜单仍展开时切换页面，检查菜单消失且新页面可用。 [Flutter State.dispose](https://api.flutter.dev/flutter/widgets/State/dispose.html)

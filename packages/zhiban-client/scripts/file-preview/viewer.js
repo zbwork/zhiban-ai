@@ -60,7 +60,20 @@ function button(label, action, parent = tools, title = label) {
   parent.append(b);
   return b;
 }
-function pagedToolbar() {
+function pagedToolbar(chapters = []) {
+  const outline = chapters.length ? group("目录") : null;
+  const selection = outline ? document.createElement("select") : null;
+  if (selection) {
+    selection.setAttribute("aria-label", "章节");
+    for (const chapter of chapters) {
+      const option = document.createElement("option");
+      option.value = String(chapter.page);
+      option.textContent = chapter.title;
+      selection.append(option);
+    }
+    selection.onchange = () => goto(Number(selection.value));
+    outline.append(selection);
+  }
   const navigation = group("页码");
   const prev = button("‹", () => goto(page - 1), navigation, "上一页");
   const label = counter();
@@ -70,6 +83,14 @@ function pagedToolbar() {
     label.textContent = `${pages.length ? page + 1 : 0} / ${pages.length}`;
     prev.disabled = page <= 0;
     next.disabled = page >= pages.length - 1;
+    if (selection) {
+      let active = "";
+      for (const chapter of chapters) {
+        if (chapter.page > page) break;
+        active = String(chapter.page);
+      }
+      selection.value = active;
+    }
   };
   function goto(n) {
     page = Math.min(Math.max(n, 0), pages.length - 1);
@@ -77,6 +98,12 @@ function pagedToolbar() {
     update();
   }
   const onscroll = () => {
+    if (selection && content.scrollTop > 0 &&
+        content.scrollHeight - content.clientHeight - content.scrollTop <= 2) {
+      page = pages.length - 1;
+      update();
+      return;
+    }
     const top = content.getBoundingClientRect().top;
     const n = pages.findIndex(
       (el) => el.getBoundingClientRect().bottom > top + 8,
@@ -89,9 +116,36 @@ function pagedToolbar() {
   content.addEventListener("scroll", onscroll);
   cleanups.push(() => content.removeEventListener("scroll", onscroll));
   update();
-  zoomToolbar();
+  zoomToolbar({ onZoom: chapters.length ? () => goto(page) : null });
 }
-function zoomToolbar({ rotate = false } = {}) {
+async function pdfChapters(pdf) {
+  const chapters = new Map();
+  let visited = 0;
+  async function walk(items, depth) {
+    if (!items || depth > 8) return;
+    for (const item of items) {
+      if (++visited > 100) return;
+      if (!item.url && item.dest && typeof item.title === "string") {
+        const dest = typeof item.dest === "string"
+          ? await pdf.getDestination(item.dest).catch(() => null)
+          : item.dest;
+        const ref = Array.isArray(dest) ? dest[0] : null;
+        const index = Number.isInteger(ref) ? ref
+          : ref && typeof ref === "object"
+            ? await pdf.getPageIndex(ref).catch(() => -1) : -1;
+        if (index >= 0 && index < pdf.numPages && !chapters.has(index)) {
+          chapters.set(index, { page: index, title: item.title.trim().slice(0, 140) });
+        }
+      }
+      await walk(item.items, depth + 1);
+    }
+  }
+  await walk(await pdf.getOutline().catch(() => null), 0);
+  return [...chapters.values()]
+    .filter((chapter) => chapter.title)
+    .sort((a, b) => a.page - b.page);
+}
+function zoomToolbar({ rotate = false, onZoom } = {}) {
   if (mobilePreview && ppt) {
     const controls = group('缩放');
     const select = document.createElement('select');
@@ -117,6 +171,7 @@ function zoomToolbar({ rotate = false } = {}) {
     else for (const el of content.children) {
       el.style.zoom = zoom;
     }
+    onZoom?.();
   };
   button("−", () => {
     zoom = Math.max(0.4, zoom - 0.1);
@@ -167,11 +222,11 @@ function toolbarIcon(button, kind) {
   };
   button.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[kind]}</svg>`;
 }
-function videoToolbar(video) {
-  const controls = group("视频播放");
+function mediaToolbar(media, label) {
+  const controls = group(label+"播放");
   controls.classList.add("video-tools");
   const play = button("▶", async () => {
-    try { video.paused ? await video.play() : video.pause(); }
+    try { media.paused ? await media.play() : media.pause(); }
     catch { play.title = "无法播放，请重试"; }
   }, controls, "播放");
   const time = counter();
@@ -186,34 +241,34 @@ function videoToolbar(video) {
   seek.min = "0";
   seek.step = "0.1";
   seek.setAttribute("aria-label", "播放进度");
-  seek.oninput = () => { video.currentTime = Number(seek.value); };
+  seek.oninput = () => { media.currentTime = Number(seek.value); };
   controls.append(seek);
-  const mute = button("♪", () => { video.muted = !video.muted; }, controls, "静音");
+  const mute = button("♪", () => { media.muted = !media.muted; }, controls, "静音");
   const volume = document.createElement("input");
   volume.type = "range";
   volume.className = "volume";
   volume.min = "0"; volume.max = "1"; volume.step = "0.05";
   volume.setAttribute("aria-label", "音量");
-  volume.oninput = () => { video.volume = Number(volume.value); video.muted = video.volume === 0; };
+  volume.oninput = () => { media.volume = Number(volume.value); media.muted = media.volume === 0; };
   controls.append(volume);
   const update = () => {
-    toolbarIcon(play, video.paused ? "play" : "pause");
-    play.title = video.paused ? "播放" : "暂停";
+    toolbarIcon(play, media.paused ? "play" : "pause");
+    play.title = media.paused ? "播放" : "暂停";
     play.setAttribute("aria-label", play.title);
-    time.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-    seek.disabled = !Number.isFinite(video.duration) || video.duration <= 0;
-    seek.max = seek.disabled ? "0" : String(video.duration);
-    seek.value = String(video.currentTime);
+    time.textContent = `${formatTime(media.currentTime)} / ${formatTime(media.duration)}`;
+    seek.disabled = !Number.isFinite(media.duration) || media.duration <= 0;
+    seek.max = seek.disabled ? "0" : String(media.duration);
+    seek.value = String(media.currentTime);
     seek.setAttribute("aria-valuetext", time.textContent);
-    toolbarIcon(mute, video.muted ? "muted" : "volume");
-    mute.title = video.muted ? "取消静音" : "静音";
+    toolbarIcon(mute, media.muted ? "muted" : "volume");
+    mute.title = media.muted ? "取消静音" : "静音";
     mute.setAttribute("aria-label", mute.title);
-    mute.setAttribute("aria-pressed", String(video.muted));
-    volume.value = String(video.muted ? 0 : video.volume);
+    mute.setAttribute("aria-pressed", String(media.muted));
+    volume.value = String(media.muted ? 0 : media.volume);
   };
   const events = ["play", "pause", "ended", "timeupdate", "durationchange", "volumechange"];
-  for (const event of events) video.addEventListener(event, update);
-  cleanups.push(() => { for (const event of events) video.removeEventListener(event, update); });
+  for (const event of events) media.addEventListener(event, update);
+  cleanups.push(() => { for (const event of events) media.removeEventListener(event, update); });
   update();
 }
 function textPreview(source, markdown) {
@@ -498,7 +553,13 @@ window.previewFile = async ({ base64, format, name, mime = "", dark, palette = {
       });
       cleanups.push(() => task.destroy());
       const pdf = await task.promise;
+      const firstPage = await pdf.getPage(1);
       if (generation !== renderGeneration) return "cancelled";
+      const placeholder = firstPage.getViewport({ scale: 1.25 });
+      const reserveSpace = (canvas, size) => {
+        canvas.style.width = `${size.width}px`;
+        canvas.style.aspectRatio = `${size.width} / ${size.height}`;
+      };
       const observer = new IntersectionObserver(
         (entries) => {
           for (const e of entries) {
@@ -510,6 +571,7 @@ window.previewFile = async ({ base64, format, name, mime = "", dark, palette = {
               .then(async (p) => {
                 const viewport = p.getViewport({ scale: 1.25 });
                 const canvas = e.target;
+                reserveSpace(canvas, viewport);
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
                 await p.render({
@@ -530,12 +592,16 @@ window.previewFile = async ({ base64, format, name, mime = "", dark, palette = {
       for (let n = 1; n <= pdf.numPages; n++) {
         const canvas = document.createElement("canvas");
         canvas.dataset.page = n;
-        canvas.style.minHeight = "300px";
+        // Reserve page space before PDF.js renders it so chapter jumps and
+        // zoom do not move when later canvases receive their dimensions.
+        reserveSpace(canvas, placeholder);
         content.append(canvas);
         pages.push(canvas);
         observer.observe(canvas);
       }
-      pagedToolbar();
+      const chapters = await pdfChapters(pdf);
+      if (generation !== renderGeneration) return "cancelled";
+      pagedToolbar(chapters);
     } else if (format === "image") {
       const img = document.createElement("img");
       img.alt = name;
@@ -572,41 +638,43 @@ window.previewFile = async ({ base64, format, name, mime = "", dark, palette = {
       observer.observe(content);
       cleanups.push(() => observer.disconnect());
       zoomToolbar({ rotate: true });
-    } else if (format === "video") {
-      const video = document.createElement('video');
-      video.controls = false;
-      video.playsInline = true;
-      video.preload = 'metadata';
-      video.style.width = '100%';
-      video.style.maxHeight = '100%';
-      video.setAttribute('aria-label', name || '视频');
+    } else if (format === "video" || format === "audio") {
+      const audio = format === "audio";
+      const label = audio ? "音频" : "视频";
+      const media = document.createElement(format);
+      media.controls = false;
+      media.playsInline = true;
+      media.preload = 'metadata';
+      media.style.width = '100%';
+      media.style.maxHeight = '100%';
+      media.setAttribute('aria-label', name || label);
       const ext = name.split('.').pop()?.toLowerCase();
-      const type = mime.startsWith('video/') ? mime : ext === 'webm' ? 'video/webm'
+      const type = audio ? 'audio/mp4' : mime.startsWith('video/') ? mime : ext === 'webm' ? 'video/webm'
           : ext === 'ogv' ? 'video/ogg' : ext === 'mov' ? 'video/quicktime' : 'video/mp4';
-      content.append(video);
+      content.append(media);
       await new Promise((resolve, reject) => {
         let settled = false;
         const finish = (error) => {
           if (settled) return;
           settled = true;
           clearTimeout(timer);
-          video.onloadedmetadata = null;
-          video.onerror = null;
+          media.onloadedmetadata = null;
+          media.onerror = null;
           error ? reject(error) : resolve();
         };
-        const timer = setTimeout(() => finish(Error('视频加载超时，请下载后查看')), 15000);
-        video.onloadedmetadata = () => finish();
-        video.onerror = () => finish(Error('视频损坏或当前设备不支持此编码，请下载后查看'));
+        const timer = setTimeout(() => finish(Error(label+'加载超时，请下载后查看')), 15000);
+        media.onloadedmetadata = () => finish();
+        media.onerror = () => finish(Error(label+'损坏或当前设备不支持此编码，请下载后查看'));
         cleanups.push(() => {
           finish(Error('预览已切换'));
-          video.pause();
-          video.removeAttribute('src');
-          video.load();
+          media.pause();
+          media.removeAttribute('src');
+          media.load();
         });
-        video.src = blob(bytes, type);
+        media.src = blob(bytes, type);
       });
       if (generation !== renderGeneration) return "cancelled";
-      videoToolbar(video);
+      mediaToolbar(media, label);
     } else if (format === "html") {
       const frame = document.createElement("iframe");
       frame.sandbox = "allow-scripts";
