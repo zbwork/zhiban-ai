@@ -62,7 +62,8 @@ class CreatorTranscriptionRuntime {
     final executable = Platform.isWindows ? 'whisper-cli.exe' : 'whisper-cli';
     return _installer.prepare(
       label: '语音识别组件',
-      url: url,
+      url: 'https://gh-proxy.com/$url',
+      fallbackUrl: url,
       digest: digest,
       output: executable,
       archiveEntry: Platform.isWindows ? 'Release/$executable' : executable,

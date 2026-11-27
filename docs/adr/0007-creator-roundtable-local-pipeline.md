@@ -27,7 +27,7 @@
 ### 3. 运行时按需安装
 
 - 媒体探测、抽帧和转码使用最小 FFmpeg 运行时。
-- 语音转写使用 `whisper.cpp`；应用首次需要时自动准备固定版本的转写组件和默认多语种模型，通过 SHA-256 校验后写入应用目录。归档视频保留在本机，下载只获取组件和模型。FFmpeg 取自 imageio-ffmpeg 发布包，Whisper 的 Windows CPU 包取自上游发布，macOS 包取自独立构建项目，模型取自上游模型仓库的固定提交。CLI 单独运行，应用不依赖系统包管理器或 shell 配置。 模型约 148 MB，使用 [Hugging Face 镜像](https://hf-mirror.com/) 优先服务国内网络，并保留固定提交的官方源。两处下载校验同一 SHA-256，避免为接入镜像而替换模型或改变识别质量。
+- 语音转写使用 `whisper.cpp`；应用首次需要时自动准备固定版本的转写组件和默认多语种模型，通过 SHA-256 校验后写入应用目录。归档视频保留在本机，下载只获取组件和模型。FFmpeg 取自 imageio-ffmpeg 发布包，Whisper 的 Windows CPU 包取自上游发布，macOS 包取自独立构建项目，模型取自上游模型仓库的固定提交。CLI 单独运行，应用不依赖系统包管理器或 shell 配置。CLI 优先通过 [GH-Proxy](https://gh-proxy.com/) 下载，失败时回退到原 GitHub Release 地址。Apple Silicon、Intel Mac 和 Windows x64 的镜像包与 GitHub 发布包均已完整下载并验证 SHA-256 一致。 模型约 148 MB，使用 [Hugging Face 镜像](https://hf-mirror.com/) 优先服务国内网络，并保留固定提交的官方源。两处下载校验同一 SHA-256，避免为接入镜像而替换模型或改变识别质量。
 - 渠道解析器是可替换适配器。抖音适配器沿用 F2，首次调用通过同一 Dart 下载器按平台获取固定版本的 uv，并校验压缩包摘要。使用 [uv 管理的 Python](https://docs.astral.sh/uv/concepts/python-versions/) 和其内置校验清单，在应用数据目录创建固定 CPython 补丁版本的独立环境，再从固定提交安装并校验 F2，成功导入模块后标记就绪。当前渠道解析需要解释器，随应用按需准备可复用现有适配器并避免使用系统 Python 或系统包管理器。
 - 运行时必须校验版本和文件散列，安装目录不可写入凭据。
 
