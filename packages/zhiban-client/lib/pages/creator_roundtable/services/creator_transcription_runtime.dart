@@ -71,10 +71,13 @@ class CreatorTranscriptionRuntime {
     );
   }
 
+  static const _modelPath = '/ggerganov/whisper.cpp/resolve/'
+      '5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.bin';
+
   Future<String> model(void Function(String) progress) => _installer.prepare(
         label: '本机多语种模型',
-        url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/'
-            '5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.bin',
+        url: 'https://hf-mirror.com$_modelPath',
+        fallbackUrl: 'https://huggingface.co$_modelPath',
         digest:
             '60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe',
         output: 'ggml-base.bin',

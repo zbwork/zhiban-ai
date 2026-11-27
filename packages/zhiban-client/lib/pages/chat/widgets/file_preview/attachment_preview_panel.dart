@@ -22,6 +22,7 @@ class AttachmentPreviewPanel extends StatefulWidget {
       this.onOpenExternal,
       this.expanded = false,
       this.mobile = false,
+      this.useStandardCloseButton = false,
       this.frameBuilder});
 
   /// Captures the actual native renderer in debug integration tests.
@@ -31,7 +32,7 @@ class AttachmentPreviewPanel extends StatefulWidget {
   final AttachmentPreviewTarget target;
   final VoidCallback onClose;
   final VoidCallback? onExpand, onOpenExternal;
-  final bool expanded, mobile;
+  final bool expanded, mobile, useStandardCloseButton;
   final Widget Function(Widget body, int? byteLength, bool saving,
       VoidCallback reload, VoidCallback save)? frameBuilder;
   @override
@@ -201,6 +202,7 @@ class _AttachmentPreviewPanelState extends State<AttachmentPreviewPanel> {
           onReload: _load,
           onDownload: _download,
           onClose: widget.onClose,
+          useStandardCloseButton: widget.useStandardCloseButton,
           onExpand: widget.onExpand,
           onOpenExternal: widget.onOpenExternal,
           expanded: widget.expanded,

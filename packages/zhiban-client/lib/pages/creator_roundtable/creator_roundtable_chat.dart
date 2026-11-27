@@ -199,9 +199,11 @@ class _CreatorRoundtableChatState extends State<CreatorRoundtableChat> {
           content: const Text('删除此会话及其中的消息？'),
           actions: [
             TextButton(
+                style: roundtableTextControlStyle,
                 onPressed: () => Navigator.pop(dialogContext, false),
                 child: const Text('取消')),
             FilledButton(
+                style: roundtableTextControlStyle,
                 onPressed: () => Navigator.pop(dialogContext, true),
                 child: const Text('删除')),
           ]),
@@ -489,6 +491,7 @@ class _CreatorRoundtableChatState extends State<CreatorRoundtableChat> {
                                     ),
                                   UiIconButton(
                                     tooltip: _expanded ? '退出全屏对话' : '关闭',
+                                    showTooltip: _expanded,
                                     onTap: _expanded
                                         ? () {
                                             setState(() => _expanded = false);
@@ -557,12 +560,19 @@ class _CreatorRoundtableChatState extends State<CreatorRoundtableChat> {
                               _selected.isNotEmpty &&
                               value.text.trim().isNotEmpty;
                           return IconButton(
-                            style: roundtableIconControlStyle,
+                            style: roundtableIconControlStyle.copyWith(
+                              minimumSize: const WidgetStatePropertyAll(
+                                Size.square(roundtableControlHeight),
+                              ),
+                              fixedSize: const WidgetStatePropertyAll(
+                                Size.square(roundtableControlHeight),
+                              ),
+                            ),
                             tooltip: '发送',
                             onPressed: canSend ? _send : null,
                             icon: Ink(
-                              width: 34,
-                              height: 34,
+                              width: 30,
+                              height: 30,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: canSend
@@ -744,6 +754,7 @@ class _CreatorRoundtableChatState extends State<CreatorRoundtableChat> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             UiSheetHeader(
+              showCloseTooltip: false,
               title: '选择专家',
               onClose: widget.expertsOnly ? () => Navigator.pop(context) : null,
               trailing: Padding(

@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:zhiban_ui/widgets/ui_icon_button.dart';
 import '../file_attachment_icon.dart';
 import 'attachment_preview_target.dart';
 
@@ -14,6 +15,7 @@ class AttachmentPreviewHeader extends StatelessWidget {
     this.onExpand,
     this.onOpenExternal,
     this.expanded = false,
+    this.useStandardCloseButton = false,
     this.byteLength,
     this.trailingInset = 0,
   });
@@ -21,7 +23,7 @@ class AttachmentPreviewHeader extends StatelessWidget {
   final AttachmentPreviewTarget target;
   final VoidCallback onReload, onDownload, onClose;
   final VoidCallback? onExpand, onOpenExternal;
-  final bool expanded;
+  final bool expanded, useStandardCloseButton;
   final int? byteLength;
   final double trailingInset;
 
@@ -146,7 +148,15 @@ class AttachmentPreviewHeader extends StatelessWidget {
                     : CupertinoIcons.arrow_up_left_arrow_down_right,
                 expanded ? '还原' : '展开预览',
                 onExpand),
-          action(CupertinoIcons.xmark, '关闭预览', onClose),
+          if (useStandardCloseButton)
+            UiIconButton(
+              icon: CupertinoIcons.xmark,
+              tooltip: '关闭预览',
+              showTooltip: false,
+              onTap: onClose,
+            )
+          else
+            action(CupertinoIcons.xmark, '关闭预览', onClose),
         ]);
       }),
     );

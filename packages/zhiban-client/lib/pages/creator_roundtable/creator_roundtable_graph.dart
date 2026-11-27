@@ -10,6 +10,7 @@ import '../local_workspace/services/local_workspace_store.dart';
 import 'services/creator_subtitles.dart';
 import 'services/creator_graph_topics.dart';
 import 'services/creator_graph_precedence.dart';
+import 'creator_roundtable_controls.dart';
 
 enum _GraphKind { author, topic, method, condition, work }
 
@@ -707,6 +708,7 @@ class _CreatorRoundtableGraphState extends State<CreatorRoundtableGraph>
                     final center = viewport.biggest.center(Offset.zero);
                     return Row(mainAxisSize: MainAxisSize.min, children: [
                       IconButton(
+                          style: roundtableIconControlStyle,
                           tooltip: '缩小图谱',
                           icon: const Icon(Icons.remove),
                           onPressed: scale <= .5
@@ -714,18 +716,21 @@ class _CreatorRoundtableGraphState extends State<CreatorRoundtableGraph>
                               : () => _setZoom(scale - .25, center)),
                       Text('${(scale * 100).round()}%'),
                       IconButton(
+                          style: roundtableIconControlStyle,
                           tooltip: '放大图谱',
                           icon: const Icon(Icons.add),
                           onPressed: scale >= 3
                               ? null
                               : () => _setZoom(scale + .25, center)),
                       IconButton(
+                          style: roundtableIconControlStyle,
                           tooltip: '复位图谱',
                           icon: const Icon(Icons.center_focus_strong),
                           onPressed: () =>
                               _transform.value = Matrix4.identity()),
                       if (!widget.full)
                         IconButton(
+                          style: roundtableIconControlStyle,
                           tooltip: '全屏知识图谱',
                           icon: const Icon(Icons.fullscreen),
                           onPressed: () => showDialog<void>(

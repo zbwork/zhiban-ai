@@ -46,6 +46,7 @@ class LocalModelPicker extends ConsumerStatefulWidget {
     required this.onSelected,
     this.busy = false,
     this.openBelow = false,
+    this.controlHeight,
     this.switchHint = '切换后从下一条消息生效',
   });
 
@@ -53,6 +54,7 @@ class LocalModelPicker extends ConsumerStatefulWidget {
   final Future<void> Function(LlmModelOption) onSelected;
   final bool busy;
   final bool openBelow;
+  final double? controlHeight;
   final String switchHint;
 
   @override
@@ -149,9 +151,11 @@ class _LocalModelPickerState extends ConsumerState<LocalModelPicker> {
       child: AgentControlButton(
         label: label,
         icon: CupertinoIcons.sparkles,
+        height: widget.controlHeight,
         leading: model == null
             ? null
-            : conversationModelIcon(context, model.modelId, size: 22),
+            : conversationModelIcon(context, model.modelId,
+                size: widget.controlHeight == null ? 22 : 18),
         expanded: _open,
         onPressed: widget.busy ? null : _showPicker,
       ),

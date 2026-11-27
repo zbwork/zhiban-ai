@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zhiban_ui/zhiban_ui.dart';
+import 'creator_roundtable_controls.dart';
 
 enum CreatorImportStage {
   saving,
@@ -60,7 +61,9 @@ class CreatorImportFeedback extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  UiSheetHeader(title: title, onClose: close),
+                  UiSheetHeader(
+                    showCloseTooltip: false,
+                    title: title, onClose: close),
                   const Divider(height: 20),
                   if (value.workCount case final count?)
                     Padding(
@@ -100,6 +103,7 @@ class CreatorImportFeedback extends StatelessWidget {
                     children: [
                       if (!running && value.creatorId != null)
                         OutlinedButton(
+                          style: roundtableTextControlStyle,
                           onPressed: () {
                             close();
                             onOpenWorks(value.creatorId!);
@@ -107,6 +111,7 @@ class CreatorImportFeedback extends StatelessWidget {
                           child: const Text('查看作品'),
                         ),
                       FilledButton(
+                        style: roundtableTextControlStyle,
                         onPressed: close,
                         child: Text(running ? '后台处理' : '完成'),
                       ),

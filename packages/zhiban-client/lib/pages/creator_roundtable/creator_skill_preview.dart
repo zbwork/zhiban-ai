@@ -4,6 +4,7 @@ import 'package:zhiban_ui/widgets/ui_dialog_shell.dart';
 import 'package:zhiban_ui/widgets/ui_sheet_header.dart';
 
 import 'services/creator_asset_workflow.dart';
+import 'creator_roundtable_controls.dart';
 
 class CreatorSkillPreview extends StatefulWidget {
   const CreatorSkillPreview({
@@ -63,6 +64,7 @@ class _CreatorSkillPreviewState extends State<CreatorSkillPreview> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               UiSheetHeader(
+                showCloseTooltip: false,
                 title: widget.title,
                 subtitle: '技能 · SKILL.md',
                 onClose: () => Navigator.pop(context),
@@ -135,12 +137,14 @@ class _CreatorSkillPreviewState extends State<CreatorSkillPreview> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   IconButton(
+                    style: roundtableIconControlStyle,
                     tooltip: '上一节',
                     onPressed: _index == 0 ? null : () => _select(_index - 1),
                     icon: const Icon(Icons.chevron_left),
                   ),
                   Text('${_index + 1} / ${_sections.length}'),
                   IconButton(
+                    style: roundtableIconControlStyle,
                     tooltip: '下一节',
                     onPressed: _index == _sections.length - 1
                         ? null
@@ -148,17 +152,20 @@ class _CreatorSkillPreviewState extends State<CreatorSkillPreview> {
                     icon: const Icon(Icons.chevron_right),
                   ),
                   IconButton(
+                    style: roundtableIconControlStyle,
                     tooltip: '缩小',
                     onPressed: _zoom <= 75 ? null : () => _scale(-25),
                     icon: const Icon(Icons.remove),
                   ),
                   Text('$_zoom%'),
                   IconButton(
+                    style: roundtableIconControlStyle,
                     tooltip: '放大',
                     onPressed: _zoom >= 200 ? null : () => _scale(25),
                     icon: const Icon(Icons.add),
                   ),
                   FilledButton(
+                    style: roundtableTextControlStyle,
                     onPressed: widget.onDownload,
                     child: const Text('下载技能'),
                   ),

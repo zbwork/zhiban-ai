@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -21,6 +22,7 @@ class CreatorComponentInstaller {
     required String digest,
     required String output,
     required void Function(String) progress,
+    String? fallbackUrl,
     String? archiveEntry,
     bool windowsWhisperLibraries = false,
   }) async {
@@ -39,7 +41,10 @@ class CreatorComponentInstaller {
       destination: destination,
       installed: installed,
       label: label,
-      url: url,
+      sources: [
+        Uri.parse(url),
+        if (fallbackUrl != null) Uri.parse(fallbackUrl)
+      ],
       digest: digest,
       output: output,
       archiveEntry: archiveEntry,
@@ -59,7 +64,7 @@ class CreatorComponentInstaller {
     required Directory destination,
     required File installed,
     required String label,
-    required String url,
+    required List<Uri> sources,
     required String digest,
     required String output,
     required String? archiveEntry,
@@ -71,10 +76,19 @@ class CreatorComponentInstaller {
       await root.create(recursive: true);
       staging = await root.createTemp('download-');
       final download = File('${staging.path}/download');
-      await _download(Uri.parse(url), download, label, progress);
-      progress('正在校验$label…');
-      if ((await sha256.bind(download.openRead()).first).toString() != digest) {
-        throw CreatorWorkflowException('$label校验失败，请重试。');
+      for (final (index, source) in sources.indexed) {
+        if (index > 0) progress('正在切换$label下载源…');
+        try {
+          await _download(source, download, label, progress);
+          progress('正在校验$label…');
+          if ((await sha256.bind(download.openRead()).first).toString() !=
+              digest) {
+            throw CreatorWorkflowException('$label校验失败，请重试。');
+          }
+          break;
+        } on CreatorWorkflowException {
+          if (index == sources.length - 1) rethrow;
+        }
       }
       final payload = await Directory('${staging.path}/payload').create();
       final artifact = File('${payload.path}/$output');
@@ -97,8 +111,10 @@ class CreatorComponentInstaller {
       return installed.path;
     } on CreatorWorkflowException {
       rethrow;
+    } on FileSystemException {
+      throw CreatorWorkflowException('无法保存$label，请检查磁盘空间和权限。');
     } on Exception {
-      throw CreatorWorkflowException('准备$label失败，请检查网络和磁盘空间后重试。');
+      throw CreatorWorkflowException('准备$label失败，请重试。');
     } finally {
       if (staging != null) await staging.delete(recursive: true);
     }
@@ -115,9 +131,12 @@ class CreatorComponentInstaller {
       final request = await client.getUrl(uri);
       final response =
           await request.close().timeout(const Duration(seconds: 30));
-      if (response.statusCode != HttpStatus.ok ||
-          response.contentLength > maxBytes) {
-        throw CreatorWorkflowException('下载$label失败，请稍后重试。');
+      if (response.statusCode != HttpStatus.ok) {
+        throw CreatorWorkflowException(
+            '$label下载服务暂不可用（HTTP ${response.statusCode}），请重试。');
+      }
+      if (response.contentLength > maxBytes) {
+        throw CreatorWorkflowException('$label超过下载体积上限，请重试。');
       }
       final sink = file.openWrite();
       var received = 0;
@@ -126,9 +145,11 @@ class CreatorComponentInstaller {
         await sink.addStream(
           response.timeout(const Duration(seconds: 30)).map((bytes) {
             received += bytes.length;
-            if (received > maxBytes ||
-                timer.elapsed > const Duration(minutes: 10)) {
-              throw CreatorWorkflowException('下载$label超时或文件过大，请重试。');
+            if (received > maxBytes) {
+              throw CreatorWorkflowException('$label超过下载体积上限，请重试。');
+            }
+            if (timer.elapsed > const Duration(minutes: 10)) {
+              throw CreatorWorkflowException('$label下载超时，请重试。');
             }
             final total = response.contentLength;
             if (total > 0) {
@@ -144,6 +165,14 @@ class CreatorComponentInstaller {
       } finally {
         await sink.close();
       }
+    } on TimeoutException {
+      throw CreatorWorkflowException('$label下载超时，请检查网络后重试。');
+    } on SocketException {
+      throw CreatorWorkflowException('$label下载连接失败，请检查网络后重试。');
+    } on HttpException {
+      throw CreatorWorkflowException('$label下载中断，请检查网络后重试。');
+    } on HandshakeException {
+      throw CreatorWorkflowException('$label无法建立安全连接，请检查网络后重试。');
     } finally {
       client.close(force: true);
     }

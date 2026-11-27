@@ -3,7 +3,8 @@ import 'package:zhiban_ui/widgets/ui_field_style.dart';
 
 import '../local_workspace/services/local_workspace_store.dart';
 
-const roundtableControlHeight = 40.0;
+const roundtableControlHeight = 36.0;
+const roundtableActionHeight = 32.0;
 const roundtableControlRadius = 10.0;
 const roundtableComposerGap = 8.0;
 const roundtableQuestionHint = '向圆桌专家提问…';
@@ -15,20 +16,20 @@ const _roundtableControlShape = WidgetStatePropertyAll<OutlinedBorder>(
 );
 
 const roundtableTextControlStyle = ButtonStyle(
-  minimumSize: WidgetStatePropertyAll(Size(0, roundtableControlHeight)),
-  padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 12)),
+  minimumSize: WidgetStatePropertyAll(Size(0, roundtableActionHeight)),
+  padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
   visualDensity: VisualDensity.standard,
   shape: _roundtableControlShape,
 );
 
 const roundtableIconControlStyle = ButtonStyle(
-  minimumSize: WidgetStatePropertyAll(Size.square(roundtableControlHeight)),
-  fixedSize: WidgetStatePropertyAll(Size.square(roundtableControlHeight)),
+  minimumSize: WidgetStatePropertyAll(Size.square(roundtableActionHeight)),
+  fixedSize: WidgetStatePropertyAll(Size.square(roundtableActionHeight)),
   padding: WidgetStatePropertyAll(EdgeInsets.zero),
   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
   visualDensity: VisualDensity.standard,
-  iconSize: WidgetStatePropertyAll(18),
+  iconSize: WidgetStatePropertyAll(16),
   shape: _roundtableControlShape,
 );
 
@@ -51,6 +52,9 @@ class RoundtableExpertControl extends StatelessWidget {
     return FilledButton(
       onPressed: onPressed,
       style: roundtableTextControlStyle.copyWith(
+        minimumSize: const WidgetStatePropertyAll(
+          Size(0, roundtableControlHeight),
+        ),
         backgroundColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.disabled)
                 ? scheme.surfaceContainerLow

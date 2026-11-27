@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -589,6 +590,44 @@ void main() {
     ));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('博主列表、引导和添加博主的关闭按钮统一且悬停不弹提示', (tester) async {
+    await open(tester, const Size(1200, 800), douyinSession: 'fixture');
+    await _openCreatorDrawer(tester);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer();
+    addTearDown(mouse.removePointer);
+
+    Future<Finder> verifyClose(String label) async {
+      final finder = find.byWidgetPredicate(
+          (widget) => widget is UiIconButton && widget.tooltip == label);
+      expect(finder, findsOneWidget);
+      final button = tester.widget<UiIconButton>(finder);
+      expect(button.icon, CupertinoIcons.xmark);
+      expect(button.iconSize, 16);
+      expect(button.showTooltip, isFalse);
+      expect(tester.getSize(finder), const Size.square(32));
+      await mouse.moveTo(tester.getCenter(finder));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text(label), findsNothing);
+      return finder;
+    }
+
+    await verifyClose('收起博主列表');
+    await tester.tap(await verifyClose('关闭引导'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('快速开始'), findsNothing);
+    await tester.tap(find.text('+ 添加博主'));
+    await tester.pumpAndSettle();
+    await tester.tap(await verifyClose('关闭'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('roundtable-add-link')), findsNothing);
+    await _openCreatorDrawer(tester);
+    await tester.tap(find.byTooltip('收起博主列表'));
+    await tester.pumpAndSettle();
+    expect(_creatorDrawer, findsNothing);
+  });
 
   testWidgets('圆桌与知识资产共用已选文本模型', (tester) async {
     await open(tester, const Size(1280, 800), configureModels: true);
@@ -1464,6 +1503,16 @@ void main() {
     expect(tester.getRect(_creatorDrawer).right, 900);
     expect(tester.getSize(_creatorDrawer).width, 360);
     expect(find.text('测试博主').hitTestable(), findsOneWidget);
+    final knowledgeTab = find.widgetWithText(Tab, '知识资产');
+    expect(tester.getTopLeft(_creatorDrawer).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(knowledgeTab).dy));
+    await tester.tap(knowledgeTab);
+    await tester.pumpAndSettle();
+    expect(_creatorDrawer, findsNothing);
+    await tester.tap(find.widgetWithText(Tab, '圆桌专家团'));
+    await tester.pumpAndSettle();
+    expect(_creatorDrawer, findsNothing);
+    await _openCreatorDrawer(tester);
     await tester.tapAt(const Offset(40, 400));
     await tester.pumpAndSettle();
     expect(_creatorDrawer, findsNothing);
@@ -1471,8 +1520,13 @@ void main() {
     await tester
         .tap(find.byKey(const ValueKey('roundtable-compact-creator-a')));
     await tester.pumpAndSettle();
-    expect(find.text('返回博主列表'), findsOneWidget);
+    expect(find.text('返回圆桌'), findsOneWidget);
     expect(find.text('测试作品'), findsWidgets);
+    await tester.tap(find.text('返回圆桌'));
+    await tester.pumpAndSettle();
+    expect(_creatorDrawer, findsNothing);
+    expect(rail, findsOneWidget);
+    expect(tester.getRect(scene), sceneRect);
     expect(tester.takeException(), isNull);
   });
 
@@ -1525,7 +1579,7 @@ void main() {
           closeTo(8, .01),
         );
       }
-      expect(fieldRect.height, 40);
+      expect(fieldRect.height, 36);
       expect(tester.getCenter(editor).dy, closeTo(fieldRect.center.dy, 1));
       for (final control in controls) {
         final actual = tester.getRect(control);
@@ -1576,7 +1630,7 @@ void main() {
     expect(sendFace.color, scheme.primary);
     expect(sendFace.shape, BoxShape.circle);
     expect((activeFace.child as Icon).color, scheme.onPrimary);
-    expect(tester.getSize(send), const Size.square(40));
+    expect(tester.getSize(send), const Size.square(36));
     expectComposerAlignment(input, [select, send, expand]);
     expect(composer, findsNothing);
     await tester.binding.setSurfaceSize(const Size(1080, 810));

@@ -11,6 +11,7 @@ import '../local_workspace/services/local_workspace_store.dart';
 import 'creator_roundtable_chat.dart';
 import 'services/creator_asset_workflow.dart';
 import 'services/creator_expert_workflow.dart';
+import 'creator_roundtable_controls.dart';
 
 Future<Directory> creatorAssetDirectory() async => Directory(
     '${(await getApplicationSupportDirectory()).path}/creator-assets');
@@ -265,7 +266,9 @@ class _CreatorAssetDialogState extends ConsumerState<CreatorAssetDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              UiSheetHeader(title: title, onClose: running ? null : close),
+              UiSheetHeader(
+                showCloseTooltip: false,
+                title: title, onClose: running ? null : close),
               const Divider(height: 20),
               if (running) ...[
                 Text(_status ?? '正在整理所选博主的作品…'),
@@ -311,6 +314,7 @@ class _CreatorAssetDialogState extends ConsumerState<CreatorAssetDialog> {
                     children: [
                       if (!running && _failed)
                         OutlinedButton(
+                          style: roundtableTextControlStyle,
                           onPressed: () => setState(() {
                             _failed = false;
                             _error = null;
@@ -319,11 +323,13 @@ class _CreatorAssetDialogState extends ConsumerState<CreatorAssetDialog> {
                         ),
                       if (!running && !_failed && checkpoint != null)
                         TextButton(
+                          style: roundtableTextControlStyle,
                           onPressed: () => _generate(retry: checkpoint),
                           child: const Text('继续上次生成'),
                         ),
                       if (_failed)
                         FilledButton(
+                          style: roundtableTextControlStyle,
                           onPressed:
                               failedCheckpoint != null || widget.canGenerate
                                   ? () => _generate(retry: failedCheckpoint)
@@ -332,11 +338,13 @@ class _CreatorAssetDialogState extends ConsumerState<CreatorAssetDialog> {
                         ),
                       if (!running && !_failed)
                         FilledButton(
+                          style: roundtableTextControlStyle,
                           onPressed:
                               widget.canGenerate ? () => _generate() : null,
                           child: const Text('生成'),
                         ),
                       OutlinedButton(
+                        style: roundtableTextControlStyle,
                         onPressed: running ? null : close,
                         child: Text(running || _failed ? '完成' : '取消'),
                       ),
@@ -383,6 +391,7 @@ class _CreatorAssetDialogState extends ConsumerState<CreatorAssetDialog> {
               ),
               const SizedBox(width: 8),
               OutlinedButton(
+                style: roundtableTextControlStyle,
                 onPressed: matches.isEmpty
                     ? null
                     : () => setState(() {

@@ -114,6 +114,7 @@ class CreatorRoundtablePage extends ConsumerStatefulWidget {
 
 class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
   int _tab = 0;
+  bool _creatorDrawerOpen = false;
   int _revision = 0;
   ({
     LocalWorkspaceStore store,
@@ -447,13 +448,9 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                     alignment: Alignment.centerLeft,
                     child: OutlinedButton.icon(
                       style: roundtableTextControlStyle,
-                      onPressed: () {
-                        setState(() => _tab = 0);
-                        unawaited(_showCreatorDrawer(
-                            creators, controller.store, selectedModel));
-                      },
+                      onPressed: () => setState(() => _tab = 0),
                       icon: const Icon(CupertinoIcons.arrow_left, size: 16),
-                      label: const Text('返回博主列表'),
+                      label: Text(_creatorDrawerOpen ? '返回博主列表' : '返回圆桌'),
                     ),
                   ),
                 )
@@ -461,7 +458,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                 _header(models.isNotEmpty, selectedModel),
               Expanded(
                 child: switch (_tab) {
-                  0 => _roundtable(creators, controller.store, selectedModel),
+                  0 => _roundtableTab(creators, controller.store, selectedModel),
                   1 => _works(selected, controller.store, selectedModel),
                   _ => _knowledge(controller.store, creators, selectedModel),
                 },
@@ -503,6 +500,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                             key: const ValueKey('roundtable-model-selector'),
                             selected: selectedModel,
                             openBelow: true,
+                            controlHeight: roundtableControlHeight,
                             switchHint: '切换后从下一次圆桌任务生效',
                             onSelected: (model) => _selectModel(model.id),
                           ),
@@ -522,17 +520,20 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                 dividerHeight: 0,
                 labelColor: scheme.primary,
                 indicatorColor: scheme.primary,
-                onTap: (index) => setState(() => _tab = index == 0 ? 0 : 2),
+                onTap: (index) => setState(() {
+                  _tab = index == 0 ? 0 : 2;
+                  if (index != 0) _creatorDrawerOpen = false;
+                }),
                 tabs: const [
                   Tab(
-                      height: 41,
+                      height: 36,
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         Icon(CupertinoIcons.person_2, size: 15),
                         SizedBox(width: 5),
                         Text('圆桌专家团'),
                       ])),
                   Tab(
-                      height: 41,
+                      height: 36,
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         Icon(CupertinoIcons.doc_text, size: 15),
                         SizedBox(width: 5),
@@ -544,6 +545,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
           ),
           if (!hasModels)
             TextButton(
+              style: roundtableTextControlStyle,
               key: const ValueKey('roundtable-configure-model'),
               onPressed: () => context.go(RoutePaths.modelService),
               child: const Text('配置模型服务'),
@@ -711,7 +713,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
             key: const ValueKey('roundtable-open-creators'),
             style: buttonStyle,
             tooltip: '展开博主列表',
-            onPressed: () => _showCreatorDrawer(creators, store, selectedModel),
+            onPressed: () => setState(() => _creatorDrawerOpen = true),
             icon: const Icon(CupertinoIcons.sidebar_left),
           ),
           IconButton(
@@ -719,8 +721,8 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
             tooltip: '添加博主',
             onPressed: () => _addCreator(store, selectedModel),
             icon: Ink(
-              width: 30,
-              height: 30,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 color: scheme.primary,
                 borderRadius: BorderRadius.circular(6),
@@ -752,7 +754,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                       style: buttonStyle,
                       tooltip: '${creator['name']}',
                       onPressed: () => _openCreatorWorks(creator),
-                      icon: _creatorAvatar(creator, 32),
+                      icon: _creatorAvatar(creator, 28),
                     ),
                   );
                 },
@@ -772,58 +774,69 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
     });
   }
 
-  Future<void> _showCreatorDrawer(List<LocalRow> creators,
-      LocalWorkspaceStore store, String? selectedModel) {
-    return showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '关闭博主列表',
-      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: .36),
-      transitionDuration: CreatorRoundtableChat.transitionDuration(context),
-      pageBuilder: (drawerContext, _, __) {
-        void close() => Navigator.pop(drawerContext);
-        return Align(
-          alignment: Alignment.centerRight,
-          child: SizedBox(
-            key: const ValueKey('roundtable-creators-drawer'),
-            width:
-                MediaQuery.sizeOf(drawerContext).width.clamp(0, 360).toDouble(),
-            height: double.infinity,
-            child: Material(
-              color: Theme.of(drawerContext).colorScheme.surface,
-              child: SafeArea(
-                child: StatefulBuilder(
-                  builder: (context, setDrawerState) => _creatorRail(
-                    creators,
-                    close: close,
-                    onConfigure: () {
-                      close();
-                      unawaited(_configureChannel());
-                    },
-                    onAdd: () {
-                      close();
-                      unawaited(_addCreator(store, selectedModel));
-                    },
-                    onSkipGuide: () {
-                      unawaited(_skipGuide());
-                      setDrawerState(() {});
-                    },
-                    onSelect: (creator) {
-                      close();
-                      _openCreatorWorks(creator);
-                    },
+  Widget _roundtableTab(List<LocalRow> creators, LocalWorkspaceStore store,
+      String? selectedModel) {
+    void close() => setState(() => _creatorDrawerOpen = false);
+    final scheme = Theme.of(context).colorScheme;
+    return ClipRect(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ExcludeFocus(
+            excluding: _creatorDrawerOpen,
+            child: _roundtable(creators, store, selectedModel),
+          ),
+          if (_creatorDrawerOpen) ...[
+            ModalBarrier(
+              color: scheme.scrim.withValues(alpha: .36),
+              onDismiss: close,
+              semanticsLabel: '关闭博主列表',
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 1, end: 0),
+                duration: CreatorRoundtableChat.transitionDuration(context),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) => FractionalTranslation(
+                  translation: Offset(value, 0),
+                  child: child,
+                ),
+                child: SizedBox(
+                  key: const ValueKey('roundtable-creators-drawer'),
+                  width: 360,
+                  height: double.infinity,
+                  child: Material(
+                    color: scheme.surface,
+                    child: CallbackShortcuts(
+                      bindings: {
+                        const SingleActivator(LogicalKeyboardKey.escape):
+                            close,
+                      },
+                      child: FocusScope(
+                        autofocus: true,
+                        child: _creatorRail(
+                          creators,
+                          close: close,
+                          onConfigure: () {
+                            close();
+                            unawaited(_configureChannel());
+                          },
+                          onAdd: () {
+                            close();
+                            unawaited(_addCreator(store, selectedModel));
+                          },
+                          onSkipGuide: () => unawaited(_skipGuide()),
+                          onSelect: _openCreatorWorks,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      },
-      transitionBuilder: (_, animation, __, child) => SlideTransition(
-        position: animation
-            .drive(CurveTween(curve: Curves.easeOutCubic))
-            .drive(Tween(begin: const Offset(1, 0), end: Offset.zero)),
-        child: child,
+          ],
+        ],
       ),
     );
   }
@@ -1105,6 +1118,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         UiSheetHeader(
+                          showCloseTooltip: false,
                             title: '生成席位形象',
                             onClose: () => Navigator.pop(context)),
                         const SizedBox(height: 12),
@@ -1134,6 +1148,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: FilledButton(
+                            style: roundtableTextControlStyle,
                             onPressed: selection == null
                                 ? null
                                 : () => Navigator.pop(context, selection),
@@ -1210,6 +1225,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     UiSheetHeader(
+                      showCloseTooltip: false,
                       title: '设置展示席位',
                       onClose: () => Navigator.pop(dialogContext),
                     ),
@@ -1261,6 +1277,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                                     key: ObjectKey(portrait),
                                     future: portrait,
                                     builder: (_, snapshot) => TextButton(
+                                      style: roundtableTextControlStyle,
                                       onPressed: generating
                                           ? null
                                           : () => _generateSeatPortrait(
@@ -1273,6 +1290,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                                     ),
                                   ),
                                 OutlinedButton(
+                                  style: roundtableTextControlStyle,
                                   onPressed: generating ||
                                           (slot == -1 && occupied == limit)
                                       ? null
@@ -1295,6 +1313,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: FilledButton(
+                        style: roundtableTextControlStyle,
                         onPressed: () => Navigator.pop(dialogContext, draft),
                         child: const Text('完成'),
                       ),
@@ -1336,7 +1355,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
               color:
                   guiding && active ? scheme.primary : scheme.outlineVariant),
           padding: const EdgeInsets.symmetric(horizontal: 9),
-          minimumSize: const Size(0, roundtableControlHeight),
+          minimumSize: const Size(0, roundtableActionHeight),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.standard,
         );
@@ -1353,7 +1372,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
           FilledButton(
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
-                minimumSize: const Size(0, roundtableControlHeight),
+                minimumSize: const Size(0, roundtableActionHeight),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.standard,
                 side: guiding && connected
@@ -1385,11 +1404,12 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
             ),
           ),
           const Spacer(),
-          IconButton(
-              style: roundtableIconControlStyle,
-              tooltip: '收起博主列表',
-              onPressed: close,
-              icon: const Icon(CupertinoIcons.xmark, size: 16)),
+          UiIconButton(
+            tooltip: '收起博主列表',
+            showTooltip: false,
+            onTap: close,
+            icon: CupertinoIcons.xmark,
+          ),
         ]),
         actions,
         const SizedBox(height: 12),
@@ -1419,11 +1439,11 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                               style: theme.textTheme.labelSmall,
                             ),
                           ),
-                          IconButton(
-                            style: roundtableIconControlStyle,
+                          UiIconButton(
                             tooltip: '关闭引导',
-                            onPressed: onSkipGuide,
-                            icon: const Icon(Icons.close, size: 15),
+                            showTooltip: false,
+                            onTap: onSkipGuide,
+                            icon: CupertinoIcons.xmark,
                           ),
                         ],
                       ),
@@ -1730,6 +1750,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
             trailing: Wrap(spacing: 8, children: [
               if (published != null)
                 IconButton(
+                  style: roundtableIconControlStyle,
                   tooltip: '下载专家 Skill',
                   icon: const Icon(Icons.download),
                   onPressed: () =>
@@ -2511,6 +2532,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
           '${report.failedSubtitles} 份平台字幕未归档，可再次同步。',
         if (transcription.saved > 0) '已补充 ${transcription.saved} 份本机逐字稿。',
         if (transcription.failed > 0) '${transcription.failed} 条作品尚无逐字稿。',
+        if (transcription.failureReason case final String reason) reason,
         if (report.images > 0) '已归档 ${report.images} 张图片。',
         if (report.failedImages > 0) '${report.failedImages} 张图片未归档，可再次同步。',
       ];
@@ -3008,6 +3030,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                                     images.isNotEmpty &&
                                     !readOnly)
                                   FilledButton(
+                                    style: roundtableTextControlStyle,
                                     onPressed: () async {
                                       final done = await _recognizeWorkImage(
                                           store, work, index, url);
@@ -3314,6 +3337,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             UiSheetHeader(
+              showCloseTooltip: false,
                 title: '关联作品', onClose: () => Navigator.of(context).pop()),
             const SizedBox(height: 16),
             Flexible(
@@ -3406,6 +3430,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                             const Text('蒸馏博主后，这里会展示提炼出的主题和关联作品。'),
                             const SizedBox(height: 8),
                             FilledButton(
+                                style: roundtableTextControlStyle,
                                 onPressed: () =>
                                     _addCreator(store, selectedModel),
                                 child: const Text('前往添加博主')),
@@ -3449,6 +3474,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                                 final canGenerate =
                                     selectedModel != null && experts.isNotEmpty;
                                 Widget action(bool canOpen) => FilledButton(
+                                    style: roundtableTextControlStyle,
                                     key: ValueKey(
                                         'creator-generate-${kind.name}'),
                                     onPressed: !canOpen
@@ -3527,6 +3553,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                                         child: Text('共 ${rows.length} 项',
                                             style: theme.textTheme.labelSmall)),
                                     TextButton(
+                                      style: roundtableTextControlStyle,
                                       key:
                                           ValueKey('creator-more-${kind.name}'),
                                       onPressed: () =>
@@ -3559,6 +3586,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     UiSheetHeader(
+                      showCloseTooltip: false,
                         title: '${kind.label}资产',
                         onClose: () => Navigator.of(context).pop()),
                     const Divider(height: 20),
@@ -3585,6 +3613,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                     Align(
                         alignment: Alignment.centerRight,
                         child: OutlinedButton(
+                            style: roundtableTextControlStyle,
                             onPressed: () => Navigator.of(context).pop(),
                             child: const Text('完成'))),
                   ]),
@@ -3605,10 +3634,12 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
           Text(created > 0 ? '$type · ${date.month} 月 ${date.day} 日' : type),
       trailing: Wrap(children: [
         IconButton(
+            style: roundtableIconControlStyle,
             tooltip: '打开',
             icon: const Icon(CupertinoIcons.eye, size: 18),
             onPressed: () => _openAsset(row, kind, export: false)),
         IconButton(
+            style: roundtableIconControlStyle,
             tooltip: '下载',
             icon: const Icon(CupertinoIcons.arrow_down_to_line, size: 18),
             onPressed: () => _openAsset(row, kind, export: true)),
@@ -3699,6 +3730,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
             height: 690,
             child: AttachmentPreviewPanel(
               target: target,
+              useStandardCloseButton: true,
               onOpenExternal: onOpenExternal,
               onClose: () => Navigator.of(context).pop(),
             ),
@@ -3823,6 +3855,7 @@ class _CreatorInlineMediaState extends State<_CreatorInlineMedia> {
               if (data.large) {
                 return Center(
                   child: OutlinedButton(
+                    style: roundtableTextControlStyle,
                     onPressed: () => _openCreatorLocalVideo(
                         context, Uri.parse(data.target.url)),
                     child: const Text('用本机播放器打开原片'),
@@ -3833,6 +3866,7 @@ class _CreatorInlineMediaState extends State<_CreatorInlineMedia> {
                 borderRadius: BorderRadius.circular(8),
                 child: AttachmentPreviewPanel(
                   target: data.target,
+                  useStandardCloseButton: true,
                   onClose: widget.onClose,
                 ),
               );
@@ -4008,6 +4042,7 @@ class _SyncCreatorDialogState extends ConsumerState<_SyncCreatorDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               UiSheetHeader(
+                showCloseTooltip: false,
                   title: '立即同步', onClose: close, closeEnabled: !_checking),
               const Divider(height: 20),
               DecoratedBox(
@@ -4144,7 +4179,9 @@ class _SyncCreatorDialogState extends ConsumerState<_SyncCreatorDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              UiSheetHeader(title: '同步进度', onClose: close),
+              UiSheetHeader(
+                showCloseTooltip: false,
+                title: '同步进度', onClose: close),
               const Divider(height: 20),
               Text(run.status,
                   style: TextStyle(
@@ -4291,6 +4328,7 @@ class _DouyinAuthorizationDialogState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             UiSheetHeader(
+              showCloseTooltip: false,
                 title: _step.label,
                 onClose: () => Navigator.of(context).pop(false)),
             const Divider(height: 19),
@@ -4464,23 +4502,28 @@ class _DouyinAuthorizationDialogState
               child: Wrap(spacing: 8, children: [
                 if (_step == _DouyinAuthorizationStep.introduction)
                   OutlinedButton(
+                      style: roundtableTextControlStyle,
                       onPressed: () => Navigator.of(context).pop(false),
                       child: const Text('取消')),
                 if (scan || _step == _DouyinAuthorizationStep.scope)
                   OutlinedButton(
+                      style: roundtableTextControlStyle,
                       onPressed: () => _showStep(
                           _DouyinAuthorizationStep.values[_step.index - 1]),
                       child: const Text('上一步')),
                 if (_step == _DouyinAuthorizationStep.introduction)
                   FilledButton(
+                      style: roundtableTextControlStyle,
                       onPressed: () => _showStep(_DouyinAuthorizationStep.scan),
                       child: const Text('前往授权')),
                 if (_step == _DouyinAuthorizationStep.scope)
                   FilledButton(
+                      style: roundtableTextControlStyle,
                       onPressed: () => _showStep(_DouyinAuthorizationStep.done),
                       child: const Text('确认范围')),
                 if (_step == _DouyinAuthorizationStep.done)
                   FilledButton(
+                      style: roundtableTextControlStyle,
                       key: const ValueKey(
                           'roundtable-douyin-authorization-done'),
                       onPressed: () => Navigator.of(context).pop(true),
@@ -4633,16 +4676,11 @@ class _AddDouyinCreatorDialogState
       return AlertDialog(
         alignment: const Alignment(0, -.37),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Row(children: [
-          const Expanded(
-              child: Text('添加博主',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          IconButton(
-            tooltip: '关闭',
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(CupertinoIcons.xmark, size: 15),
-          ),
-        ]),
+        title: UiSheetHeader(
+          showCloseTooltip: false,
+          title: '添加博主',
+          onClose: () => Navigator.pop(context),
+        ),
         content: SizedBox(
             width: 440,
             child: Column(
@@ -4681,8 +4719,10 @@ class _AddDouyinCreatorDialogState
             )),
         actions: [
           OutlinedButton(
+              style: roundtableTextControlStyle,
               onPressed: () => Navigator.pop(context), child: const Text('取消')),
           FilledButton(
+              style: roundtableTextControlStyle,
               onPressed: _busy ? null : _read, child: const Text('读取作品')),
         ],
       );
@@ -4698,6 +4738,7 @@ class _AddDouyinCreatorDialogState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             UiSheetHeader(
+              showCloseTooltip: false,
                 title: '添加博主', onClose: () => Navigator.of(context).pop()),
             const SizedBox(height: 12),
             Flexible(
@@ -4709,6 +4750,7 @@ class _AddDouyinCreatorDialogState
                       Expanded(
                           child: Text(_cookie.isEmpty ? '尚未登录抖音' : '已登录抖音')),
                       TextButton(
+                          style: roundtableTextControlStyle,
                           onPressed: _busy
                               ? null
                               : () => _authorize(renew: _cookie.isNotEmpty),
@@ -4724,6 +4766,7 @@ class _AddDouyinCreatorDialogState
                         hintText: '粘贴抖音作品链接或分享文本',
                         onSubmitted: (_) => _read(),
                         suffixIcon: IconButton(
+                            style: roundtableIconControlStyle,
                             tooltip: '粘贴',
                             onPressed: _busy
                                 ? null
@@ -4799,6 +4842,7 @@ class _AddDouyinCreatorDialogState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               UiSheetHeader(
+                showCloseTooltip: false,
                   title: '蒸馏失败', onClose: () => Navigator.pop(context)),
               const Divider(height: 20),
               Text(_error ?? '无法读取博主及作品。',
@@ -4809,13 +4853,18 @@ class _AddDouyinCreatorDialogState
                 alignment: WrapAlignment.end,
                 children: [
                   OutlinedButton(
+                    style: roundtableTextControlStyle,
                     onPressed: () => setState(() {
                       _readFailed = false;
                       _error = null;
                     }),
                     child: const Text('修改链接'),
                   ),
-                  FilledButton(onPressed: _read, child: const Text('重试')),
+                  FilledButton(
+                    style: roundtableTextControlStyle,
+                    onPressed: _read,
+                    child: const Text('重试'),
+                  ),
                 ],
               ),
             ],
@@ -4842,7 +4891,9 @@ class _AddDouyinCreatorDialogState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            UiSheetHeader(title: '配置渠道', onClose: () => Navigator.pop(context)),
+            UiSheetHeader(
+              showCloseTooltip: false,
+              title: '配置渠道', onClose: () => Navigator.pop(context)),
             const Divider(height: 16),
             Flexible(
               child: ListView.separated(
@@ -4887,6 +4938,7 @@ class _AddDouyinCreatorDialogState
                         if (available) ...[
                           const SizedBox(width: 8),
                           OutlinedButton(
+                            style: roundtableTextControlStyle,
                             onPressed: _busy
                                 ? null
                                 : () => _authorize(renew: connected),
@@ -4905,9 +4957,11 @@ class _AddDouyinCreatorDialogState
             Row(children: [
               if (connected)
                 TextButton(
+                    style: roundtableTextControlStyle,
                     onPressed: _disconnectChannel, child: const Text('断开抖音')),
               const Spacer(),
               FilledButton(
+                  style: roundtableTextControlStyle,
                   onPressed: () => Navigator.pop(context),
                   child: const Text('完成')),
             ]),

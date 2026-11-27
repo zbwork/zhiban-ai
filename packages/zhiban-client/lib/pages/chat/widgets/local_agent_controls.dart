@@ -201,6 +201,7 @@ class AgentControlButton extends StatelessWidget {
       required this.icon,
       required this.onPressed,
       this.leading,
+      this.height,
       this.color,
       this.expanded = false,
       this.compact = false});
@@ -211,6 +212,7 @@ class AgentControlButton extends StatelessWidget {
   final Widget? leading;
   final VoidCallback? onPressed;
   final Color? color;
+  final double? height;
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -223,8 +225,9 @@ class AgentControlButton extends StatelessWidget {
             backgroundColor: (expanded || compact)
                 ? accent.withValues(alpha: .08)
                 : scheme.surface,
-            padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 14),
-            minimumSize: Size(0, compact ? 26 : 42),
+            padding: EdgeInsets.symmetric(
+                horizontal: compact ? 8 : height == null ? 14 : 10),
+            minimumSize: Size(0, height ?? (compact ? 26 : 42)),
             visualDensity: VisualDensity.standard,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             side: BorderSide(
@@ -241,7 +244,7 @@ class AgentControlButton extends StatelessWidget {
           Opacity(
               opacity: onPressed == null ? .45 : 1,
               child: leading ??
-                  Icon(icon, size: compact ? 16 : 22, color: accent)),
+                  Icon(icon, size: compact || height != null ? 16 : 22, color: accent)),
           SizedBox(width: compact ? 5 : 10),
           Flexible(
               child: Text(label,

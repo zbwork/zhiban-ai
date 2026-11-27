@@ -14,6 +14,7 @@ class UiSheetHeader extends StatelessWidget {
     this.subtitle,
     this.onClose,
     this.closeEnabled = true,
+    this.showCloseTooltip = true,
     this.trailing,
   });
 
@@ -25,6 +26,7 @@ class UiSheetHeader extends StatelessWidget {
 
   /// false 时关闭按钮置灰不可点（适用于保存中等场景）。
   final bool closeEnabled;
+  final bool showCloseTooltip;
   final Widget? trailing;
 
   @override
@@ -68,6 +70,7 @@ class UiSheetHeader extends StatelessWidget {
           UiIconButton(
             icon: CupertinoIcons.xmark,
             tooltip: '关闭',
+            showTooltip: showCloseTooltip,
             onTap: onClose,
             enabled: closeEnabled,
           ),

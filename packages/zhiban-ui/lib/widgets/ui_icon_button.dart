@@ -9,6 +9,7 @@ class UiIconButton extends StatefulWidget {
     required this.icon,
     this.onTap,
     this.tooltip,
+    this.showTooltip = true,
     this.size = 32,
     this.iconSize = 16,
     this.enabled = true,
@@ -22,6 +23,7 @@ class UiIconButton extends StatefulWidget {
     required Widget icon,
     this.onTap,
     this.tooltip,
+    this.showTooltip = true,
     this.size = 32,
     this.enabled = true,
     this.hoverColor,
@@ -34,6 +36,7 @@ class UiIconButton extends StatefulWidget {
   final Widget? iconWidget;
   final VoidCallback? onTap;
   final String? tooltip;
+  final bool showTooltip;
   final double size;
   final double iconSize;
   final bool enabled;
@@ -109,6 +112,9 @@ class _UiIconButtonState extends State<UiIconButton> {
 
     if (widget.tooltip != null) {
       btn = Tooltip(message: widget.tooltip!, child: btn);
+      if (!widget.showTooltip) {
+        btn = TooltipVisibility(visible: false, child: btn);
+      }
     }
     return btn;
   }
