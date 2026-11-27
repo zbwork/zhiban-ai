@@ -345,8 +345,11 @@ class _CreatorRoundtableChatState extends State<CreatorRoundtableChat> {
     final sceneSize = frame.size.aspectRatio > ratio
         ? Size(frame.height * ratio, frame.height)
         : Size(frame.width, frame.width / ratio);
-    final scene = Rect.fromLTWH(frame.center.dx - sceneSize.width / 2,
-        frame.top, sceneSize.width, sceneSize.height);
+    final scene = Rect.fromCenter(
+      center: frame.center,
+      width: sceneSize.width,
+      height: sceneSize.height,
+    );
     final wide = frame.width >= 690;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -356,7 +359,8 @@ class _CreatorRoundtableChatState extends State<CreatorRoundtableChat> {
     if (widget.expertsOnly) {
       return Dialog(
         alignment: wide ? const Alignment(-.36, 1) : Alignment.bottomCenter,
-        insetPadding: const EdgeInsets.fromLTRB(12, 12, 12, 76),
+        insetPadding:
+            EdgeInsets.fromLTRB(12, 12, 12, viewport.height - scene.bottom + 64),
         insetAnimationDuration: duration,
         backgroundColor: Colors.transparent,
         elevation: 0,

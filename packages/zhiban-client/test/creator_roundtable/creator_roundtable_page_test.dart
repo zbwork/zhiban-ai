@@ -56,6 +56,9 @@ class _RoundtableStore extends Fake implements LocalWorkspaceStore {
   Future<LocalRow?> lastCreatorExpertJob(String creatorId) async => null;
 
   @override
+  Future<LocalRow?> nextQueuedCreatorExpertJob() async => null;
+
+  @override
   Future<LocalRow?> lastResumableCreatorSyncJob(String creatorId) async => null;
 
   @override
@@ -139,6 +142,87 @@ class _RunningSyncStore extends _RoundtableStore {
   @override
   Future<void> failCreatorJob(String id, String message) async {
     failure = (id, message);
+  }
+}
+
+class _QueuedSyncStore extends _RunningSyncStore {
+  _QueuedSyncStore() {
+    creators.add({
+      'id': 'b',
+      'channel': 'douyin',
+      'source_account_id': 'original',
+      'name': '正在蒸馏的博主',
+    });
+  }
+
+  LocalRow? task;
+
+  @override
+  Future<List<LocalRow>> creatorWorks(String creatorId) async => [
+        {
+          'id': 'work-$creatorId',
+          'creator_id': creatorId,
+          'source_work_id': '1234567890123456789',
+          'title': '取证作品',
+          'source_url': 'https://www.douyin.com/video/1234567890123456789',
+          'source_version': 1,
+          'metadata': '{"article_body":"先核对原始收据，再确认已付费用。"}',
+        }
+      ];
+
+  @override
+  Future<String> beginCreatorExpertJob(String creatorId,
+      Map<String, Object> model, List<Map<String, Object>> evidence,
+      {bool fromSync = false,
+      LocalRow? creatorIdentity,
+      bool queued = false}) async {
+    expect(creatorId, 'a');
+    expect(queued, isTrue);
+    expect(fromSync, isTrue);
+    task = {
+      'id': 'queued-job',
+      'status': 'queued',
+      'model_snapshot': jsonEncode(model),
+      'source_snapshot': jsonEncode(evidence),
+      'request_payload': jsonEncode({
+        'creator_ids': [creatorId],
+        'trigger': 'work-sync',
+        'creator_identity': creatorIdentity,
+      }),
+      'result_payload': '{}',
+    };
+    return 'queued-job';
+  }
+
+  @override
+  Future<LocalRow?> nextQueuedCreatorExpertJob() async =>
+      task?['status'] == 'queued' ? task : null;
+
+  @override
+  Future<LocalRow?> lastCreatorExpertJob(String creatorId) async =>
+      creatorId == 'a' ? task : null;
+
+  @override
+  Future<void> resumeCreatorExpertJob(String id) async {
+    expect(id, 'queued-job');
+    task = {...task!, 'status': 'running'};
+  }
+
+  @override
+  Future<void> failCreatorJob(String id, String message) async {
+    expect(id, 'queued-job');
+    task = {...task!, 'status': 'failed', 'error': message};
+  }
+}
+
+class _QueuedSyncCredentials extends Fake implements ModelServiceStore {
+  final active = Completer<String?>();
+  int requested = 0;
+
+  @override
+  Future<String?> getApiKey(String providerId) async {
+    expect(providerId, 'test');
+    return ++requested == 1 ? active.future : null;
   }
 }
 
@@ -459,6 +543,7 @@ void main() {
       {List<LocalRow> creators = const [],
       bool configureModels = false,
       CreatorSeatPortraitService? portraits,
+      ModelServiceStore? credentials,
       String? douyinSession,
       DouyinCreatorService Function()? adapter,
       LocalWorkspaceStore? store,
@@ -478,11 +563,11 @@ void main() {
         if (configureModels)
           modelCatalogProvider.overrideWith((_) async =>
               const ModelCatalog(providers: [], modelsByProviderId: {})),
-        if (portraits != null) ...[
+        if (portraits != null)
           creatorSeatPortraitServiceProvider.overrideWithValue(portraits),
+        if (credentials != null || portraits != null)
           modelServiceStoreProvider
-              .overrideWithValue(_PortraitTestCredentials()),
-        ],
+              .overrideWithValue(credentials ?? _PortraitTestCredentials()),
         if (mediaDirectory != null)
           creatorAssetDirectoryProvider.overrideWithValue(mediaDirectory),
         if (adapter != null)
@@ -876,6 +961,58 @@ void main() {
         false);
     expect(tester.widget<TextField>(quantity).controller?.text, '3');
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('另一位博主蒸馏期间同步作品，任务排队后自动开始', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'creator_roundtable.model.v1': '["test","gpt-test-a"]',
+    });
+    final store = _QueuedSyncStore();
+    final credentials = _QueuedSyncCredentials();
+    final adapter = _WaitingSyncAdapter();
+    await open(tester, const Size(1200, 750),
+        store: store,
+        configureModels: true,
+        credentials: credentials,
+        douyinSession: 'fixture',
+        adapter: () => adapter);
+    await _openCreatorDrawer(tester);
+    await tester.tap(find.text('正在蒸馏的博主'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('继续生成'));
+    await tester.pumpAndSettle();
+    expect(credentials.requested, 1);
+    await tester.tap(find.text('返回博主列表'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('后台同步博主'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('立即同步'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('开始同步'));
+    await tester.pumpAndSettle();
+    adapter.request.complete({
+      'author': {'id': 'author'},
+      'posts': [
+        {'id': '1234567890123456789', 'published_at': 1},
+      ],
+      'next_cursor': null,
+    });
+    await tester.pumpAndSettle();
+
+    expect(store.task?['status'], 'queued');
+    expect(jsonDecode(store.task!['model_snapshot'] as String),
+        {'provider_id': 'test', 'model_id': 'gpt-test-a'});
+    expect(find.textContaining('已排队'), findsWidgets);
+    expect(credentials.requested, 1);
+    await tester.tap(find.text('完成').hitTestable());
+    await tester.pumpAndSettle();
+    credentials.active.complete(null);
+    await tester.pumpAndSettle();
+
+    expect(credentials.requested, 2);
+    expect(store.task?['status'], 'failed');
+    expect(find.text('重试知识更新'), findsOneWidget);
   });
 
   testWidgets('同步期间可以切换旧作品和返回圆桌，取消后释放原任务', (tester) async {
@@ -1442,9 +1579,15 @@ void main() {
     expect(tester.getSize(send), const Size.square(40));
     expectComposerAlignment(input, [select, send, expand]);
     expect(composer, findsNothing);
-    await tester.binding.setSurfaceSize(const Size(1050, 720));
+    await tester.binding.setSurfaceSize(const Size(1080, 810));
     await tester.pumpAndSettle();
-    expect(tester.getCenter(panel).dx, closeTo(tester.getCenter(stage).dx, 1));
+    final stageBounds = tester.getRect(stage);
+    final railBounds =
+        tester.getRect(find.byKey(const ValueKey('roundtable-compact-creators')));
+    expect(stageBounds.top, greaterThan(railBounds.top + 30));
+    expect(stageBounds.center.dy, closeTo(railBounds.center.dy, 1));
+    expect(tester.getCenter(panel).dx, closeTo(stageBounds.center.dx, 1));
+    expect(tester.getRect(panel).bottom, closeTo(stageBounds.bottom - 12, 1));
     final expandTarget =
         find.descendant(of: expand, matching: find.byType(GestureDetector));
     Focus.of(tester.element(expandTarget)).requestFocus();

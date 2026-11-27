@@ -4,8 +4,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:zhiban_client/config/client_assets.dart';
+
+import 'creator_expert_workflow.dart';
+import 'douyin_creator_runtime.dart';
 
 class DouyinCreatorException implements Exception {
   const DouyinCreatorException(this.message, {this.code});
@@ -128,12 +130,15 @@ Future<({Map<String, dynamic> author, List<Map<String, dynamic>> works})>
 /// Thin channel adapter. Cookies are accepted only through stdin and never
 /// become command arguments, environment variables, database rows or logs.
 class DouyinCreatorService {
-  static const sourceCommit = 'f6be8c0ffba9a127075bbeafe4838716650b6325';
+  DouyinCreatorService({DouyinCreatorRuntime? runtime})
+      : _runtime = runtime ?? DouyinCreatorRuntime();
   static const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
       'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
+  final DouyinCreatorRuntime _runtime;
+  final _closedSignal = Completer<void>();
   Process? _process;
-  bool _closed = false;
+  bool get _closed => _closedSignal.isCompleted;
 
   static String normalizeLink(String text) {
     // Some share paths escape URL punctuation as Markdown or JSON.
@@ -163,7 +168,7 @@ class DouyinCreatorService {
   }
 
   void close() {
-    _closed = true;
+    if (!_closed) _closedSignal.complete();
     _process?.kill();
   }
 
@@ -210,55 +215,29 @@ class DouyinCreatorService {
 
   Future<Map<String, dynamic>> _read(String cookie, Map<String, Object> source,
       void Function(String) onStatus) async {
-    final support = await getApplicationSupportDirectory();
-    final tools = Directory('${support.path}/community-douyin/$sourceCommit');
-    await tools.create(recursive: true);
-    final python = Platform.isWindows
-        ? '${tools.path}/env/Scripts/python.exe'
-        : '${tools.path}/env/bin/python';
-    final marker = File('${tools.path}/ready');
-    if (!await marker.exists() || !await File(python).exists()) {
-      final uv = await _findUv();
-      onStatus('首次准备抖音解析组件，正在下载依赖…');
-      if (!await File(python).exists()) {
-        await _run(
-            uv,
-            [
-              'venv',
-              '--python',
-              '>=3.11',
-              '--no-python-downloads',
-              '${tools.path}/env',
-            ],
-            workingDirectory: tools.path,
-            timeout: const Duration(minutes: 2));
-      }
-      await _run(
-          uv,
-          [
-            'pip',
-            'install',
-            '--python',
-            python,
-            '--index-url',
-            'https://pypi.org/simple',
-            'f2 @ https://github.com/Johnserf-Seed/f2/archive/$sourceCommit.zip',
-          ],
-          workingDirectory: tools.path,
-          timeout: const Duration(minutes: 4));
-      _checkOpen();
-      await marker.writeAsString(sourceCommit, flush: true);
+    _checkOpen();
+    final adapter = await rootBundle
+        .loadString(ClientAssets.path('assets/tools/douyin_creator.py'));
+    _checkOpen();
+    final DouyinRuntimePaths runtime;
+    try {
+      runtime = await Future.any<DouyinRuntimePaths>([
+        _runtime.prepare(adapter, (status) {
+          if (!_closed) onStatus(status);
+        }),
+        _closedSignal.future.then<DouyinRuntimePaths>(
+            (_) => throw const DouyinCreatorException('已停止读取。')),
+      ]);
+    } on CreatorWorkflowException catch (error) {
+      throw DouyinCreatorException(error.message);
+    } on FileSystemException {
+      throw const DouyinCreatorException('无法保存抖音解析组件，请检查本机存储空间和权限。');
     }
     _checkOpen();
-    final runner = File('${tools.path}/douyin_creator.py');
-    await runner.writeAsString(
-        await rootBundle
-            .loadString(ClientAssets.path('assets/tools/douyin_creator.py')),
-        flush: true);
     final cursor = source['cursor'];
     onStatus(cursor is int && cursor > 0 ? '正在读取公开作品…' : '正在读取作品、博主和其他公开作品…');
-    final output = await _run(python, ['-I', runner.path],
-        workingDirectory: tools.path,
+    final output = await _run(runtime.python, ['-I', '-X', 'utf8', runtime.runner],
+        workingDirectory: runtime.directory,
         timeout: const Duration(seconds: 60),
         input: {
           ...source,
@@ -305,25 +284,10 @@ class DouyinCreatorService {
     if (_closed) throw const DouyinCreatorException('已停止读取。');
   }
 
-  Future<String> _findUv() async {
-    final directories = [
-      '/opt/homebrew/bin',
-      '/usr/local/bin',
-      if (Platform.environment['HOME'] case final String home)
-        '$home/.local/bin',
-      ...?Platform.environment['PATH']?.split(Platform.isWindows ? ';' : ':'),
-    ];
-    for (final directory in directories) {
-      final file = File('$directory/${Platform.isWindows ? 'uv.exe' : 'uv'}');
-      if (await file.exists()) return file.absolute.path;
-    }
-    throw const DouyinCreatorException('首次使用需要本机安装 uv，并准备 Python 3.11 或更高版本。');
-  }
-
   Future<String> _run(String executable, List<String> arguments,
       {required String workingDirectory,
       required Duration timeout,
-      Map<String, dynamic>? input}) async {
+      required Map<String, dynamic> input}) async {
     _checkOpen();
     final Process process;
     try {
@@ -348,16 +312,14 @@ class DouyinCreatorService {
     });
     final errorsDone = process.stderr.drain<void>();
     try {
-      if (input != null) process.stdin.write(jsonEncode(input));
+      process.stdin.write(jsonEncode(input));
       await process.stdin.close();
       final exit = await process.exitCode.timeout(timeout);
       await Future.wait([outputDone, errorsDone]);
       _checkOpen();
       if (tooLarge) throw const DouyinCreatorException('作品数据过大，已停止读取。');
       if (exit != 0) {
-        throw DouyinCreatorException(input == null
-            ? '解析组件准备失败，请检查 GitHub/PyPI 网络后重试。'
-            : '解析组件运行失败，请重试。');
+        throw const DouyinCreatorException('解析组件运行失败，请重试。');
       }
       return utf8.decode(bytes);
     } on TimeoutException {

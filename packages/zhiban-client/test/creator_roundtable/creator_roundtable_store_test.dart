@@ -79,6 +79,103 @@ void main() {
     expect(complete['result_payload'], '{}');
   });
 
+  test('升级旧库后联合作品共享归档并且不阻塞整批同步', () async {
+    final dir = await Directory.systemTemp.createTemp('creator-links-');
+    addTearDown(() => dir.delete(recursive: true));
+    Future<LocalWorkspaceStore> open() => LocalWorkspaceStore.open(
+        factory: databaseFactoryFfi, path: '${dir.path}/workspace.db');
+    var store = await open();
+    addTearDown(() => store.db.close());
+    const publisher = {'id': 'publisher', 'name': '原作者'};
+    const collaborator = {'id': 'collaborator', 'name': '联合作品作者'};
+    const joint = {'id': '1234567890123456789', 'title': '联合作品'};
+    final original = await store.importCreatorWorks(publisher, [joint]);
+    final originalWork = (await store.creatorWorks(original.creatorId)).single;
+    final workId = originalWork['id'] as String;
+    await store.saveCreatorTranscript(
+        workId: workId,
+        sourceVersion: 1,
+        transcript: '两位博主共享的原文',
+        cues: [
+          {'start_ms': 0, 'end_ms': 1000, 'text': '两位博主共享的原文'}
+        ]);
+    await store.db.execute('DROP TABLE creator_work_links');
+    await store.db.setVersion(8);
+    await store.db.close();
+    store = await open();
+
+    final first = (await store.creatorWorks(original.creatorId)).single;
+    expect(first['id'], workId);
+    expect(first['source_version'], 2);
+    final other = await store.importCreatorWorks(collaborator, []);
+    final job = await store.beginCreatorSyncJob(other.creatorId,
+        latest: 4, model: null);
+    const batch = [
+      {'id': '1234567890123456790', 'title': '其他新作品'},
+      {...joint, 'coauthored': true, 'publisher_account_id': 'publisher'},
+    ];
+    expect((await store.importCreatorWorks(collaborator, batch, syncJobId: job))
+        .added, 2);
+    final otherWorks = await store.creatorWorks(other.creatorId);
+    expect(otherWorks, hasLength(2));
+    final linked = otherWorks.singleWhere((row) => row['id'] == workId);
+    expect(linked['creator_id'], other.creatorId);
+    expect(linked['transcript'], first['transcript']);
+    expect(creatorEvidence([linked]), creatorEvidence([first]));
+    expect((await store.importCreatorWorks(collaborator, batch)).added, 0);
+    expect(await store.db.query('creator_works'), hasLength(2));
+    expect(await store.lastResumableCreatorSyncJob(other.creatorId), isNull);
+
+    const otherJoint = {'id': '1234567890123456791', 'title': '先从合作者导入'};
+    await store.importCreatorWorks(collaborator, [
+      {...otherJoint, 'coauthored': true, 'publisher_account_id': 'publisher'}
+    ]);
+    expect((await store.importCreatorWorks(publisher, [otherJoint])).added, 1);
+    expect(await store.db.query('creator_works'), hasLength(3));
+    const legacyJoint = {'id': '1234567890123456792', 'title': '旧版归档的联合作品'};
+    await store.importCreatorWorks(collaborator, [
+      {...legacyJoint, 'coauthored': true}
+    ]);
+    expect(
+        (await store.importCreatorWorks(publisher, [
+          {...legacyJoint, 'publisher_account_id': 'publisher'}
+        ])).added,
+        1);
+    expect(await store.db.query('creator_works'), hasLength(4));
+  });
+
+  test('重开后按顺序取出待蒸馏任务并保留模型和证据', () async {
+    final dir = await Directory.systemTemp.createTemp('creator-expert-queue-');
+    addTearDown(() => dir.delete(recursive: true));
+    Future<LocalWorkspaceStore> open() => LocalWorkspaceStore.open(
+        factory: databaseFactoryFfi, path: '${dir.path}/workspace.db');
+    var store = await open();
+    addTearDown(() => store.db.close());
+    const model = {'provider_id': 'fixture', 'model_id': 'original'};
+    const evidence = [{'id': 'evidence-v1', 'text': '原始作品证据'}];
+    final active = await store.beginCreatorExpertJob('a', model, evidence);
+    final first = await store.beginCreatorExpertJob('b', model, evidence,
+        queued: true, fromSync: true);
+    final second = await store.beginCreatorExpertJob('c', model, evidence,
+        queued: true, fromSync: true);
+    await store.db.close();
+    store = await open();
+
+    expect((await store.lastCreatorExpertJob('a'))!['id'], active);
+    expect((await store.lastCreatorExpertJob('a'))!['status'], 'interrupted');
+    final queued = (await store.nextQueuedCreatorExpertJob())!;
+    expect(queued['id'], first);
+    expect(queued['status'], 'queued');
+    expect(jsonDecode(queued['model_snapshot'] as String), model);
+    expect(jsonDecode(queued['source_snapshot'] as String), evidence);
+    await store.resumeCreatorExpertJob(first);
+    expect((await store.lastCreatorExpertJob('b'))!['status'], 'running');
+    expect((await store.nextQueuedCreatorExpertJob())!['id'], second);
+    await store.failCreatorJob(first, '所选模型已停用');
+    expect((await store.lastCreatorExpertJob('b'))!['status'], 'failed');
+    expect((await store.nextQueuedCreatorExpertJob())!['id'], second);
+  });
+
   test('对话历史按标题或正文搜索并将通配符视为普通文本', () async {
     final store = await LocalWorkspaceStore.open(
         factory: databaseFactoryFfi, path: inMemoryDatabasePath);

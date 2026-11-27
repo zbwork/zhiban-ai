@@ -147,6 +147,10 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
   CreatorMediaTranscriber? _transcriber;
   String? _transcriptionProgress;
   CancelToken? _expertCancel;
+  LocalWorkspaceStore? _checkedExpertQueue;
+  bool _drainingExpertQueue = false;
+  bool _recheckExpertQueue = false;
+  static const _expertQueuedMessage = '已排队，当前专家任务结束后自动更新知识。';
   final _expertMessages = <String, String>{};
 
   @override
@@ -379,6 +383,15 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
   Widget build(BuildContext context) {
     final workspace = ref.watch(localWorkspaceProvider);
     final providers = ref.watch(modelProvidersProvider);
+    final store = workspace.value?.store;
+    if (store != null &&
+        providers.hasValue &&
+        !identical(_checkedExpertQueue, store)) {
+      _checkedExpertQueue = store;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_drainExpertQueue(store));
+      });
+    }
     final models = localTextModelOptions(providers.value ?? const []);
     final imageModels = [
       for (final provider in providers.value ?? const [])
@@ -663,7 +676,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                           ),
                       ]),
                     ));
-                return Align(alignment: Alignment.topCenter, child: scene);
+                return Center(child: scene);
               }),
             ),
           ),
@@ -1676,6 +1689,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
           );
         }
         final [published, task] = data;
+        final queued = task?['status'] == 'queued';
         final canResume =
             task != null && {'failed', 'interrupted'}.contains(task['status']);
         final sameUnfinishedEvidence = canResume &&
@@ -1684,8 +1698,9 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
         final hasNewEvidence = evidence.isNotEmpty &&
             creatorEvidenceHasChanged(
                 evidence, published?['evidence'] as String? ?? '[]');
-        final canPrepare = published == null && pendingMedia.isNotEmpty;
-        final canGenerate = hasNewEvidence && !sameUnfinishedEvidence;
+        final canPrepare =
+            !queued && published == null && pendingMedia.isNotEmpty;
+        final canGenerate = hasNewEvidence && !sameUnfinishedEvidence && !queued;
         final title = published != null
             ? '博主专家 · v${published['version']}'
             : canPrepare
@@ -1694,6 +1709,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
                     ? '博主专家 · 待补充作品'
                     : '博主专家';
         final subtitle = _expertMessages[id] ??
+            (queued ? _expertQueuedMessage : null) ??
             (published != null && !hasNewEvidence
                 ? '已发布，可参与圆桌问答。'
                 : canPrepare
@@ -1883,11 +1899,46 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
     );
   }
 
+  LocalRow _creatorExpertIdentity(LocalRow profile) => {
+        'name': profile['name'],
+        'bio': profile['bio'],
+        'channel': profile['channel'],
+        'source_account_id': profile['source_account_id'],
+        'has_avatar': (profile['avatar_url'] as String?)?.isNotEmpty == true,
+      };
+
+  Future<void> _drainExpertQueue(LocalWorkspaceStore store,
+      {String? progressJob, ValueChanged<String>? onProgress}) async {
+    if (_expertCancel != null) return;
+    if (_drainingExpertQueue) {
+      _recheckExpertQueue = true;
+      return;
+    }
+    _drainingExpertQueue = true;
+    try {
+      do {
+        _recheckExpertQueue = false;
+        while (mounted && _expertCancel == null) {
+          final job = await store.nextQueuedCreatorExpertJob();
+          if (!mounted || _expertCancel != null || job == null) break;
+          final request = jsonDecode(job['request_payload'] as String) as Map;
+          final id = (request['creator_ids'] as List).single as String;
+          await _distillCreator(store, {'id': id}, const [], null,
+              retry: job,
+              onProgress: progressJob == job['id'] ? onProgress : null);
+        }
+      } while (mounted && _expertCancel == null && _recheckExpertQueue);
+    } catch (error) {
+      debugPrint(
+          '[creator-roundtable] failed to process expert queue: ${error.runtimeType}');
+    } finally {
+      _drainingExpertQueue = false;
+    }
+  }
+
   Future<bool> _distillCreator(LocalWorkspaceStore store, LocalRow creator,
       List<LocalRow> works, String? selectedModel,
-      {LocalRow? retry,
-      bool fromSync = false,
-      ValueChanged<String>? onProgress}) async {
+      {LocalRow? retry, ValueChanged<String>? onProgress}) async {
     if (_expertCancel != null) return false;
     final id = creator['id'] as String;
     final cancel = CancelToken();
@@ -1898,6 +1949,11 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
     onProgress?.call('正在准备作品证据…');
     String? jobId;
     try {
+      if (retry?['status'] == 'queued') {
+        final queuedJob = retry!['id'] as String;
+        await store.resumeCreatorExpertJob(queuedJob);
+        jobId = queuedJob;
+      }
       final checkpoint = retry == null
           ? <String, dynamic>{}
           : jsonDecode(retry['result_payload'] as String)
@@ -1919,7 +1975,9 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
           : jsonEncode(
               [originalModel['provider_id'], originalModel['model_id']]);
       final model = await _resolveRoundtableModel(selection, cancel);
-      if (cancel.isCancelled) return false;
+      if (cancel.isCancelled) {
+        throw const CreatorWorkflowException('专家生成已中断。');
+      }
       final request = retry == null
           ? const <String, dynamic>{}
           : jsonDecode(retry['request_payload'] as String)
@@ -1934,19 +1992,15 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
             .where((row) => row['id'] == id)
             .firstOrNull;
         if (profile == null) throw StateError('该博主已移除。');
-        identity = {
-          'name': profile['name'],
-          'bio': profile['bio'],
-          'channel': profile['channel'],
-          'source_account_id': profile['source_account_id'],
-          'has_avatar': (profile['avatar_url'] as String?)?.isNotEmpty == true,
-        };
+        identity = _creatorExpertIdentity(profile);
       }
-      if (cancel.isCancelled) return false;
+      if (cancel.isCancelled) {
+        throw const CreatorWorkflowException('专家生成已中断。');
+      }
       if (retry == null) {
         jobId = await store.beginCreatorExpertJob(id, model.snapshot, evidence,
-            fromSync: fromSync, creatorIdentity: identity);
-      } else {
+            creatorIdentity: identity);
+      } else if (jobId == null) {
         final existing = retry['id'] as String;
         await store.resumeCreatorExpertJob(existing);
         jobId = existing;
@@ -2042,7 +2096,7 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
         expectedBaseVersion: baseVersion,
       );
       if (mounted) {
-        final synced = fromSync || request['trigger'] == 'work-sync';
+        final synced = request['trigger'] == 'work-sync';
         setState(() {
           _seatExperts.remove((store, id));
           _expertMessages[id] = synced
@@ -2057,11 +2111,15 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
         StateError() => error.message.toString(),
         _ => '专家生成失败，请重试。',
       };
+      if (retry?['status'] == 'queued' && jobId == null) rethrow;
       if (jobId != null) await store.failCreatorJob(jobId, message);
       if (mounted) setState(() => _expertMessages[id] = message);
       return false;
     } finally {
-      if (mounted) setState(() => _expertCancel = null);
+      if (mounted) {
+        setState(() => _expertCancel = null);
+        if (!_drainingExpertQueue) unawaited(_drainExpertQueue(store));
+      }
     }
   }
 
@@ -2337,7 +2395,6 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
       final evidence = creatorEvidence(works);
       final published = await store.latestCreatorExpert(id);
       if (!active()) return;
-      if (_expertCancel != null) return;
       if (evidence.isEmpty) {
         setState(() => _expertMessages[id] = '暂无可更新的证据，可补充逐字稿或图片文字。');
         return;
@@ -2348,20 +2405,36 @@ class _CreatorRoundtablePageState extends ConsumerState<CreatorRoundtablePage> {
         return;
       }
       final pending = await store.lastCreatorExpertJob(id);
-      if (!active() || _expertCancel != null) return;
+      if (!active()) return;
       if (pending != null &&
-          {'failed', 'interrupted'}.contains(pending['status']) &&
+          {'running', 'queued', 'failed', 'interrupted'}
+              .contains(pending['status']) &&
           !creatorEvidenceHasChanged(
               evidence, pending['source_snapshot'] as String)) {
-        setState(() => _expertMessages[id] = '已有未完成的知识任务，可直接重试。');
+        final status = pending['status'];
+        setState(() => _expertMessages[id] = switch (status) {
+              'queued' => _expertQueuedMessage,
+              'running' => '正在更新知识…',
+              _ => '已有未完成的知识任务，可直接重试。',
+            });
         return;
       }
       if (model == null) {
         setState(() => _expertMessages[id] = '有新证据，选择可用模型后可更新知识。');
         return;
       }
-      await _distillCreator(store, creator, works, model,
-          fromSync: true, onProgress: run.update);
+      final choice = jsonDecode(model) as List;
+      final jobId = await store.beginCreatorExpertJob(
+          id,
+          {'provider_id': choice[0] as String, 'model_id': choice[1] as String},
+          evidence,
+          creatorIdentity: _creatorExpertIdentity(creator),
+          fromSync: true,
+          queued: true);
+      if (!active()) return;
+      setState(() => _expertMessages[id] = _expertQueuedMessage);
+      run.update(_expertQueuedMessage);
+      await _drainExpertQueue(store, progressJob: jobId, onProgress: run.update);
     } catch (_) {
       if (active()) {
         setState(() => _expertMessages[id] = '已保存作品，知识暂未更新，可手动重试。');

@@ -88,7 +88,9 @@ class DouyinAdapterTest(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(APP.RequestError, "author_mismatch"):
             await self.page(1)
         self.posts[0]["cooperation_info"] = {"co_creators": [{"sec_uid": "author"}]}
-        self.assertTrue((await self.page(1))["posts"][0]["coauthored"])
+        linked = (await self.page(1))["posts"][0]
+        self.assertTrue(linked["coauthored"])
+        self.assertEqual(linked["publisher_account_id"], self.posts[0]["author"]["sec_uid"])
         self.assertEqual(self.profile_requests, [])
 
 

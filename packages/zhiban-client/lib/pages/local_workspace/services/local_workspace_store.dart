@@ -29,10 +29,11 @@ class LocalWorkspaceStore {
         '${(await getApplicationSupportDirectory()).path}/community_workspace_v1.db';
     final database = await (factory ?? databaseFactory).openDatabase(location,
         options: OpenDatabaseOptions(
-          version: 8,
+          version: 9,
           onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
           onUpgrade: (db, oldVersion, newVersion) async {
             if (oldVersion < 8) await _createCreatorRoundtableTables(db);
+            if (oldVersion < 9) await _createCreatorWorkLinks(db);
             if (oldVersion < 7) await _createTaskTables(db);
             if (oldVersion < 6) {
               await db.execute(
@@ -64,6 +65,7 @@ class LocalWorkspaceStore {
           onCreate: (db, version) async {
             await _createTaskTables(db);
             await _createCreatorRoundtableTables(db);
+            await _createCreatorWorkLinks(db);
             await db.execute(
                 'CREATE TABLE employees (id TEXT PRIMARY KEY, name TEXT NOT NULL, prompt TEXT NOT NULL, provider_id TEXT NOT NULL, model_id TEXT NOT NULL, skills TEXT NOT NULL, created INTEGER NOT NULL)');
             await db.execute(
@@ -253,11 +255,27 @@ class LocalWorkspaceStore {
   Future<List<LocalRow>> creatorProfiles() =>
       db.query('creator_profiles', orderBy: 'last_synced DESC, name');
 
-  Future<List<LocalRow>> creatorWorks(String creatorId) =>
-      db.query('creator_works',
-          where: 'creator_id = ?',
-          whereArgs: [creatorId],
-          orderBy: 'published_at DESC, updated DESC');
+  static Future<void> _createCreatorWorkLinks(Database db) async {
+    await db.execute('''CREATE TABLE creator_work_links (
+      creator_id TEXT NOT NULL REFERENCES creator_profiles(id) ON DELETE CASCADE,
+      work_id TEXT NOT NULL REFERENCES creator_works(id) ON DELETE CASCADE,
+      PRIMARY KEY(creator_id, work_id)
+    )''');
+    await db.execute(
+        'CREATE INDEX creator_work_links_work ON creator_work_links(work_id)');
+    await db.execute('''INSERT INTO creator_work_links(creator_id, work_id)
+      SELECT creator_id, id FROM creator_works''');
+  }
+
+  Future<List<LocalRow>> creatorWorks(String creatorId) async {
+    final rows = await db.rawQuery('''
+      SELECT work.* FROM creator_work_links AS link
+      JOIN creator_works AS work ON work.id = link.work_id
+      WHERE link.creator_id = ?
+      ORDER BY work.published_at DESC, work.updated DESC
+    ''', [creatorId]);
+    return [for (final row in rows) {...row, 'creator_id': creatorId}];
+  }
 
   static String _stableCreatorId(String channel, String sourceId) =>
       '$channel:${sha256.convert(utf8.encode('$channel:$sourceId'))}';
@@ -341,15 +359,24 @@ class LocalWorkspaceStore {
             where: 'id = ?',
             whereArgs: [workId],
             limit: 1);
-        if (old.isNotEmpty && old.single['creator_id'] != creatorId) {
-          throw StateError('该作品已归档到另一位博主');
-        }
-        if (old.isEmpty) added++;
         final title = '${work['title'] ?? ''}';
         final oldMetadata = old.isEmpty
             ? <String, dynamic>{}
             : jsonDecode(old.single['metadata'] as String)
                 as Map<String, dynamic>;
+        final publisherId = work['publisher_account_id'] as String?;
+        final knownPublisherId = oldMetadata['publisher_account_id'] as String?;
+        final owner = old.firstOrNull?['creator_id'] as String? ?? creatorId;
+        final verifiedContributor = work['coauthored'] == true ||
+            publisherId == sourceAccountId ||
+            knownPublisherId == sourceAccountId;
+        final publisherChanged = knownPublisherId != null &&
+            publisherId != null &&
+            publisherId.isNotEmpty &&
+            knownPublisherId != publisherId;
+        if (owner != creatorId && (!verifiedContributor || publisherChanged)) {
+          throw StateError('该作品已归档到另一位博主');
+        }
         final body = (work['article_body'] as String?)?.trim() ??
             oldMetadata['article_body'] as String? ??
             '';
@@ -362,40 +389,56 @@ class LocalWorkspaceStore {
                             jsonEncode(images)
                     ? 0
                     : 1);
-        await txn.insert(
-            'creator_works',
-            {
-              'id': workId,
-              'creator_id': creatorId,
-              'channel': channel,
-              'source_work_id': sourceWorkId,
-              'title': title,
-              'cover_url': '${work['cover'] ?? ''}',
-              'source_url':
-                  'https://www.douyin.com/${images.isEmpty && body.isEmpty ? 'video' : 'note'}/$sourceWorkId',
-              'published_at':
-                  ((work['published_at'] as num?)?.toInt() ?? 0) * 1000,
-              'likes': (work['likes'] as num?)?.toInt() ?? 0,
-              'comments': (work['comments'] as num?)?.toInt() ?? 0,
-              'collects': (work['collects'] as num?)?.toInt() ?? 0,
-              'shares': (work['shares'] as num?)?.toInt() ?? 0,
-              'source_version': sourceVersion,
-              'transcript': old.firstOrNull?['transcript'] ?? '',
-              'status': old.firstOrNull?['status'] ?? 'archived',
-              'created': old.isEmpty ? now : old.single['created'],
-              'updated': now,
-              'metadata': jsonEncode({
-                ...oldMetadata,
-                'publisher': work['publisher'] ?? '',
-                'images': images,
-                if (work['duration_ms'] case final int duration
-                    when duration > 0)
-                  'duration_ms': duration,
-                if (body.isNotEmpty || oldMetadata.containsKey('article_body'))
-                  'article_body': body,
-              }),
-            },
-            conflictAlgorithm: ConflictAlgorithm.replace);
+        final row = <String, Object?>{
+          'id': workId,
+          'creator_id': owner,
+          'channel': channel,
+          'source_work_id': sourceWorkId,
+          'title': title,
+          'cover_url': '${work['cover'] ?? ''}',
+          'source_url':
+              'https://www.douyin.com/${images.isEmpty && body.isEmpty ? 'video' : 'note'}/$sourceWorkId',
+          'published_at':
+              ((work['published_at'] as num?)?.toInt() ?? 0) * 1000,
+          'likes': (work['likes'] as num?)?.toInt() ?? 0,
+          'comments': (work['comments'] as num?)?.toInt() ?? 0,
+          'collects': (work['collects'] as num?)?.toInt() ?? 0,
+          'shares': (work['shares'] as num?)?.toInt() ?? 0,
+          'source_version': sourceVersion,
+          'transcript': old.firstOrNull?['transcript'] ?? '',
+          'status': old.firstOrNull?['status'] ?? 'archived',
+          'created': old.isEmpty ? now : old.single['created'],
+          'updated': now,
+          'metadata': jsonEncode({
+            ...oldMetadata,
+            'publisher': work['publisher'] ?? oldMetadata['publisher'] ?? '',
+            if (publisherId != null && publisherId.isNotEmpty)
+              'publisher_account_id': publisherId,
+            'images': images,
+            if (work['duration_ms'] case final int duration
+                when duration > 0)
+              'duration_ms': duration,
+            if (body.isNotEmpty || oldMetadata.containsKey('article_body'))
+              'article_body': body,
+          }),
+        };
+        if (old.isEmpty) {
+          await txn.insert('creator_works', row);
+        } else {
+          await txn.update('creator_works', row,
+              where: 'id = ?', whereArgs: [workId]);
+        }
+        final links = await txn.query('creator_work_links',
+            columns: ['work_id'],
+            where: 'creator_id = ? AND work_id = ?',
+            whereArgs: [creatorId, workId]);
+        if (links.isEmpty) {
+          await txn.insert('creator_work_links', {
+            'creator_id': creatorId,
+            'work_id': workId,
+          });
+          added++;
+        }
       }
     });
     return (creatorId: creatorId, added: added);
@@ -732,14 +775,16 @@ class LocalWorkspaceStore {
 
   Future<String> beginCreatorExpertJob(String creatorId,
       Map<String, Object> model, List<Map<String, Object>> evidence,
-      {bool fromSync = false, LocalRow? creatorIdentity}) async {
+      {bool fromSync = false,
+      LocalRow? creatorIdentity,
+      bool queued = false}) async {
     final id = uuid.v4();
     final now = DateTime.now().millisecondsSinceEpoch;
     await db.insert('creator_jobs', {
       'id': id,
       'kind': 'creator-expert',
-      'status': 'running',
-      'stage': 'extract_review',
+      'status': queued ? 'queued' : 'running',
+      'stage': queued ? 'queued' : 'extract_review',
       'model_snapshot': jsonEncode(model),
       'source_snapshot': jsonEncode(evidence),
       'request_payload': jsonEncode({
@@ -846,6 +891,13 @@ class LocalWorkspaceStore {
           limit: 1))
       .firstOrNull;
 
+  Future<LocalRow?> nextQueuedCreatorExpertJob() async =>
+      (await db.query('creator_jobs',
+              where: "kind = 'creator-expert' AND status = 'queued'",
+              orderBy: 'created, rowid',
+              limit: 1))
+          .firstOrNull;
+
   Future<void> resumeCreatorExpertJob(String id) async {
     final changed = await db.update(
         'creator_jobs',
@@ -855,7 +907,7 @@ class LocalWorkspaceStore {
           'updated': DateTime.now().millisecondsSinceEpoch,
         },
         where:
-            "id = ? AND kind = 'creator-expert' AND status IN ('failed', 'interrupted')",
+            "id = ? AND kind = 'creator-expert' AND status IN ('failed', 'interrupted', 'queued')",
         whereArgs: [id]);
     if (changed != 1) throw StateError('任务状态已经变化，请刷新后重试。');
   }

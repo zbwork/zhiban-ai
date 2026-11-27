@@ -76,6 +76,7 @@ def work_data(work, author_id, allow_coauthored=False):
         "collects": stats.get("collect_count") or 0,
         "shares": stats.get("share_count") or 0,
         "publisher": str(author.get("nickname") or ""),
+        "publisher_account_id": str(author.get("sec_uid") or ""),
         "coauthored": not is_publisher and is_coauthor,
     }
 
